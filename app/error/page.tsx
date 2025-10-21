@@ -94,13 +94,13 @@ export default function ErrorPage() {
         <div className="space-y-3">
           <Link
             href="/"
-            className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+            className="block w-full bg-primary hover:bg-primary/90 text-white font-semibold py-3 px-6 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl"
           >
             Volver al Inicio
           </Link>
           <Link
             href="/admin/login"
-            className="block w-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+            className="block w-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-midnight_text dark:text-white font-semibold py-3 px-6 rounded-full transition-all duration-300"
           >
             Intentar Iniciar Sesión Nuevamente
           </Link>

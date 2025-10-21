@@ -53,4 +53,5 @@ export interface FormProps {
   initialValues?: Record<string, unknown>; // For editing existing data
   requireCaptcha?: boolean;
   onFieldChange?: (fieldName: string, value: unknown) => void; // Callback when field value changes
+  isSubmitting?: boolean; // Indicates if form is being submitted
 }

@@ -50,12 +50,12 @@ export async function GET(request: NextRequest, { params }: Params) {
         cedulas: [cedula],
       };
 
-      const apiRes = await fetch(process.env.NEXT_PUBLIC_CEDULA_API_URL!, {
+      const apiRes = await fetch(process.env.CEDULA_API_URL!, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tool-name": process.env.NEXT_PUBLIC_CEDULA_API_TOOL!,
-          "x-api-key": process.env.NEXT_PUBLIC_CEDULA_API_KEY!,
+          "x-tool-name": process.env.CEDULA_API_TOOL!,
+          "x-api-key": process.env.CEDULA_API_KEY!,
         },
         body: JSON.stringify(body),
       });

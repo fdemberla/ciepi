@@ -76,6 +76,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
   siteKey,
   initialValues = {},
   onFieldChange,
+  isSubmitting = false,
 }) => {
   const resolvedSiteKey = siteKey || getDefaultSiteKey();
   const [formData, setFormData] =
@@ -200,9 +201,9 @@ const Form: React.FC<FormWithCaptchaProps> = ({
         rendered.push(
           <div
             key={parentKey + section.name}
-            className={`${section.className || ""} mb-6`}
+            className={`${section.className || ""} mb-8`}
           >
-            <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-2">
+            <h3 className="mb-6 text-xl font-semibold text-midnight_text dark:text-white border-b border-black/20 dark:border-gray-700 pb-3">
               {section.label}
             </h3>
             <div className="grid gap-4 sm:grid-cols-2 sm:gap-6">
@@ -229,13 +230,13 @@ const Form: React.FC<FormWithCaptchaProps> = ({
           rendered.push(
             <div
               key={parentKey + "row-" + rowNum + "-" + i}
-              className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+              className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-[22px]"
             >
               {rowFields.map((rf) => (
                 <div key={rf.name} className={`${rf.width || ""}`}>
                   <label
                     htmlFor={rf.name}
-                    className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+                    className="block mb-2 text-base font-medium text-midnight_text dark:text-white"
                   >
                     {rf.label}
                     {rf.required && (
@@ -256,10 +257,10 @@ const Form: React.FC<FormWithCaptchaProps> = ({
         } else {
           // Render single field in its own row
           rendered.push(
-            <div key={parentKey + f.name} className="sm:col-span-2">
+            <div key={parentKey + f.name} className="sm:col-span-2 mb-[22px]">
               <label
                 htmlFor={f.name}
-                className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+                className="block mb-2 text-base font-medium text-midnight_text dark:text-white"
               >
                 {f.label}
                 {f.required && <span className="text-red-500 ml-1">*</span>}
@@ -291,7 +292,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
             id={f.name}
             name={f.name}
             type={f.type}
-            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
+            className="w-full rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
             value={formData[f.name] || ""}
             onChange={(e) => handleChange(f.name, e.target.value)}
             required={f.required}
@@ -311,7 +312,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
           <textarea
             id={f.name}
             name={f.name}
-            className="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
+            className="w-full rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
             value={formData[f.name] || ""}
             onChange={(e) => handleChange(f.name, e.target.value)}
             required={f.required}
@@ -338,13 +339,13 @@ const Form: React.FC<FormWithCaptchaProps> = ({
               id={f.name}
               name={f.name}
               type="date"
-              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block w-full pl-10 p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
+              className="w-full rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 pl-10 pr-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
               value={formData[f.name] || ""}
               onChange={(e) => handleChange(f.name, e.target.value)}
               required={f.required}
               disabled={f.disabled}
             />
-            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500">
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-dark_grey dark:text-gray-400">
               <svg
                 className="w-4 h-4"
                 fill="none"
@@ -382,7 +383,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
           <select
             id={f.name}
             name={f.name}
-            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
+            className="w-full rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
             value={formData[f.name] || ""}
             onChange={(e) => handleChange(f.name, e.target.value)}
             required={f.required}
@@ -400,7 +401,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
       case "file":
         return (
           <div
-            className="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg py-8 px-4 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 cursor-pointer transition-all hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[120px] sm:min-h-[140px]"
+            className="w-full flex flex-col items-center justify-center border-2 border-dashed border-black/20 dark:border-gray-600 rounded-md py-8 px-4 bg-white dark:bg-gray-800 text-dark_grey dark:text-gray-300 cursor-pointer transition-all hover:border-[#1A21BC] hover:bg-primary/5 dark:hover:bg-primary/10 focus:outline-none focus:border-[#1A21BC] min-h-[120px] sm:min-h-[140px]"
             onClick={() =>
               document.getElementById(`file-input-${f.name}`)?.click()
             }
@@ -428,7 +429,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
             />
             <div className="flex flex-col items-center pointer-events-none select-none text-center">
               <svg
-                className="w-8 h-8 sm:w-10 sm:h-10 mb-3 text-gray-400 dark:text-gray-500"
+                className="w-8 h-8 sm:w-10 sm:h-10 mb-3 text-dark_grey dark:text-gray-400"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.5"
@@ -441,13 +442,13 @@ const Form: React.FC<FormWithCaptchaProps> = ({
                   d="M12 16V4m0 0l-4 4m4-4l4 4M20.25 16.5v2.25A2.25 2.25 0 0118 21H6a2.25 2.25 0 01-2.25-2.25V16.5"
                 />
               </svg>
-              <span className="text-sm sm:text-base px-2">
+              <span className="text-sm sm:text-base px-2 text-midnight_text dark:text-white">
                 {f.dropzoneText ||
                   "Arrastra y suelta archivos aquí o toca para seleccionar"}
               </span>
             </div>
             {formData[f.name] && formData[f.name].length > 0 && (
-              <div className="mt-3 text-xs sm:text-sm text-gray-700 dark:text-gray-300 w-full text-center px-2">
+              <div className="mt-3 text-xs sm:text-sm text-midnight_text dark:text-white w-full text-center px-2">
                 {formData[f.name].map((file: File) => file.name).join(", ")}
               </div>
             )}
@@ -460,37 +461,68 @@ const Form: React.FC<FormWithCaptchaProps> = ({
   }
 
   return (
-    <section className="bg-white dark:bg-gray-900 min-h-screen">
-      <div className="max-w-2xl px-4 py-8 mx-auto lg:py-16">
-        <div className="bg-white dark:bg-gray-900">
+    <section className="bg-slateGray dark:bg-gray-900 min-h-screen">
+      <div className="max-w-2xl px-4 py-2 mx-auto lg:py-6">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 sm:p-8 lg:p-10">
           {title && (
-            <h2 className="mb-4 text-xl font-bold text-gray-900 dark:text-white">
+            <h2 className="mb-6 text-2xl font-bold text-midnight_text dark:text-white">
               {title}
             </h2>
           )}
           <form className={`${className}`} onSubmit={handleSubmit}>
-            <div className="grid gap-4 mb-4 sm:gap-6 sm:mb-5">
-              {renderFields(fields)}
-            </div>
+            <div className="mb-4">{renderFields(fields)}</div>
             {captchaError && (
-              <div className="text-red-500 text-center text-sm mb-4">
+              <div className="text-red-500 dark:text-red-400 text-center text-base mb-6">
                 {captchaError}
               </div>
             )}
-            <div className="flex items-center space-x-4">
+            <div className="mb-9">
               <button
                 type="submit"
-                className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800"
+                disabled={isSubmitting}
+                className={`flex w-full items-center text-lg font-medium justify-center rounded-md px-5 py-3 text-white transition duration-300 ease-in-out border-[#1A21BC] border ${
+                  isSubmitting
+                    ? "bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-70"
+                    : "bg-primary hover:bg-primary/90"
+                }`}
               >
-                {submitLabel}
+                {isSubmitting ? (
+                  <>
+                    <svg
+                      className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Procesando...
+                  </>
+                ) : (
+                  submitLabel
+                )}
               </button>
+            </div>
+            <div className="flex justify-center">
               <button
                 type="button"
-                className="text-gray-600 inline-flex items-center hover:text-white border border-gray-600 hover:bg-gray-600 focus:ring-4 focus:outline-none focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:border-gray-500 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-900"
+                className="text-midnight_text dark:text-white inline-flex items-center hover:text-primary dark:hover:text-primary border border-black/20 dark:border-gray-600 hover:border-[#1A21BC] focus:outline-none font-medium rounded-md text-base px-5 py-3 text-center transition duration-300"
                 onClick={() => window.history.back()}
               >
                 <svg
-                  className="w-5 h-5 mr-1 -ml-1"
+                  className="w-5 h-5 mr-2"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="1.5"

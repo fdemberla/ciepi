@@ -13,10 +13,10 @@ export function getSmtpTransporter(): Transporter {
     return transporter;
   }
 
-  const smtpServer = process.env.NEXT_PUBLIC_SMTP_SERVER;
-  const smtpPort = process.env.NEXT_PUBLIC_SMTP_PORT;
-  const smtpUser = process.env.NEXT_PUBLIC_SMTP_USER;
-  const smtpPass = process.env.NEXT_PUBLIC_SMTP_PASS;
+  const smtpServer = process.env.SMTP_SERVER;
+  const smtpPort = process.env.SMTP_PORT;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
 
   if (!smtpServer || !smtpPort || !smtpUser || !smtpPass) {
     throw new Error("Faltan configuraciones SMTP en las variables de entorno");

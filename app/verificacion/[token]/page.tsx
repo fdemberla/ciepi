@@ -21,6 +21,10 @@ interface VerificationResult {
     tipo: string;
     inscripcion_id?: number;
     estado_inscripcion?: number;
+    capacitacion?: {
+      nombre: string;
+      fecha_inicio_capacitacion: string;
+    };
   };
 }
 
@@ -36,6 +40,10 @@ export default function VerificarCorreoPage() {
   const [estudianteData, setEstudianteData] = useState<EstudianteData | null>(
     null
   );
+  const [capacitacionData, setCapacitacionData] = useState<{
+    nombre: string;
+    fecha_inicio_capacitacion: string;
+  } | null>(null);
 
   useEffect(() => {
     const verificarToken = async () => {
@@ -58,12 +66,10 @@ export default function VerificarCorreoPage() {
           if (data.data?.estudiante) {
             setEstudianteData(data.data.estudiante);
           }
-          toast.success("¡Correo verificado exitosamente!");
-
-          // Redirigir después de 3 segundos
-          setTimeout(() => {
-            router.push("/capacitaciones");
-          }, 3000);
+          if (data.data?.capacitacion) {
+            setCapacitacionData(data.data.capacitacion);
+          }
+          toast.success("¡Correo verificado e inscripción confirmada!");
         } else {
           // Manejar diferentes tipos de error
           if (data.code === "TOKEN_EXPIRED") {
@@ -120,9 +126,9 @@ export default function VerificarCorreoPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8 border border-slate-200 dark:border-slate-700">
+    <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center p-4">
+      <div className="max-w-3xl w-full">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-700">
           {/* Loading State */}
           {estado === "loading" && (
             <div className="text-center">
@@ -139,9 +145,129 @@ export default function VerificarCorreoPage() {
           {/* Success State */}
           {estado === "success" && (
             <div className="text-center">
-              <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-6">
+              {/* Success Icon */}
+              <div className="mx-auto w-20 h-20 bg-gradient-to-br from-success/20 to-success/10 dark:from-success/30 dark:to-success/20 rounded-full flex items-center justify-center mb-6 shadow-lg">
                 <svg
-                  className="w-10 h-10 text-green-600 dark:text-green-400"
+                  className="w-12 h-12 text-success"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2.5}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+
+              {/* Main Heading */}
+              <h1 className="text-3xl sm:text-4xl font-bold text-success mb-3">
+                ¡Inscripción Confirmada!
+              </h1>
+
+              <p className="text-lg text-midnight_text dark:text-white mb-8">
+                Tu correo ha sido verificado exitosamente
+              </p>
+
+              {/* Student Info Card */}
+              {estudianteData && (
+                <div className="bg-slateGray dark:bg-gray-700 rounded-2xl p-6 mb-6 border-2 border-success/30">
+                  <div className="flex items-center justify-center gap-3 mb-4">
+                    <svg
+                      className="w-6 h-6 text-success"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
+                    </svg>
+                    <h3 className="text-xl font-bold text-midnight_text dark:text-white">
+                      Información del Participante
+                    </h3>
+                  </div>
+                  <div className="space-y-3 text-left">
+                    <div className="flex items-start gap-2">
+                      <span className="font-semibold text-midnight_text dark:text-white min-w-[80px]">
+                        Nombre:
+                      </span>
+                      <span className="text-midnight_text dark:text-gray-300">
+                        {estudianteData.nombres} {estudianteData.apellidos}
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="font-semibold text-midnight_text dark:text-white min-w-[80px]">
+                        Correo:
+                      </span>
+                      <span className="text-midnight_text dark:text-gray-300 break-all">
+                        {estudianteData.correo}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Capacitacion Info Card */}
+              {capacitacionData && (
+                <div className="bg-gradient-to-br from-primary/10 to-secondary/10 dark:from-primary/20 dark:to-secondary/20 rounded-2xl p-6 mb-8 border-2 border-primary/30 dark:border-primary/40">
+                  <div className="flex items-center justify-center gap-3 mb-4">
+                    <svg
+                      className="w-6 h-6 text-primary"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                      />
+                    </svg>
+                    <h3 className="text-xl font-bold text-primary dark:text-primary/90">
+                      Capacitación Inscrita
+                    </h3>
+                  </div>
+                  <div className="space-y-3 text-left">
+                    <div className="flex items-start gap-2">
+                      <span className="font-semibold text-midnight_text dark:text-white min-w-[100px]">
+                        Curso:
+                      </span>
+                      <span className="text-midnight_text dark:text-gray-300 font-medium">
+                        {capacitacionData.nombre}
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="font-semibold text-midnight_text dark:text-white min-w-[100px]">
+                        Fecha Inicio:
+                      </span>
+                      <span className="text-midnight_text dark:text-gray-300">
+                        {new Date(
+                          capacitacionData.fecha_inicio_capacitacion
+                        ).toLocaleDateString("es-ES", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Button */}
+              <button
+                onClick={() => router.push("/")}
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-primary hover:bg-primary/90 text-white font-semibold text-lg rounded-full transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
+                <svg
+                  className="w-5 h-5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -150,30 +276,11 @@ export default function VerificarCorreoPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M5 13l4 4L19 7"
+                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
                   />
                 </svg>
-              </div>
-              <h1 className="text-3xl font-bold text-green-600 dark:text-green-400 mb-4">
-                ¡Verificación Exitosa!
-              </h1>
-              <p className="text-lg text-slate-700 dark:text-slate-300 mb-6">
-                {mensaje}
-              </p>
-              {estudianteData && (
-                <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-6 mb-6 border border-green-200 dark:border-green-800">
-                  <p className="text-slate-700 dark:text-slate-300">
-                    <strong>Nombre:</strong> {estudianteData.nombres}{" "}
-                    {estudianteData.apellidos}
-                  </p>
-                  <p className="text-slate-700 dark:text-slate-300 mt-2">
-                    <strong>Correo:</strong> {estudianteData.correo}
-                  </p>
-                </div>
-              )}
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Serás redirigido automáticamente...
-              </p>
+                Volver a Página Principal
+              </button>
             </div>
           )}
 
@@ -299,8 +406,8 @@ export default function VerificarCorreoPage() {
 
         {/* Footer Info */}
         <div className="mt-6 text-center">
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Centro de Innovación y Emprendimiento (CIEPI) - INADEH
+          <p className="text-sm text-dark_grey dark:text-gray-400">
+            Centro de Innovación y Emprendimiento Productivo (CIEPI) - INADEH
           </p>
         </div>
       </div>

@@ -9,7 +9,7 @@ export async function GET() {
       SELECT 
         id as value,
         nombre as label
-      FROM ciepi.tipos_consultas
+      FROM ciepi.tipos_consulta
       WHERE activo = true
     `,
       []

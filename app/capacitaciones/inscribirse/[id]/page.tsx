@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { Icon } from "@iconify/react";
 import Form from "@/components/Form";
 import type { FormFieldOrSection } from "@/components/Form.types";
 
@@ -58,7 +59,6 @@ export default function InscribirsePage() {
     number | null
   >(null);
   const [formKey, setFormKey] = useState(0); // Para forzar re-render del Form
-  const [canEditFields, setCanEditFields] = useState(false);
   const [birthDateConfirmed, setBirthDateConfirmed] = useState(false);
   const [birthDateInput, setBirthDateInput] = useState("");
   const [showBirthDateConfirmation, setShowBirthDateConfirmation] =
@@ -68,6 +68,7 @@ export default function InscribirsePage() {
   >({});
   const [emailError, setEmailError] = useState<string | null>(null);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchCapacitacion();
@@ -302,11 +303,10 @@ export default function InscribirsePage() {
     // Compare birth dates
     if (formattedDate === estudianteData.fecha_nacimiento) {
       setBirthDateConfirmed(true);
-      setCanEditFields(true);
       setShowBirthDateConfirmation(false);
       setStep("form");
       toast.success(
-        "Fecha de nacimiento confirmada. Puede editar sus datos si es necesario."
+        "Fecha de nacimiento confirmada. Puede continuar con la inscripción."
       );
     } else {
       toast.error("La fecha de nacimiento no coincide con nuestros registros");
@@ -349,12 +349,19 @@ export default function InscribirsePage() {
   };
 
   const handleSubmit = async (formData: Record<string, unknown>) => {
+    // Prevenir múltiples envíos
+    if (isSubmitting) {
+      return;
+    }
+
     try {
       // Validate birth date for existing students
       if (isExistingStudent && !birthDateConfirmed) {
         toast.error("Debe confirmar su fecha de nacimiento para continuar");
         return;
       }
+
+      setIsSubmitting(true);
 
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
@@ -399,6 +406,12 @@ export default function InscribirsePage() {
 
       const result = await response.json();
 
+      console.log("📝 Respuesta del API:", {
+        status: response.status,
+        ok: response.ok,
+        result: result,
+      });
+
       if (!response.ok) {
         // Manejar errores específicos de duplicación
         if (response.status === 409) {
@@ -417,15 +430,22 @@ export default function InscribirsePage() {
 
       // Verificar si requiere verificación de correo
       if (result.verification_required) {
+        console.log("✉️ Requiere verificación, token:", result.token);
         toast.success(
-          "Correo de verificación enviado. Por favor revisa tu email."
+          "Correo de verificación enviado. Por favor revisa tu email.",
+          { duration: 5000 }
         );
         // Redirigir a página de espera con el token
         setTimeout(() => {
+          console.log(
+            "🔄 Redirigiendo a:",
+            `/verificacion/esperando/${result.token}`
+          );
           router.push(`/verificacion/esperando/${result.token}`);
         }, 1500);
       } else {
         // Inscripción completada inmediatamente (correo ya verificado)
+        console.log("✅ Inscripción completada sin verificación");
         toast.success("¡Inscripción exitosa!");
         setTimeout(() => {
           router.push("/capacitaciones");
@@ -436,73 +456,100 @@ export default function InscribirsePage() {
       toast.error(
         error instanceof Error ? error.message : "Error al inscribirse"
       );
+      setIsSubmitting(false); // Reactivar el botón en caso de error
     }
   };
 
   // Formulario de cédula
   if (step === "cedula") {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4">
-        <div className="max-w-md mx-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+      <section className="min-h-screen bg-slateGray dark:bg-gray-900 py-20 px-4">
+        <div className="max-w-lg mx-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-10">
+            {/* Badge */}
+            <div className="flex gap-2 items-center justify-center mb-6">
+              <Icon
+                icon="solar:verified-check-bold"
+                className="text-success text-2xl"
+              />
+              <p className="text-success text-base font-semibold">
+                Verificación Segura
+              </p>
+            </div>
+
+            <h1 className="text-3xl font-bold text-midnight_text dark:text-white mb-3 text-center">
               Inscripción a Capacitación
             </h1>
             {capacitacion && (
-              <p className="text-gray-600 dark:text-gray-300 mb-6">
+              <p className="text-dark_grey dark:text-gray-300 text-center mb-8 text-lg">
                 {capacitacion.nombre}
               </p>
             )}
 
             <form onSubmit={handleVerificarCedula}>
-              <div className="mb-6">
+              <div className="mb-8">
                 <label
                   htmlFor="cedula"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  className="block text-sm font-semibold text-midnight_text dark:text-white mb-3"
                 >
                   Número de Cédula
                 </label>
-                <input
-                  type="text"
-                  id="cedula"
-                  value={cedula}
-                  onChange={(e) => setCedula(e.target.value)}
-                  placeholder="Ej: 8-123-456"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  required
-                />
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Icon
+                      icon="solar:card-linear"
+                      className="text-dark_grey dark:text-gray-400 w-6 h-6"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    id="cedula"
+                    value={cedula}
+                    onChange={(e) => setCedula(e.target.value)}
+                    placeholder="Ej: 8-123-456"
+                    className="w-full pl-14 pr-4 py-4 border-2 border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-[#1A21BC]/20 focus:border-[#1A21BC] transition-all text-midnight_text dark:text-white bg-white dark:bg-gray-700 font-medium text-lg shadow-lg placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                    style={{ boxShadow: "0 4px 15px rgba(0, 0, 0, 0.08)" }}
+                    required
+                  />
+                </div>
+                <p className="mt-3 text-sm text-dark_grey dark:text-gray-300 flex items-center gap-2">
+                  <Icon icon="solar:info-circle-linear" className="w-4 h-4" />
                   Ingrese su cédula para verificar su información
                 </p>
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+                className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-5 px-6 rounded-full transition-all duration-300 shadow-xl hover:shadow-2xl text-lg mb-4"
               >
                 Verificar Cédula
+                <Icon
+                  icon="solar:arrow-right-linear"
+                  className="w-6 h-6 inline-block ml-2"
+                />
+              </button>
+
+              <button
+                onClick={() => router.push("/capacitaciones")}
+                type="button"
+                className="w-full bg-slateGray dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-midnight_text dark:text-white font-semibold py-5 px-6 rounded-full transition-all duration-300"
+              >
+                Cancelar
               </button>
             </form>
-
-            <button
-              onClick={() => router.push("/capacitaciones")}
-              className="w-full mt-4 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-3 px-6 rounded-lg transition-colors"
-            >
-              Cancelar
-            </button>
           </div>
         </div>
-      </div>
+      </section>
     );
   }
 
   // Loading
   if (step === "loading") {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-300">
+          <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-[#1A21BC]/20 border-t-[#1A21BC]"></div>
+          <p className="mt-6 text-midnight_text dark:text-white text-lg font-medium">
             Verificando cédula...
           </p>
         </div>
@@ -513,62 +560,83 @@ export default function InscribirsePage() {
   // Birth date confirmation for existing students
   if (showBirthDateConfirmation) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4">
-        <div className="max-w-md mx-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+      <section className="min-h-screen bg-slateGray dark:bg-gray-900 py-20 px-4">
+        <div className="max-w-lg mx-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-10">
+            {/* Badge */}
+            <div className="flex gap-2 items-center justify-center mb-6">
+              <Icon
+                icon="solar:shield-check-linear"
+                className="text-primary text-2xl"
+              />
+              <p className="text-primary text-base font-semibold">
+                Confirmación de Identidad
+              </p>
+            </div>
+
+            <h1 className="text-3xl font-bold text-midnight_text dark:text-white mb-3 text-center">
               Confirmar Identidad
             </h1>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
+            <p className="text-dark_grey dark:text-gray-300 text-center mb-8">
               Para editar sus datos, por favor confirme su fecha de nacimiento
             </p>
 
             <form onSubmit={handleBirthDateConfirmation}>
-              <div className="mb-6">
+              <div className="mb-8">
                 <label
                   htmlFor="birthDate"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  className="block text-sm font-semibold text-midnight_text dark:text-white mb-3"
                 >
                   Fecha de Nacimiento
                 </label>
-                <input
-                  type="text"
-                  id="birthDate"
-                  value={birthDateInput}
-                  onChange={(e) => {
-                    let value = e.target.value.replace(/[^\d]/g, ""); // Solo números
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Icon
+                      icon="solar:calendar-linear"
+                      className="text-dark_grey dark:text-gray-400 w-6 h-6"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    id="birthDate"
+                    value={birthDateInput}
+                    onChange={(e) => {
+                      let value = e.target.value.replace(/[^\d]/g, ""); // Solo números
 
-                    // Auto-formatear con barras mientras escribe
-                    if (value.length >= 2) {
-                      value = value.slice(0, 2) + "/" + value.slice(2);
-                    }
-                    if (value.length >= 5) {
-                      value = value.slice(0, 5) + "/" + value.slice(5);
-                    }
+                      // Auto-formatear con barras mientras escribe
+                      if (value.length >= 2) {
+                        value = value.slice(0, 2) + "/" + value.slice(2);
+                      }
+                      if (value.length >= 5) {
+                        value = value.slice(0, 5) + "/" + value.slice(5);
+                      }
 
-                    // Limitar a 10 caracteres (DD/MM/YYYY)
-                    if (value.length <= 10) {
-                      setBirthDateInput(value);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    // Permitir borrar las barras con Backspace
-                    if (
-                      e.key === "Backspace" &&
-                      (birthDateInput.endsWith("/") ||
-                        birthDateInput.length === 3 ||
-                        birthDateInput.length === 6)
-                    ) {
-                      e.preventDefault();
-                      setBirthDateInput(birthDateInput.slice(0, -1));
-                    }
-                  }}
-                  placeholder="DD/MM/YYYY (ej: 15/03/1990)"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  required
-                  maxLength={10}
-                />
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                      // Limitar a 10 caracteres (DD/MM/YYYY)
+                      if (value.length <= 10) {
+                        setBirthDateInput(value);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      // Permitir borrar las barras con Backspace
+                      if (
+                        e.key === "Backspace" &&
+                        (birthDateInput.endsWith("/") ||
+                          birthDateInput.length === 3 ||
+                          birthDateInput.length === 6)
+                      ) {
+                        e.preventDefault();
+                        setBirthDateInput(birthDateInput.slice(0, -1));
+                      }
+                    }}
+                    placeholder="DD/MM/YYYY (ej: 15/03/1990)"
+                    className="w-full pl-14 pr-4 py-4 border-2 border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-[#1A21BC]/20 focus:border-[#1A21BC] transition-all text-midnight_text dark:text-white bg-white dark:bg-gray-700 font-medium text-lg shadow-lg placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                    style={{ boxShadow: "0 4px 15px rgba(0, 0, 0, 0.08)" }}
+                    required
+                    maxLength={10}
+                  />
+                </div>
+                <p className="mt-3 text-sm text-dark_grey dark:text-gray-300 flex items-center gap-2">
+                  <Icon icon="solar:info-circle-linear" className="w-4 h-4" />
                   Ingrese su fecha de nacimiento en formato DD/MM/YYYY para
                   verificar su identidad
                 </p>
@@ -576,25 +644,30 @@ export default function InscribirsePage() {
 
               <button
                 type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
+                className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-5 px-6 rounded-full transition-all duration-300 shadow-xl hover:shadow-2xl text-lg mb-4"
               >
                 Confirmar
+                <Icon
+                  icon="solar:check-circle-linear"
+                  className="w-6 h-6 inline-block ml-2"
+                />
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowBirthDateConfirmation(false);
+                  setStep("cedula");
+                  setBirthDateInput("");
+                }}
+                type="button"
+                className="w-full bg-slateGray dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-midnight_text dark:text-white font-semibold py-5 px-6 rounded-full transition-all duration-300"
+              >
+                Volver
               </button>
             </form>
-
-            <button
-              onClick={() => {
-                setShowBirthDateConfirmation(false);
-                setStep("cedula");
-                setBirthDateInput("");
-              }}
-              className="w-full mt-4 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-3 px-6 rounded-lg transition-colors"
-            >
-              Volver
-            </button>
           </div>
         </div>
-      </div>
+      </section>
     );
   }
 
@@ -660,14 +733,14 @@ export default function InscribirsePage() {
           label: "Nombres",
           type: "text",
           required: true,
-          disabled: !canEditFields, // Editable si se confirmó la fecha de nacimiento
+          disabled: true, // Bloqueado - viene del API
         },
         {
           name: "apellidos",
           label: "Apellidos",
           type: "text",
           required: true,
-          disabled: !canEditFields, // Editable si se confirmó la fecha de nacimiento
+          disabled: true, // Bloqueado - viene del API
         },
         {
           name: "nombre_cedula",
@@ -734,64 +807,46 @@ export default function InscribirsePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
-      {isExistingStudent && canEditFields && (
-        <div className="max-w-2xl mx-auto px-4 mb-4">
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg
-                className="w-5 h-5 text-blue-600 dark:text-blue-400 mr-2"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <p className="text-blue-800 dark:text-blue-200 text-sm">
-                Puede editar sus nombres y apellidos si es necesario. Los demás
-                datos personales se mantienen según el sistema nacional.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+    <section className="min-h-screen bg-slateGray dark:bg-gray-900 py-20">
+      {/* Mensaje de error de correo */}
       {emailError && (
-        <div className="max-w-2xl mx-auto px-4 mb-4">
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg
-                className="w-5 h-5 text-red-600 dark:text-red-400 mr-2"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                  clipRule="evenodd"
+        <div className="max-w-4xl mx-auto px-4 mb-6">
+          <div className="bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border-2 border-red-200 dark:border-red-700 rounded-2xl p-6 shadow-lg">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-full bg-red-500 dark:bg-red-600 flex items-center justify-center flex-shrink-0">
+                <Icon
+                  icon="solar:danger-circle-linear"
+                  className="w-6 h-6 text-white"
                 />
-              </svg>
-              <p className="text-red-800 dark:text-red-200 text-sm font-medium">
-                {emailError}
-              </p>
+              </div>
+              <div>
+                <h3 className="text-red-900 dark:text-red-300 font-bold text-lg mb-1">
+                  Error de Validación
+                </h3>
+                <p className="text-red-800 dark:text-red-400 font-medium">
+                  {emailError}
+                </p>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Mensaje de verificación de correo */}
       {isCheckingEmail && (
-        <div className="max-w-2xl mx-auto px-4 mb-4">
-          <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 dark:border-gray-400 mr-2"></div>
-              <p className="text-gray-700 dark:text-gray-300 text-sm">
+        <div className="max-w-4xl mx-auto px-4 mb-6">
+          <div className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-lg">
+            <div className="flex items-center gap-4">
+              <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#1A21BC]/20 border-t-[#1A21BC]"></div>
+              <p className="text-midnight_text dark:text-white font-medium">
                 Verificando disponibilidad del correo...
               </p>
             </div>
           </div>
         </div>
       )}
+
+      {/* Formulario */}
       <Form
         key={formKey}
         title={`Inscripción: ${capacitacion?.nombre || "Cargando..."}`}
@@ -799,6 +854,7 @@ export default function InscribirsePage() {
         onSubmit={handleSubmit}
         submitLabel="Completar Inscripción"
         initialValues={getInitialValues()}
+        isSubmitting={isSubmitting}
         onFieldChange={(fieldName, value) => {
           // Track all form data changes to preserve inputs during re-renders
           setCurrentFormData((prev) => ({
@@ -840,6 +896,6 @@ export default function InscribirsePage() {
           }
         }}
       />
-    </div>
+    </section>
   );
 }

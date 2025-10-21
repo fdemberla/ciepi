@@ -3,13 +3,25 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --primary: #004a98;
+  --secondary: #ed7625;
+  --success: #44a147;
+  --slate-gray: #f8fafc;
+  --midnight-text: #1e293b;
+  --dark-grey: #3f3f3f;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-success: var(--success);
+  --color-slateGray: var(--slate-gray);
+  --color-midnight_text: var(--midnight-text);
+  --color-dark_grey: var(--dark-grey);
+  --font-sans: var(--font-roboto-condensed);
+  --shadow-input-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,8 +31,16 @@
   }
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-roboto-condensed), Arial, Helvetica, sans-serif;
+}
+
+section {
+  @apply py-20;
 }

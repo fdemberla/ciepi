@@ -297,30 +297,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Si el correo ya está verificado, completar inscripción inmediatamente
-    if (correoVerificado) {
-      const inscripcionResult = await query(
-        `INSERT INTO ciepi.inscripciones (
-          id_usuario, id_capacitacion, estado_inscripcion
-        ) VALUES ($1, $2, 1)
-        RETURNING id, id_usuario, id_capacitacion, estado_inscripcion, fecha_inscripcion`,
-        [estudianteId, capacitacion_id]
-      );
-
-      return NextResponse.json(
-        {
-          success: true,
-          message: "Inscripción completada exitosamente",
-          verification_required: false,
-          data: {
-            inscripcion: inscripcionResult.rows[0],
-            estudiante_id: estudianteId,
-          },
-        },
-        { status: 201 }
-      );
-    }
-
     // Si el correo NO está verificado, enviar correo de verificación
     // Invalidar tokens anteriores del mismo tipo
     await invalidatePreviousTokens(estudianteId, "inscripcion");

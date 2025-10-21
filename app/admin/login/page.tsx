@@ -44,12 +44,12 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-blue-100">
+          <div className="mx-auto h-16 w-16 flex items-center justify-center rounded-full bg-gradient-to-br from-primary to-blue-700 shadow-lg">
             <svg
-              className="h-6 w-6 text-blue-600"
+              className="h-8 w-8 text-white"
               fill="none"
               stroke="currentColor"
               strokeWidth="1.5"
@@ -63,28 +63,28 @@ const AdminLogin = () => {
               />
             </svg>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-midnight_text dark:text-white">
             Portal de Administración
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-base text-dark_grey dark:text-gray-400">
             Autenticación con Microsoft
           </p>
         </div>
 
-        <div className="mt-8 space-y-6">
+        <div className="mt-8 space-y-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
           <div className="text-center">
-            <p className="text-sm text-gray-600 mb-6">
+            <p className="text-base text-dark_grey dark:text-gray-300 mb-6">
               Para acceder al portal de administración, inicie sesión con su
               cuenta de Microsoft.
             </p>
           </div>
 
           {error && (
-            <div className="rounded-md bg-red-50 p-4">
+            <div className="rounded-md bg-red-50 dark:bg-red-900/20 p-4 border border-red-200 dark:border-red-800">
               <div className="flex">
                 <div className="flex-shrink-0">
                   <svg
-                    className="h-5 w-5 text-red-400"
+                    className="h-5 w-5 text-red-400 dark:text-red-500"
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     aria-hidden="true"
@@ -97,10 +97,12 @@ const AdminLogin = () => {
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
+                  <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
                     Error de autenticación
                   </h3>
-                  <p className="mt-1 text-sm text-red-700">{error}</p>
+                  <p className="mt-1 text-sm text-red-700 dark:text-red-400">
+                    {error}
+                  </p>
                 </div>
               </div>
             </div>
@@ -111,7 +113,7 @@ const AdminLogin = () => {
               type="button"
               onClick={handleSamlLogin}
               disabled={isLoading}
-              className="group relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="group relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-lg font-medium rounded-md text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1A21BC] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
             >
               {isLoading ? (
                 <div className="flex items-center">
@@ -145,10 +147,10 @@ const AdminLogin = () => {
                     viewBox="0 0 23 23"
                     fill="currentColor"
                   >
-                    <path d="M11 11H0V0h11v11z" fill="#f25022" />
-                    <path d="M23 11H12V0h11v11z" fill="#00a4ef" />
-                    <path d="M11 23H0V12h11v11z" fill="#ffb900" />
-                    <path d="M23 23H12V12h11v11z" fill="#737373" />
+                    <path d="M11 11H0V0h11v11z" fill="#FFF" />
+                    <path d="M23 11H12V0h11v11z" fill="#FFF" />
+                    <path d="M11 23H0V12h11v11z" fill="#FFF" />
+                    <path d="M23 23H12V12h11v11z" fill="#FFF" />
                   </svg>
                   Iniciar Sesión con Microsoft
                 </div>
@@ -156,18 +158,18 @@ const AdminLogin = () => {
             </button>
           </div>
 
-          <div className="text-center text-xs text-gray-500 mt-4">
+          <div className="text-center text-sm text-dark_grey dark:text-gray-400 mt-4">
             <p>
               Al continuar, será redirigido a Microsoft para autenticarse de
               forma segura.
             </p>
           </div>
 
-          <div className="text-center">
+          <div className="text-center pt-4 border-t border-black/10 dark:border-white/10">
             <button
               type="button"
               onClick={() => router.push("/")}
-              className="text-sm text-blue-600 hover:text-blue-500 transition-colors"
+              className="text-base text-primary dark:text-blue-400 hover:text-primary/80 dark:hover:text-blue-300 transition-colors font-medium"
             >
               ← Volver al inicio
             </button>

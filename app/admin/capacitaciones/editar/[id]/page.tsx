@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import type { FormFieldOrSection } from "@/components/Form.types";
 import Form from "@/components/Form";
 import toast from "react-hot-toast";
+import AdminProtection from "@/components/AdminProtection";
 
 const fields: FormFieldOrSection[] = [
   {
@@ -283,13 +284,15 @@ const EditarCapacitacionPage = () => {
   }
 
   return (
-    <Form
-      title="Editar Capacitación"
-      fields={fields}
-      onSubmit={handleSubmit}
-      submitLabel="Guardar Cambios"
-      initialValues={initialData}
-    />
+    <AdminProtection>
+      <Form
+        title="Editar Capacitación"
+        fields={fields}
+        onSubmit={handleSubmit}
+        submitLabel="Guardar Cambios"
+        initialValues={initialData}
+      />
+    </AdminProtection>
   );
 };
 

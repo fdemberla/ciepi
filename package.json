@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@iconify/react": "^6.0.2",
+    "@tanstack/react-table": "^8.21.3",
     "next": "15.5.3",
     "next-auth": "^4.24.11",
     "nodemailer": "^6.10.1",

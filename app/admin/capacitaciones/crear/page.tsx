@@ -3,6 +3,7 @@ import React from "react";
 import type { FormFieldOrSection } from "@/components/Form.types";
 import Form from "@/components/Form";
 import toast from "react-hot-toast";
+import AdminProtection from "@/components/AdminProtection";
 
 const fields: FormFieldOrSection[] = [
   {
@@ -164,12 +165,14 @@ const Page = () => {
   };
 
   return (
-    <Form
-      title={"Crear Nueva Capacitación"}
-      fields={fields}
-      onSubmit={handleSubmit}
-      submitLabel="Guardar"
-    />
+    <AdminProtection>
+      <Form
+        title={"Crear Nueva Capacitación"}
+        fields={fields}
+        onSubmit={handleSubmit}
+        submitLabel="Guardar"
+      />
+    </AdminProtection>
   );
 };
 
