@@ -8,9 +8,15 @@ import Form from "@/components/Form";
 const Page = () => {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [tiposConsulta, setTiposConsulta] = useState<Array<{ label: string; value: number }>>([]);
-  const [sedes, setSedes] = useState<Array<{ label: string; value: number }>>([]);
-  const [areas, setAreas] = useState<Array<{ label: string; value: number }>>([]);
+  const [tiposConsulta, setTiposConsulta] = useState<
+    Array<{ label: string; value: number }>
+  >([]);
+  const [sedes, setSedes] = useState<Array<{ label: string; value: number }>>(
+    []
+  );
+  const [areas, setAreas] = useState<Array<{ label: string; value: number }>>(
+    []
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -20,7 +26,7 @@ const Page = () => {
   const fetchOpciones = async () => {
     try {
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-      
+
       const [tiposRes, sedesRes, areasRes] = await Promise.all([
         fetch(`${basePath}/api/admin/tipos-consultas`),
         fetch(`${basePath}/api/sedes`),
@@ -106,21 +112,26 @@ const Page = () => {
           label: "Tipo de consulta",
           type: "select",
           required: false,
-          values: tiposConsulta.length > 0 ? tiposConsulta : [{ label: "Cargando...", value: "" }],
+          values:
+            tiposConsulta.length > 0
+              ? tiposConsulta
+              : [{ label: "Cargando...", value: "" }],
         },
         {
           name: "sede",
           label: "Sede",
           type: "select",
           required: false,
-          values: sedes.length > 0 ? sedes : [{ label: "Cargando...", value: "" }],
+          values:
+            sedes.length > 0 ? sedes : [{ label: "Cargando...", value: "" }],
         },
         {
           name: "areadeformacion",
           label: "Área de formación",
           type: "select",
           required: false,
-          values: areas.length > 0 ? areas : [{ label: "Cargando...", value: "" }],
+          values:
+            areas.length > 0 ? areas : [{ label: "Cargando...", value: "" }],
         },
         {
           name: "CursoInteres",
@@ -160,7 +171,8 @@ const Page = () => {
       const result = await response.json();
 
       toast.success(
-        result.message || "Consulta enviada exitosamente. Nos pondremos en contacto contigo pronto.",
+        result.message ||
+          "Consulta enviada exitosamente. Nos pondremos en contacto contigo pronto.",
         { duration: 5000 }
       );
 

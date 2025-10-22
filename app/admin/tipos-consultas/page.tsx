@@ -106,9 +106,7 @@ export default function TiposConsultaAdminPage() {
       fetchTipos();
     } catch (error) {
       console.error("Error guardando tipo:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Error al guardar"
-      );
+      toast.error(error instanceof Error ? error.message : "Error al guardar");
     } finally {
       setIsSubmitting(false);
     }
@@ -141,9 +139,7 @@ export default function TiposConsultaAdminPage() {
       fetchTipos();
     } catch (error) {
       console.error("Error eliminando tipo:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Error al eliminar"
-      );
+      toast.error(error instanceof Error ? error.message : "Error al eliminar");
     }
   };
 
@@ -276,7 +272,9 @@ export default function TiposConsultaAdminPage() {
               {/* Header */}
               <div className="flex justify-between items-start mb-6">
                 <h2 className="text-2xl font-bold text-midnight_text dark:text-white">
-                  {editingTipo ? "Editar Tipo de Consulta" : "Nuevo Tipo de Consulta"}
+                  {editingTipo
+                    ? "Editar Tipo de Consulta"
+                    : "Nuevo Tipo de Consulta"}
                 </h2>
                 <button
                   onClick={() => setShowModal(false)}

@@ -27,7 +27,9 @@ export default function ConsultasAdminPage() {
   const router = useRouter();
   const [consultas, setConsultas] = useState<Consulta[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedConsulta, setSelectedConsulta] = useState<Consulta | null>(null);
+  const [selectedConsulta, setSelectedConsulta] = useState<Consulta | null>(
+    null
+  );
   const [showModal, setShowModal] = useState(false);
   const [respuesta, setRespuesta] = useState("");
   const [nuevoEstado, setNuevoEstado] = useState("");
@@ -130,9 +132,12 @@ export default function ConsultasAdminPage() {
 
   const getEstadoBadge = (estado: string) => {
     const badges = {
-      pendiente: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-      en_proceso: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-      respondida: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+      pendiente:
+        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+      en_proceso:
+        "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+      respondida:
+        "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
       cerrada: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
     };
 
@@ -144,7 +149,11 @@ export default function ConsultasAdminPage() {
     };
 
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${badges[estado as keyof typeof badges]}`}>
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-semibold ${
+          badges[estado as keyof typeof badges]
+        }`}
+      >
         {labels[estado as keyof typeof labels]}
       </span>
     );
@@ -397,8 +406,11 @@ export default function ConsultasAdminPage() {
                 />
                 {selectedConsulta.fecha_respuesta && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    Respondida por {selectedConsulta.respondido_por_nombre || "Admin"} el{" "}
-                    {new Date(selectedConsulta.fecha_respuesta).toLocaleString("es-PA")}
+                    Respondida por{" "}
+                    {selectedConsulta.respondido_por_nombre || "Admin"} el{" "}
+                    {new Date(selectedConsulta.fecha_respuesta).toLocaleString(
+                      "es-PA"
+                    )}
                   </p>
                 )}
               </div>

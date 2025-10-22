@@ -69,6 +69,18 @@ export const navigationConfig: NavSection[] = [
         },
       },
       {
+        name: "Blog",
+        href: "/blog",
+        icon: "solar:document-text-linear",
+        visible: {
+          public: true,
+          authenticated: true,
+          admin: true,
+          mobile: true,
+          desktop: true,
+        },
+      },
+      {
         name: "Contacto",
         href: "/contacto",
         icon: "solar:letter-linear",
@@ -124,6 +136,16 @@ export const navigationConfig: NavSection[] = [
         name: "Mensajes de Contacto",
         href: "/admin/contacto",
         icon: "solar:letter-linear",
+        visible: {
+          admin: true,
+          mobile: true,
+          desktop: true,
+        },
+      },
+      {
+        name: "Gestión de Blog",
+        href: "/admin/blog",
+        icon: "solar:document-text-linear",
         visible: {
           admin: true,
           mobile: true,

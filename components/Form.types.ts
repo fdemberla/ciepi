@@ -10,6 +10,7 @@ type FormFieldType =
   | "date"
   | "select"
   | "file"
+  | "keywords"
   | "section";
 
 export interface FormFieldConfig {
