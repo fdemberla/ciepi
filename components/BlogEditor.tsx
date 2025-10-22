@@ -4,8 +4,10 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Icon } from "@iconify/react";
 import { Descendant } from "slate";
+import { useSession } from "next-auth/react";
 import SlateEditorField from "@/components/SlateEditorField";
 import type { FormFieldConfig } from "@/components/Form.types";
+import { canEditBlog, getAllowedStatesForRole } from "@/lib/permissions-client";
 
 // Componente de palabras clave
 interface KeywordsInputProps {
@@ -338,6 +340,7 @@ interface BlogEditorProps {
 
 export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedAction, setSelectedAction] = useState<"borrador" | "revision">(
     "borrador"
@@ -349,6 +352,7 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
     localBlog?.estado ?? null
   );
   const [comentarioEstado, setComentarioEstado] = useState("");
+  const userRole = session?.user?.rolId || 0;
 
   // Definir los campos del formulario con layout completo
   const formFields: FormFieldConfig[] = [
@@ -624,35 +628,39 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
                         nombre: "Publicado",
                         descripcion: "Publicado públicamente",
                       },
-                    ].map((estado) => (
-                      <label
-                        key={estado.id}
-                        className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                          selectedEstadoId === estado.id
-                            ? "border-primary bg-primary/5 dark:bg-primary/10"
-                            : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="estado"
-                          value={estado.id}
-                          checked={selectedEstadoId === estado.id}
-                          onChange={() => setSelectedEstadoId(estado.id)}
-                          className="mt-1 text-primary focus:ring-primary"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-midnight_text dark:text-white">
-                              {estado.nombre}
-                            </span>
+                    ]
+                      .filter((estado) =>
+                        getAllowedStatesForRole(userRole).includes(estado.id)
+                      )
+                      .map((estado) => (
+                        <label
+                          key={estado.id}
+                          className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                            selectedEstadoId === estado.id
+                              ? "border-primary bg-primary/5 dark:bg-primary/10"
+                              : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="estado"
+                            value={estado.id}
+                            checked={selectedEstadoId === estado.id}
+                            onChange={() => setSelectedEstadoId(estado.id)}
+                            className="mt-1 text-primary focus:ring-primary"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-midnight_text dark:text-white">
+                                {estado.nombre}
+                              </span>
+                            </div>
+                            <p className="text-sm text-dark_grey dark:text-gray-400 mt-1">
+                              {estado.descripcion}
+                            </p>
                           </div>
-                          <p className="text-sm text-dark_grey dark:text-gray-400 mt-1">
-                            {estado.descripcion}
-                          </p>
-                        </div>
-                      </label>
-                    ))}
+                        </label>
+                      ))}
 
                     <div>
                       <label className="block text-sm font-medium text-midnight_text dark:text-white mb-2">
@@ -822,35 +830,103 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
             </div>
           </div>
         )}
+
+        {/* Validación de permisos de edición */}
+        {mode === "edit" && !canEditBlog(userRole) && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <Icon
+                icon="solar:lock-linear"
+                className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5"
+              />
+              <div>
+                <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1">
+                  Permisos limitados
+                </h3>
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  Tu rol solo permite cambiar el estado del blog, no editarlo.
+                  Para realizar cambios en el contenido, contacta al
+                  administrador.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Formulario personalizado con ancho completo */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
-          <h2 className="mb-8 text-2xl font-bold text-midnight_text dark:text-white">
-            Información del Blog
-          </h2>
-          <BlogForm
-            fields={formFields}
-            onSubmit={onSubmit}
-            submitLabel={
-              mode === "create"
-                ? selectedAction === "borrador"
-                  ? "Guardar Borrador"
-                  : "Enviar a Revisión"
-                : "Actualizar Blog"
-            }
-            isSubmitting={isSubmitting}
-            initialValues={{
-              titulo: blog?.titulo || "",
-              imagen_banner: "", // Las imágenes no se precargan en file inputs
-              palabras_clave: blog?.palabras_clave || [],
-              contenido: blog?.contenido || [
-                {
-                  type: "paragraph",
-                  children: [{ text: "" }],
-                } as unknown as Descendant,
-              ],
-            }}
-          />
-        </div>
+        {canEditBlog(userRole) ? (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
+            <h2 className="mb-8 text-2xl font-bold text-midnight_text dark:text-white">
+              Información del Blog
+            </h2>
+            <BlogForm
+              fields={formFields}
+              onSubmit={onSubmit}
+              submitLabel={
+                mode === "create"
+                  ? selectedAction === "borrador"
+                    ? "Guardar Borrador"
+                    : "Enviar a Revisión"
+                  : "Actualizar Blog"
+              }
+              isSubmitting={isSubmitting}
+              initialValues={{
+                titulo: blog?.titulo || "",
+                imagen_banner: "", // Las imágenes no se precargan en file inputs
+                palabras_clave: blog?.palabras_clave || [],
+                contenido: blog?.contenido || [
+                  {
+                    type: "paragraph",
+                    children: [{ text: "" }],
+                  } as unknown as Descendant,
+                ],
+              }}
+            />
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
+            <h2 className="mb-8 text-2xl font-bold text-midnight_text dark:text-white">
+              Información del Blog
+            </h2>
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-dark_grey dark:text-gray-400 mb-2">
+                  Título del Blog
+                </label>
+                <div className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-midnight_text dark:text-white">
+                  {blog?.titulo}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark_grey dark:text-gray-400 mb-2">
+                  Palabras Clave
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {blog?.palabras_clave && blog.palabras_clave.length > 0
+                    ? blog.palabras_clave.map((palabra, idx) => (
+                        <span
+                          key={idx}
+                          className="px-3 py-1 bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary/80 rounded-full text-sm"
+                        >
+                          {palabra}
+                        </span>
+                      ))
+                    : "Sin palabras clave"}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-dark_grey dark:text-gray-400 mb-2">
+                  Contenido
+                </label>
+                <div className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-midnight_text dark:text-white max-h-64 overflow-y-auto">
+                  <p className="text-sm opacity-75">
+                    [Contenido del blog - no editable para tu rol]
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -92,19 +92,6 @@ export const navigationConfig: NavSection[] = [
           desktop: true,
         },
       },
-      // Ejemplo: Agregar nueva página pública
-      // {
-      //   name: "Acerca de",
-      //   href: "/acerca",
-      //   icon: "solar:info-circle-linear",
-      //   visible: {
-      //     public: true,
-      //     authenticated: true,
-      //     admin: true,
-      //     mobile: true,
-      //     desktop: true,
-      //   },
-      // },
     ],
   },
   {
@@ -152,17 +139,26 @@ export const navigationConfig: NavSection[] = [
           desktop: true,
         },
       },
-      // Ejemplo: Agregar nueva página de admin
-      // {
-      //   name: "Usuarios",
-      //   href: "/admin/usuarios",
-      //   icon: "solar:users-group-rounded-linear",
-      //   visible: {
-      //     admin: true,
-      //     mobile: true,
-      //     desktop: true,
-      //   },
-      // },
+      {
+        name: "Usuarios",
+        href: "/admin/usuarios",
+        icon: "solar:users-group-rounded-linear",
+        visible: {
+          admin: true,
+          mobile: true,
+          desktop: true,
+        },
+      },
+      {
+        name: "Roles",
+        href: "/admin/roles",
+        icon: "solar:users-group-rounded-linear",
+        visible: {
+          admin: true,
+          mobile: true,
+          desktop: true,
+        },
+      },
     ],
   },
 ];

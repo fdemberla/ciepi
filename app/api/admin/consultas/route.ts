@@ -79,9 +79,9 @@ export async function GET(request: NextRequest) {
         c.fecha_actualizacion
       FROM ciepi.consultas c
       LEFT JOIN ciepi.tipos_consulta tc ON c.tipo_consulta_id = tc.id
-      LEFT JOIN ciepi.sedes_formacion sf ON c.sede_id = sf.id
+      LEFT JOIN ciepi.sedes sf ON c.sede_id = sf.id
       LEFT JOIN ciepi.areas_formacion af ON c.area_formacion_id = af.id
-      LEFT JOIN ciepi.usuarios u ON c.respondido_por = u.id
+      LEFT JOIN ciepi.usuarios_administradores u ON c.respondido_por = u.id
       ${whereClause}
       ORDER BY 
         CASE 

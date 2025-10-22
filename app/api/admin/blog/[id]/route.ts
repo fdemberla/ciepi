@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
+import {
+  canEditBlog,
+  canChangeToState,
+  canDeleteBlog,
+} from "@/lib/permissions";
 
 interface Params {
   params: Promise<{
@@ -88,16 +93,31 @@ export async function GET(request: NextRequest, { params }: Params) {
 // PUT: Actualizar blog
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
-    // Verificar autenticación y permisos de admin
+    // Verificar autenticación
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user?.isAdmin) {
+    if (!session || !session.user) {
       return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
+        { error: "No autorizado. Debe iniciar sesión." },
         { status: 401 }
       );
     }
 
+    // Obtener el rol del usuario
+    const roleQuery = `
+      SELECT rol FROM ciepi.usuarios_administradores 
+      WHERE id = $1
+    `;
+    const roleResult = await query(roleQuery, [session.user.adminId]);
+    
+    if (roleResult.rows.length === 0) {
+      return NextResponse.json(
+        { error: "Usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    const userRole = roleResult.rows[0].rol;
     const { id } = await params;
     const body = await request.json();
     const {
@@ -106,34 +126,61 @@ export async function PUT(request: NextRequest, { params }: Params) {
       imagen_banner,
       palabras_clave,
       estado,
-      comentario,
+      comentario_temp,
     } = body;
 
-    // Validar que al menos un campo esté presente
-    if (
-      !titulo &&
-      !contenido &&
-      !imagen_banner &&
-      palabras_clave === undefined &&
-      !estado
-    ) {
+    // Obtener el blog actual para validaciones
+    const currentBlogQuery = `
+      SELECT estado, creado_por FROM ciepi.blogs WHERE id = $1
+    `;
+    const currentBlogResult = await query(currentBlogQuery, [id]);
+    
+    if (currentBlogResult.rows.length === 0) {
       return NextResponse.json(
-        { error: "Se debe proporcionar al menos un campo para actualizar" },
-        { status: 400 }
+        { error: "Blog no encontrado" },
+        { status: 404 }
       );
     }
 
+    const currentBlog = currentBlogResult.rows[0];
+    const isCreator = currentBlog.creado_por === session.user.adminId;
+
+    // Validación de permisos para EDITAR (no cambiar estado)
+    if (titulo || contenido || imagen_banner || palabras_clave) {
+      // Solo el creador (CIEPI) o admins pueden editar
+      if (!canEditBlog(userRole) || (!isCreator && userRole !== 1 && userRole !== 2)) {
+        return NextResponse.json(
+          { 
+            error: "No tiene permisos para editar este blog. Solo Relaciones Públicas puede cambiar estados sin editar."
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Validación de permisos para CAMBIAR ESTADO
+    if (estado !== undefined && estado !== currentBlog.estado) {
+      if (!canChangeToState(userRole, estado)) {
+        return NextResponse.json(
+          {
+            error: "No tiene permisos para cambiar el blog a ese estado.",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // Si se cambia el estado y hay comentario, guardarlo temporalmente
-    if (estado && comentario) {
+    if (estado && comentario_temp) {
       await query("SELECT ciepi.set_comentario_estado($1, $2)", [
         id,
-        comentario,
+        comentario_temp,
       ]);
     }
 
     // Construir query de actualización dinámicamente
     const updates: string[] = [];
-    const values: (string | number | null)[] = [];
+    const values: (string | number | null | boolean)[] = [];
     let paramIndex = 1;
 
     if (titulo !== undefined) {
@@ -160,19 +207,25 @@ export async function PUT(request: NextRequest, { params }: Params) {
       paramIndex++;
     }
 
-    if (estado !== undefined) {
+    if (estado !== undefined && estado !== currentBlog.estado) {
       updates.push(`estado = $${paramIndex}`);
       values.push(estado);
       paramIndex++;
 
       // Si se está aprobando/rechazando, registrar quién lo hizo
-      if ([2, 3, 4, 5, 6].includes(estado)) {
-        updates.push(`aprobado_por = $${paramIndex}`);
-        values.push(session.user.adminId || null);
-        paramIndex++;
+      updates.push(`aprobado_por = $${paramIndex}`);
+      values.push(session.user.adminId || null);
+      paramIndex++;
 
-        updates.push(`aprobado_en = CURRENT_TIMESTAMP`);
-      }
+      updates.push(`aprobado_en = CURRENT_TIMESTAMP`);
+    }
+
+    // Si no hay actualizaciones, retornar error
+    if (updates.length === 0) {
+      return NextResponse.json(
+        { error: "Se debe proporcionar al menos un campo para actualizar" },
+        { status: 400 }
+      );
     }
 
     values.push(id);
@@ -225,13 +278,37 @@ export async function PUT(request: NextRequest, { params }: Params) {
 // DELETE: Eliminar blog
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
-    // Verificar autenticación y permisos de admin
+    // Verificar autenticación
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user?.isAdmin) {
+    if (!session || !session.user) {
       return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
+        { error: "No autorizado. Debe iniciar sesión." },
         { status: 401 }
+      );
+    }
+
+    // Obtener el rol del usuario
+    const roleQuery = `
+      SELECT rol FROM ciepi.usuarios_administradores 
+      WHERE id = $1
+    `;
+    const roleResult = await query(roleQuery, [session.user.adminId]);
+    
+    if (roleResult.rows.length === 0) {
+      return NextResponse.json(
+        { error: "Usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    const userRole = roleResult.rows[0].rol;
+
+    // Validación de permisos para ELIMINAR
+    if (!canDeleteBlog(userRole)) {
+      return NextResponse.json(
+        { error: "No tienes permisos para eliminar blogs. Solo administradores pueden hacerlo." },
+        { status: 403 }
       );
     }
 

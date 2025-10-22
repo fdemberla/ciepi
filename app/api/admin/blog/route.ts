@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
+import { canCreateBlog } from "@/lib/permissions";
 
 // GET: Listar todos los blogs con filtros
 export async function GET(request: NextRequest) {
@@ -127,13 +128,37 @@ export async function GET(request: NextRequest) {
 // POST: Crear nuevo blog
 export async function POST(request: NextRequest) {
   try {
-    // Verificar autenticación y permisos de admin
+    // Verificar autenticación
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user?.isAdmin) {
+    if (!session || !session.user) {
       return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
+        { error: "No autorizado. Debe iniciar sesión." },
         { status: 401 }
+      );
+    }
+
+    // Obtener el rol del usuario desde la BD
+    const roleQuery = `
+      SELECT rol FROM ciepi.usuarios_administradores 
+      WHERE id = $1
+    `;
+    const roleResult = await query(roleQuery, [session.user.adminId]);
+    
+    if (roleResult.rows.length === 0) {
+      return NextResponse.json(
+        { error: "Usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    const userRole = roleResult.rows[0].rol;
+
+    // Verificar permisos para crear blogs
+    if (!canCreateBlog(userRole)) {
+      return NextResponse.json(
+        { error: "No tiene permisos para crear blogs. Solo roles CIEPI y Admin pueden crear." },
+        { status: 403 }
       );
     }
 

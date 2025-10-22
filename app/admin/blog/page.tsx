@@ -1,9 +1,11 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import { Icon } from "@iconify/react";
 import Table from "@/components/Table";
+import { canEditBlog, canDeleteBlog, canChangeToState } from "@/lib/permissions-client";
 import type { ColumnDef } from "@tanstack/react-table";
 
 interface Blog {
@@ -23,8 +25,11 @@ interface Blog {
 
 export default function BlogAdminPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [blogs, setBlogs] = useState<Blog[]>([]);
   const [loading, setLoading] = useState(true);
+  const userRole = session?.user?.rolId || 0;
+  const userId = session?.user?.adminId || "";
 
   useEffect(() => {
     fetchBlogs();
@@ -154,35 +159,49 @@ export default function BlogAdminPage() {
     {
       id: "acciones",
       header: "Acciones",
-      cell: ({ row }) => (
-        <div className="flex gap-2">
-          <button
-            onClick={() => router.push(`/admin/blog/editar/${row.original.id}`)}
-            className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-            title="Editar blog"
-          >
-            <Icon icon="solar:pen-linear" className="w-5 h-5" />
-          </button>
-          {row.original.estado > 1 && (
-            <button
-              onClick={() =>
-                router.push(`/admin/blog/aprobar/${row.original.id}`)
-              }
-              className="p-2 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
-              title="Gestionar aprobación"
-            >
-              <Icon icon="solar:check-circle-linear" className="w-5 h-5" />
-            </button>
-          )}
-          <button
-            onClick={() => handleEliminar(row.original.id, row.original.titulo)}
-            className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-            title="Eliminar blog"
-          >
-            <Icon icon="solar:trash-bin-trash-linear" className="w-5 h-5" />
-          </button>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const isCreator = row.original.creado_por === userId;
+        const canEdit = isCreator && canEditBlog(userRole);
+        const canDelete = canDeleteBlog(userRole);
+        const canApprove = row.original.estado > 1 && canChangeToState(userRole, row.original.estado);
+
+        return (
+          <div className="flex gap-2">
+            {canEdit && (
+              <button
+                onClick={() => router.push(`/admin/blog/editar/${row.original.id}`)}
+                className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                title="Editar blog"
+              >
+                <Icon icon="solar:pen-linear" className="w-5 h-5" />
+              </button>
+            )}
+            {canApprove && (
+              <button
+                onClick={() =>
+                  router.push(`/admin/blog/aprobar/${row.original.id}`)
+                }
+                className="p-2 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
+                title="Gestionar aprobación"
+              >
+                <Icon icon="solar:check-circle-linear" className="w-5 h-5" />
+              </button>
+            )}
+            {canDelete && (
+              <button
+                onClick={() => handleEliminar(row.original.id, row.original.titulo)}
+                className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                title="Eliminar blog"
+              >
+                <Icon icon="solar:trash-bin-trash-linear" className="w-5 h-5" />
+              </button>
+            )}
+            {!canEdit && !canApprove && !canDelete && (
+              <span className="text-xs text-gray-400 px-2 py-2">Sin permisos</span>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
