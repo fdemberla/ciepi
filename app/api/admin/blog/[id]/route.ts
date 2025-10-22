@@ -109,7 +109,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       WHERE id = $1
     `;
     const roleResult = await query(roleQuery, [session.user.adminId]);
-    
+
     if (roleResult.rows.length === 0) {
       return NextResponse.json(
         { error: "Usuario no encontrado" },
@@ -134,7 +134,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       SELECT estado, creado_por FROM ciepi.blogs WHERE id = $1
     `;
     const currentBlogResult = await query(currentBlogQuery, [id]);
-    
+
     if (currentBlogResult.rows.length === 0) {
       return NextResponse.json(
         { error: "Blog no encontrado" },
@@ -148,10 +148,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
     // Validación de permisos para EDITAR (no cambiar estado)
     if (titulo || contenido || imagen_banner || palabras_clave) {
       // Solo el creador (CIEPI) o admins pueden editar
-      if (!canEditBlog(userRole) || (!isCreator && userRole !== 1 && userRole !== 2)) {
+      if (
+        !canEditBlog(userRole) ||
+        (!isCreator && userRole !== 1 && userRole !== 2)
+      ) {
         return NextResponse.json(
-          { 
-            error: "No tiene permisos para editar este blog. Solo Relaciones Públicas puede cambiar estados sin editar."
+          {
+            error:
+              "No tiene permisos para editar este blog. Solo Relaciones Públicas puede cambiar estados sin editar.",
           },
           { status: 403 }
         );
@@ -294,7 +298,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       WHERE id = $1
     `;
     const roleResult = await query(roleQuery, [session.user.adminId]);
-    
+
     if (roleResult.rows.length === 0) {
       return NextResponse.json(
         { error: "Usuario no encontrado" },
@@ -307,7 +311,10 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     // Validación de permisos para ELIMINAR
     if (!canDeleteBlog(userRole)) {
       return NextResponse.json(
-        { error: "No tienes permisos para eliminar blogs. Solo administradores pueden hacerlo." },
+        {
+          error:
+            "No tienes permisos para eliminar blogs. Solo administradores pueden hacerlo.",
+        },
         { status: 403 }
       );
     }

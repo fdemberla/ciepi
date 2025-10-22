@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
       WHERE id = $1
     `;
     const roleResult = await query(roleQuery, [session.user.adminId]);
-    
+
     if (roleResult.rows.length === 0) {
       return NextResponse.json(
         { error: "Usuario no encontrado" },
@@ -157,7 +157,10 @@ export async function POST(request: NextRequest) {
     // Verificar permisos para crear blogs
     if (!canCreateBlog(userRole)) {
       return NextResponse.json(
-        { error: "No tiene permisos para crear blogs. Solo roles CIEPI y Admin pueden crear." },
+        {
+          error:
+            "No tiene permisos para crear blogs. Solo roles CIEPI y Admin pueden crear.",
+        },
         { status: 403 }
       );
     }

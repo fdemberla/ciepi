@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { Icon } from "@iconify/react";
 import SlateRenderer from "@/components/SlateRenderer";
+import { FileDownloadLink } from "@/components/FileDownloadLink";
 
 interface Capacitacion {
   id: number;
@@ -318,18 +319,12 @@ const CapacitacionDetailPage = () => {
                   />
                   Material Adicional
                 </h2>
-                <a
-                  href={`${process.env.NEXT_PUBLIC_BASE_PATH}${capacitacion.archivo_adjunto}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-8 py-4 bg-slateGray dark:bg-gray-700 text-midnight_text dark:text-white rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl group"
-                >
-                  <Icon
-                    icon="solar:download-linear"
-                    className="w-6 h-6 mr-3 group-hover:scale-110 transition-transform"
-                  />
-                  Descargar Material
-                </a>
+                <FileDownloadLink
+                  filePath={capacitacion.archivo_adjunto}
+                  basePath={process.env.NEXT_PUBLIC_BASE_PATH}
+                  fileName="Descargar Material"
+                  icon="solar:download-linear"
+                />
               </div>
             )}
 

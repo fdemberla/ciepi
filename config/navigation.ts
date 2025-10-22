@@ -59,7 +59,7 @@ export const navigationConfig: NavSection[] = [
       {
         name: "Eventos",
         href: "/eventos",
-        icon: "solar:calendar-1-linear",
+        icon: "solar:calendar-minimalistic-linear",
         visible: {
           public: true,
           authenticated: true,

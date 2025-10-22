@@ -179,7 +179,7 @@ El componente `Navbar` automáticamente:
 // En la sección "Administración"
 {
   name: "Dashboard",
-  href: "/admin/dashboard",
+  href: "/admin",
   icon: "solar:chart-linear",
   visible: {
     admin: true,

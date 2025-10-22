@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS ciepi.temp_blog_comentarios (
 
 -- Función para establecer comentario antes de actualizar estado
 CREATE OR REPLACE FUNCTION ciepi.set_comentario_estado(
-    p_blog_id UUID,
+    p_blog_id INT,
     p_comentario TEXT
 )
 RETURNS void AS $$
@@ -57,7 +57,7 @@ BEGIN
     IF (TG_OP = 'UPDATE' AND OLD.estado != NEW.estado) OR TG_OP = 'INSERT' THEN
         -- Obtener comentario temporal si existe
         SELECT comentario INTO v_comentario
-        FROM temp_blog_comentarios
+        FROM ciepi.temp_blog_comentarios
         WHERE blog_id = NEW.id
         LIMIT 1;
         

@@ -44,7 +44,7 @@ export default function UsuariosAdminPage() {
       const userRole = session?.user?.rolId;
       if (userRole !== 1 && userRole !== 2) {
         toast.error("No tienes permisos para acceder a esta página");
-        router.push("/dashboard");
+        router.push("/");
       }
     }
   }, [status, session, router]);

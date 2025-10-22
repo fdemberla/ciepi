@@ -19,11 +19,15 @@ export enum BlogState {
 }
 
 export function canCreateBlog(role: number): boolean {
-  return role === Role.CIEPI || role === Role.ADMIN || role === Role.SUPER_ADMIN;
+  return (
+    role === Role.CIEPI || role === Role.ADMIN || role === Role.SUPER_ADMIN
+  );
 }
 
 export function canEditBlog(role: number): boolean {
-  return role === Role.CIEPI || role === Role.ADMIN || role === Role.SUPER_ADMIN;
+  return (
+    role === Role.CIEPI || role === Role.ADMIN || role === Role.SUPER_ADMIN
+  );
 }
 
 export function canDeleteBlog(role: number): boolean {

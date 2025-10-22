@@ -88,3 +88,5 @@ next-env.d.ts
 # Contenido de carpetas en /public (pero mantener las carpetas)
 /public/*/
 !/public/*/.gitkeep
+# Snyk Security Extension - AI Rules (auto-generated)
+.github\instructions\snyk_rules.instructions.md

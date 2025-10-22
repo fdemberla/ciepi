@@ -45,7 +45,7 @@ export default function RolesPage() {
       const userRole = session?.user?.rolId;
       if (userRole !== 1 && userRole !== 2) {
         toast.error("No tienes permisos para acceder a esta página");
-        router.push("/dashboard");
+        router.push("/");
       }
     }
   }, [status, session, router]);
@@ -186,7 +186,10 @@ export default function RolesPage() {
       3: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
       4: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
     };
-    return colors[roleId] || "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
+    return (
+      colors[roleId] ||
+      "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+    );
   };
 
   const getRoleDescription = (roleId: number) => {
@@ -230,7 +233,10 @@ export default function RolesPage() {
               onClick={() => router.push("/admin/usuarios")}
               className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-midnight_text dark:text-white"
             >
-              <Icon icon="solar:users-group-rounded-linear" className="w-5 h-5" />
+              <Icon
+                icon="solar:users-group-rounded-linear"
+                className="w-5 h-5"
+              />
               Gestionar Usuarios
             </button>
             <button
@@ -304,7 +310,7 @@ export default function RolesPage() {
               </div>
 
               {/* Acciones */}
-              {(role.id !== 1 && role.id !== 2) && (
+              {role.id !== 1 && role.id !== 2 && (
                 <button
                   onClick={() => handleEditRole(role)}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-primary text-primary hover:bg-primary hover:text-white rounded-lg transition-colors"
@@ -336,7 +342,10 @@ export default function RolesPage() {
                 if (usuariosDelRol.length === 0) return null;
 
                 return (
-                  <div key={role.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <div
+                    key={role.id}
+                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
+                  >
                     <h3 className="font-semibold text-midnight_text dark:text-white mb-3">
                       {role.nombre} ({usuariosDelRol.length})
                     </h3>
@@ -375,9 +384,9 @@ export default function RolesPage() {
                             {usuario.ultimo_login && (
                               <span className="text-xs text-gray-500 dark:text-gray-400">
                                 Último acceso:{" "}
-                                {new Date(usuario.ultimo_login).toLocaleDateString(
-                                  "es-PA"
-                                )}
+                                {new Date(
+                                  usuario.ultimo_login
+                                ).toLocaleDateString("es-PA")}
                               </span>
                             )}
                           </div>
@@ -404,7 +413,10 @@ export default function RolesPage() {
                     onClick={() => setShowEditModal(false)}
                     className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                   >
-                    <Icon icon="solar:close-circle-linear" className="w-6 h-6" />
+                    <Icon
+                      icon="solar:close-circle-linear"
+                      className="w-6 h-6"
+                    />
                   </button>
                 </div>
               </div>
@@ -472,7 +484,10 @@ export default function RolesPage() {
                     onClick={() => setShowCreateModal(false)}
                     className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                   >
-                    <Icon icon="solar:close-circle-linear" className="w-6 h-6" />
+                    <Icon
+                      icon="solar:close-circle-linear"
+                      className="w-6 h-6"
+                    />
                   </button>
                 </div>
               </div>

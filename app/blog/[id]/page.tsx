@@ -5,6 +5,8 @@ import { Icon } from "@iconify/react";
 import Link from "next/link";
 import Image from "next/image";
 import SlateRenderer from "@/components/SlateRenderer";
+import { JsonLdScript } from "@/components/JsonLdScript";
+import { sanitizeForJsonLd } from "@/lib/security";
 
 interface Blog {
   id: string;
@@ -241,16 +243,14 @@ export default async function BlogPostPage({
       </article>
 
       {/* JSON-LD Structured Data */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+      <JsonLdScript
+        data={
+          sanitizeForJsonLd({
             "@context": "https://schema.org",
             "@type": "BlogPosting",
             headline: blog.titulo,
             image: blog.imagen_banner ? [blog.imagen_banner] : undefined,
             datePublished: blog.creado_en,
-            dateModified: blog.fecha_actualizacion,
             author: {
               "@type": "Person",
               name: blog.autor_nombre,
@@ -261,8 +261,8 @@ export default async function BlogPostPage({
             },
             description: blog.titulo,
             keywords: blog.palabras_clave?.join(", "),
-          }),
-        }}
+          }) as Record<string, unknown>
+        }
       />
     </div>
   );

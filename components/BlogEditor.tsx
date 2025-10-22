@@ -830,7 +830,6 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
             </div>
           </div>
         )}
-
         {/* Validación de permisos de edición */}
         {mode === "edit" && !canEditBlog(userRole) && (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-6">
@@ -852,7 +851,6 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
             </div>
           </div>
         )}
-
         {/* Formulario personalizado con ancho completo */}
         {canEditBlog(userRole) ? (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">

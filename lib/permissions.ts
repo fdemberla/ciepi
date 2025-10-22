@@ -22,14 +22,18 @@ export enum BlogState {
  * Verifica si un rol puede crear blogs
  */
 export function canCreateBlog(role: number): boolean {
-  return role === Role.CIEPI || role === Role.ADMIN || role === Role.SUPER_ADMIN;
+  return (
+    role === Role.CIEPI || role === Role.ADMIN || role === Role.SUPER_ADMIN
+  );
 }
 
 /**
  * Verifica si un rol puede editar blogs
  */
 export function canEditBlog(role: number): boolean {
-  return role === Role.CIEPI || role === Role.ADMIN || role === Role.SUPER_ADMIN;
+  return (
+    role === Role.CIEPI || role === Role.ADMIN || role === Role.SUPER_ADMIN
+  );
 }
 
 /**
