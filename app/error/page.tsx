@@ -1,9 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-export default function ErrorPage() {
+function ErrorPageContent() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
 
@@ -105,6 +106,31 @@ export default function ErrorPage() {
             Intentar Iniciar Sesión Nuevamente
           </Link>
         </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ErrorPage() {
+  return (
+    <Suspense fallback={<ErrorPageLoading />}>
+      <ErrorPageContent />
+    </Suspense>
+  );
+}
+
+function ErrorPageLoading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+      <div className="max-w-md w-full space-y-8 text-center">
+        <div className="flex justify-center">
+          <div className="rounded-full bg-gray-200 dark:bg-gray-800 p-6 animate-pulse">
+            <div className="h-16 w-16 bg-gray-300 dark:bg-gray-700 rounded-full" />
+          </div>
+        </div>
+        <div className="h-8 bg-gray-200 dark:bg-gray-800 rounded animate-pulse" />
+        <div className="h-6 bg-gray-200 dark:bg-gray-800 rounded animate-pulse" />
+        <div className="h-20 bg-gray-200 dark:bg-gray-800 rounded animate-pulse" />
       </div>
     </div>
   );

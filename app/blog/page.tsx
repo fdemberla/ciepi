@@ -255,7 +255,7 @@ export default function BlogPage() {
                 <div className="p-6">
                   <div className="flex items-center gap-2 text-sm text-dark_grey dark:text-gray-400 mb-3">
                     <Icon icon="solar:calendar-linear" className="w-4 h-4" />
-                    <span>{formatDate(blog.creado_en)}</span>
+                    <span>{formatDate(blog.fecha_creacion)}</span>
                     {blog.autor_nombre && (
                       <>
                         <span>•</span>

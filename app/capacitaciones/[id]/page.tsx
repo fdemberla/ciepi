@@ -9,8 +9,8 @@ import { FileDownloadLink } from "@/components/FileDownloadLink";
 interface Capacitacion {
   id: number;
   banner: string | null;
-  nombre?: string;
-  descripcion: unknown;
+  nombre: string;
+  descripcion: any | null;
   cantidad_horas: number | null;
   cantidad_participantes: number | null;
   archivo_adjunto: string | null;
@@ -126,8 +126,7 @@ const CapacitacionDetailPage = () => {
     );
   }
 
-  const { nombre } = capacitacion;
-  const nombreString = (nombre || "") as string;
+  const cap: Capacitacion = capacitacion as Capacitacion;
 
   return (
     <section className="bg-slateGray dark:bg-gray-900 min-h-screen pt-32 pb-20">
@@ -147,11 +146,11 @@ const CapacitacionDetailPage = () => {
         {/* Main Content Card */}
         <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden">
           {/* Banner */}
-          {capacitacion.banner ? (
+          {cap.banner ? (
             <div className="relative h-80 sm:h-96 w-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
               <Image
-                src={`${process.env.NEXT_PUBLIC_BASE_PATH}${capacitacion.banner}`}
-                alt={capacitacion.nombre || "Capacitación"}
+                src={`${process.env.NEXT_PUBLIC_BASE_PATH}${cap.banner}`}
+                alt={cap.nombre || "Capacitación"}
                 fill
                 className="object-cover"
               />
@@ -180,13 +179,12 @@ const CapacitacionDetailPage = () => {
 
             {/* Title */}
             <h1 className="text-4xl sm:text-5xl font-bold text-midnight_text dark:text-white mb-8">
-              {/* @ts-ignore */}
-              {nombreString}
+              {cap.nombre}
             </h1>
 
             {/* Quick Info Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10">
-              {capacitacion.cantidad_horas && (
+              {cap.cantidad_horas && (
                 <div className="bg-slateGray dark:bg-gray-700 rounded-2xl p-6 flex items-center gap-4">
                   <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-lg">
                     <Icon
@@ -199,14 +197,14 @@ const CapacitacionDetailPage = () => {
                       Duración Total
                     </p>
                     <p className="text-xl font-bold text-midnight_text dark:text-white">
-                      {capacitacion.cantidad_horas} hora
-                      {capacitacion.cantidad_horas !== 1 ? "s" : ""}
+                      {cap.cantidad_horas} hora
+                      {cap.cantidad_horas !== 1 ? "s" : ""}
                     </p>
                   </div>
                 </div>
               )}
 
-              {capacitacion.cantidad_participantes && (
+              {cap.cantidad_participantes && (
                 <div className="bg-slateGray dark:bg-gray-700 rounded-2xl p-6 flex items-center gap-4">
                   <div className="w-14 h-14 rounded-full bg-success flex items-center justify-center shadow-lg">
                     <Icon
@@ -219,7 +217,7 @@ const CapacitacionDetailPage = () => {
                       Cupos Disponibles
                     </p>
                     <p className="text-xl font-bold text-midnight_text dark:text-white">
-                      {capacitacion.cantidad_participantes} participantes
+                      {cap.cantidad_participantes} participantes
                     </p>
                   </div>
                 </div>
@@ -227,7 +225,7 @@ const CapacitacionDetailPage = () => {
             </div>
 
             {/* Description */}
-            {capacitacion.descripcion && (
+            {cap.descripcion && (
               <div className="mb-10">
                 <h2 className="text-3xl font-bold text-midnight_text dark:text-white mb-6 flex items-center gap-3">
                   <Icon
@@ -237,7 +235,7 @@ const CapacitacionDetailPage = () => {
                   Descripción
                 </h2>
                 <SlateRenderer
-                  content={capacitacion.descripcion}
+                  content={cap.descripcion}
                   className="prose max-w-none"
                 />
               </div>
@@ -271,13 +269,13 @@ const CapacitacionDetailPage = () => {
                       <span className="font-semibold text-midnight_text dark:text-white">
                         Inicio:
                       </span>{" "}
-                      {formatDate(capacitacion.fecha_inicio_inscripcion)}
+                      {formatDate(cap.fecha_inicio_inscripcion)}
                     </p>
                     <p className="text-sm text-dark_grey dark:text-gray-300">
                       <span className="font-semibold text-midnight_text dark:text-white">
                         Fin:
                       </span>{" "}
-                      {formatDate(capacitacion.fecha_final_inscripcion)}
+                      {formatDate(cap.fecha_final_inscripcion)}
                     </p>
                   </div>
                 </div>
@@ -300,13 +298,13 @@ const CapacitacionDetailPage = () => {
                       <span className="font-semibold text-midnight_text dark:text-white">
                         Inicio:
                       </span>{" "}
-                      {formatDate(capacitacion.fecha_inicio_capacitacion)}
+                      {formatDate(cap.fecha_inicio_capacitacion)}
                     </p>
                     <p className="text-sm text-dark_grey dark:text-gray-300">
                       <span className="font-semibold text-midnight_text dark:text-white">
                         Fin:
                       </span>{" "}
-                      {formatDate(capacitacion.fecha_final_capacitacion)}
+                      {formatDate(cap.fecha_final_capacitacion)}
                     </p>
                   </div>
                 </div>
@@ -314,7 +312,7 @@ const CapacitacionDetailPage = () => {
             </div>
 
             {/* Archivo Adjunto */}
-            {capacitacion.archivo_adjunto && (
+            {cap.archivo_adjunto && (
               <div className="mb-10">
                 <h2 className="text-3xl font-bold text-midnight_text dark:text-white mb-6 flex items-center gap-3">
                   <Icon
@@ -324,7 +322,7 @@ const CapacitacionDetailPage = () => {
                   Material Adicional
                 </h2>
                 <FileDownloadLink
-                  filePath={capacitacion.archivo_adjunto}
+                  filePath={cap.archivo_adjunto}
                   basePath={process.env.NEXT_PUBLIC_BASE_PATH}
                   fileName="Descargar Material"
                   icon="solar:download-linear"
@@ -373,8 +371,7 @@ const CapacitacionDetailPage = () => {
             <div className="mt-8 text-center text-sm text-dark_grey dark:text-gray-400">
               <p className="flex items-center justify-center gap-2">
                 <Icon icon="solar:clock-circle-linear" className="w-4 h-4" />
-                Capacitación creada el{" "}
-                {formatDateTime(capacitacion.fecha_creacion)}
+                Capacitación creada el {formatDateTime(cap.fecha_creacion)}
               </p>
             </div>
           </div>
