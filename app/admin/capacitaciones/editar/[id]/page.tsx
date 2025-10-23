@@ -142,7 +142,7 @@ const EditarCapacitacionPage = () => {
     const fetchCapacitacion = async () => {
       try {
         console.log(`Fetching capacitacion ${id}...`);
-        const response = await fetch(`/ciepi/api/admin/capacitaciones/${id}`);
+        const response = await fetch(`/ciepi/api/capacitaciones/${id}`);
         const result = await response.json();
 
         if (!response.ok || !result.success) {
@@ -269,7 +269,7 @@ const EditarCapacitacionPage = () => {
         <div className="text-center">
           <div className="text-red-600 text-lg mb-4">{error}</div>
           <button
-            onClick={() => router.push("/ciepi/admin/capacitaciones")}
+            onClick={() => router.push("/admin/capacitaciones")}
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
           >
             Volver a la lista

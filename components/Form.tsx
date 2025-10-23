@@ -293,7 +293,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
             name={f.name}
             type={f.type}
             className="w-full rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
-            value={formData[f.name] || ""}
+            value={(formData[f.name] as string) || ""}
             onChange={(e) => handleChange(f.name, e.target.value)}
             required={f.required}
             disabled={f.disabled}
@@ -313,7 +313,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
             id={f.name}
             name={f.name}
             className="w-full rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
-            value={formData[f.name] || ""}
+            value={(formData[f.name] as string) || ""}
             onChange={(e) => handleChange(f.name, e.target.value)}
             required={f.required}
             disabled={f.disabled}
@@ -326,7 +326,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
           <SlateEditorField
             id={f.name}
             name={f.name}
-            value={formData[f.name] || undefined}
+            value={(formData[f.name] as any) || undefined}
             onChange={(val) => handleChange(f.name, val)}
             required={f.required}
           />
@@ -340,7 +340,39 @@ const Form: React.FC<FormWithCaptchaProps> = ({
               name={f.name}
               type="date"
               className="w-full rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 pl-10 pr-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
-              value={formData[f.name] || ""}
+              value={(formData[f.name] as string) || ""}
+              onChange={(e) => handleChange(f.name, e.target.value)}
+              required={f.required}
+              disabled={f.disabled}
+            />
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-dark_grey dark:text-gray-400">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6.75 3v2.25M17.25 3v2.25M3 7.5h18M4.5 21h15a1.5 1.5 0 001.5-1.5V6.75A1.5 1.5 0 0019.5 5.25h-15A1.5 1.5 0 003 6.75v12.75A1.5 1.5 0 004.5 21z"
+                />
+              </svg>
+            </div>
+          </div>
+        );
+
+      case "datetime-local":
+        return (
+          <div className="relative">
+            <input
+              id={f.name}
+              name={f.name}
+              type="datetime-local"
+              className="w-full rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 pl-10 pr-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
+              value={(formData[f.name] as string) || ""}
               onChange={(e) => handleChange(f.name, e.target.value)}
               required={f.required}
               disabled={f.disabled}
@@ -384,7 +416,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
             id={f.name}
             name={f.name}
             className="w-full rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
-            value={formData[f.name] || ""}
+            value={(formData[f.name] as string) || ""}
             onChange={(e) => handleChange(f.name, e.target.value)}
             required={f.required}
             disabled={f.disabled || loadingOptions[f.name]}
@@ -447,11 +479,14 @@ const Form: React.FC<FormWithCaptchaProps> = ({
                   "Arrastra y suelta archivos aquí o toca para seleccionar"}
               </span>
             </div>
-            {formData[f.name] && formData[f.name].length > 0 && (
-              <div className="mt-3 text-xs sm:text-sm text-midnight_text dark:text-white w-full text-center px-2">
-                {formData[f.name].map((file: File) => file.name).join(", ")}
-              </div>
-            )}
+            {(formData[f.name] as File[] | undefined) &&
+              (formData[f.name] as File[]).length > 0 && (
+                <div className="mt-3 text-xs sm:text-sm text-midnight_text dark:text-white w-full text-center px-2">
+                  {(formData[f.name] as File[])
+                    .map((file: File) => file.name)
+                    .join(", ")}
+                </div>
+              )}
           </div>
         );
 
@@ -461,16 +496,19 @@ const Form: React.FC<FormWithCaptchaProps> = ({
   }
 
   return (
-    <section className="bg-slateGray dark:bg-gray-900 min-h-screen">
-      <div className="max-w-2xl px-4 py-2 mx-auto lg:py-6">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 sm:p-8 lg:p-10">
+    <section className="w-full h-full bg-slateGray dark:bg-gray-900 flex flex-col">
+      <div className="w-full h-full flex flex-col px-4 py-2 lg:py-6">
+        <div className="w-full h-full bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 sm:p-8 lg:p-10 flex flex-col">
           {title && (
             <h2 className="mb-6 text-2xl font-bold text-midnight_text dark:text-white">
               {title}
             </h2>
           )}
-          <form className={`${className}`} onSubmit={handleSubmit}>
-            <div className="mb-4">{renderFields(fields)}</div>
+          <form
+            className={`flex flex-col flex-1 ${className}`}
+            onSubmit={handleSubmit}
+          >
+            <div className="flex-1 mb-4">{renderFields(fields)}</div>
             {captchaError && (
               <div className="text-red-500 dark:text-red-400 text-center text-base mb-6">
                 {captchaError}

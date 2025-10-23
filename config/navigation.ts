@@ -120,16 +120,6 @@ export const navigationConfig: NavSection[] = [
         },
       },
       {
-        name: "Mensajes de Contacto",
-        href: "/admin/contacto",
-        icon: "solar:letter-linear",
-        visible: {
-          admin: true,
-          mobile: true,
-          desktop: true,
-        },
-      },
-      {
         name: "Gestión de Blog",
         href: "/admin/blog",
         icon: "solar:document-text-linear",

@@ -166,12 +166,17 @@ const Page = () => {
 
   return (
     <AdminProtection>
-      <Form
-        title={"Crear Nueva Capacitación"}
-        fields={fields}
-        onSubmit={handleSubmit}
-        submitLabel="Guardar"
-      />
+      <div className="w-full flex justify-center">
+        {/* Ensure the form takes at least 90% of available width, but stays responsive */}
+        <div className="w-full px-4 py-6">
+          <Form
+            title={"Crear Nueva Capacitación"}
+            fields={fields}
+            onSubmit={handleSubmit}
+            submitLabel="Guardar"
+          />
+        </div>
+      </div>
     </AdminProtection>
   );
 };

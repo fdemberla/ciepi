@@ -80,7 +80,7 @@ export default function InscribirsePage() {
     try {
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
       const response = await fetch(
-        `${basePath}/api/admin/capacitaciones/${capacitacionId}`
+        `${basePath}/api/capacitaciones/${capacitacionId}`
       );
 
       if (!response.ok) {

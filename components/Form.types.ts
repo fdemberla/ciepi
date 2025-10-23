@@ -8,6 +8,7 @@ type FormFieldType =
   | "textarea-slate"
   | "number"
   | "date"
+  | "datetime-local"
   | "select"
   | "file"
   | "keywords"

@@ -9,7 +9,7 @@ import { FileDownloadLink } from "@/components/FileDownloadLink";
 interface Capacitacion {
   id: number;
   banner: string | null;
-  nombre: string;
+  nombre?: string;
   descripcion: unknown;
   cantidad_horas: number | null;
   cantidad_participantes: number | null;
@@ -42,7 +42,7 @@ const CapacitacionDetailPage = () => {
       setLoading(true);
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
       const response = await fetch(
-        `${basePath}/api/admin/capacitaciones/${capacitacionId}`
+        `${basePath}/api/capacitaciones/${capacitacionId}`
       );
 
       if (!response.ok) {
@@ -126,6 +126,9 @@ const CapacitacionDetailPage = () => {
     );
   }
 
+  const { nombre } = capacitacion;
+  const nombreString = (nombre || "") as string;
+
   return (
     <section className="bg-slateGray dark:bg-gray-900 min-h-screen pt-32 pb-20">
       <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4">
@@ -145,10 +148,10 @@ const CapacitacionDetailPage = () => {
         <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden">
           {/* Banner */}
           {capacitacion.banner ? (
-            <div className="relative h-80 sm:h-96 w-full bg-gray-200 overflow-hidden">
+            <div className="relative h-80 sm:h-96 w-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
               <Image
                 src={`${process.env.NEXT_PUBLIC_BASE_PATH}${capacitacion.banner}`}
-                alt={capacitacion.nombre}
+                alt={capacitacion.nombre || "Capacitación"}
                 fill
                 className="object-cover"
               />
@@ -177,7 +180,8 @@ const CapacitacionDetailPage = () => {
 
             {/* Title */}
             <h1 className="text-4xl sm:text-5xl font-bold text-midnight_text dark:text-white mb-8">
-              {capacitacion.nombre}
+              {/* @ts-ignore */}
+              {nombreString}
             </h1>
 
             {/* Quick Info Cards */}
@@ -329,7 +333,7 @@ const CapacitacionDetailPage = () => {
             )}
 
             {/* CTA Section */}
-            <div className="border-t border-gray-200 pt-10 mt-10">
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-10 mt-10">
               <div className="bg-gradient-to-br from-primary to-blue-700 rounded-3xl p-8 sm:p-12 text-white shadow-2xl">
                 <div className="flex items-center gap-3 mb-4">
                   <Icon

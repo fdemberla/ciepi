@@ -3,10 +3,12 @@ import { query } from "@/lib/db";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  let id: string = "";
   try {
-    const id = params.id;
+    const resolvedParams = await params;
+    id = resolvedParams.id;
 
     console.log(
       `🔍 [GET /api/admin/capacitaciones/${id}] Fetching capacitacion`
@@ -52,10 +54,7 @@ export async function GET(
       { status: 200 }
     );
   } catch (error) {
-    console.error(
-      `❌ [GET /api/admin/capacitaciones/${params.id}] Error:`,
-      error
-    );
+    console.error(`❌ [GET /api/admin/capacitaciones/${id}] Error:`, error);
 
     return NextResponse.json(
       {
@@ -70,10 +69,12 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  let id: string = "";
   try {
-    const id = params.id;
+    const resolvedParams = await params;
+    id = resolvedParams.id;
     const formData = await request.formData();
 
     console.log(`🔍 [PUT /api/admin/capacitaciones/${id}] Processing update`);
@@ -212,10 +213,7 @@ export async function PUT(
       { status: 200 }
     );
   } catch (error) {
-    console.error(
-      `❌ [PUT /api/admin/capacitaciones/${params.id}] Error:`,
-      error
-    );
+    console.error(`❌ [PUT /api/admin/capacitaciones/${id}] Error:`, error);
 
     return NextResponse.json(
       {

@@ -92,7 +92,7 @@ export default function Navbar() {
 
   return (
     <header
-      className={`sticky top-0 z-40 w-full transition-all duration-300 bg-white dark:bg-gray-900 ${
+      className={`sticky top-0 z-40 w-full transition-all duration-300 bg-white dark:bg-gray-800 ${
         sticky ? "shadow-lg py-4" : "shadow-none py-6"
       }`}
     >

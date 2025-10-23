@@ -67,8 +67,7 @@ export async function sendEmail(options: SendEmailOptions) {
   try {
     const transporter = getSmtpTransporter();
 
-    const defaultFrom =
-      process.env.NEXT_PUBLIC_SMTP_USER || "noreply@inadeh.edu.pa";
+    const defaultFrom = process.env.SMTP_USER || "noreply@inadeh.edu.pa";
 
     const mailOptions = {
       from: options.from || defaultFrom,
