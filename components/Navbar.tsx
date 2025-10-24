@@ -32,19 +32,14 @@ export default function Navbar() {
       if (context === "desktop" && !visible.desktop) return false;
       if (context === "mobile" && !visible.mobile) return false;
 
-      // Verificar permisos de usuario
-      if (visible.admin && !isAdmin) return false;
-      if (
-        visible.authenticated &&
-        !visible.public &&
-        !visible.admin &&
-        !isAuthenticated
-      )
-        return false;
+      // Si el link requiere admin, verificar que el usuario sea admin
+      if (visible.admin && !visible.public && !isAdmin) return false;
 
-      // Si tiene restricciones y no cumple ninguna, ocultar
-      if (!visible.public && !visible.authenticated && !visible.admin)
-        return false;
+      // Si el link es público, siempre mostrarlo
+      if (visible.public) return true;
+
+      // Si el link requiere autenticación (no público), verificar autenticación
+      if (visible.authenticated && !isAuthenticated) return false;
 
       return true;
     });
