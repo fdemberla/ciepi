@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@fontsource/roboto-condensed": "^5.2.8",
     "@iconify/react": "^6.0.2",
     "@tanstack/react-table": "^8.21.3",
     "next": "^16.0.0",
@@ -19,6 +20,7 @@
     "react-dom": "19.1.0",
     "react-hot-toast": "^2.6.0",
     "slate": "^0.118.1",
+    "slate-dom": "^0.118.1",
     "slate-react": "^0.117.4"
   },
   "devDependencies": {

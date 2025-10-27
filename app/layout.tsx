@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
-import { Roboto_Condensed } from "next/font/google";
+import "@fontsource/roboto-condensed/300.css";
+import "@fontsource/roboto-condensed/400.css";
+import "@fontsource/roboto-condensed/700.css";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { AuthProvider } from "@/components/AuthProvider";
 import { Toaster } from "react-hot-toast";
-
-const robotoCondensed = Roboto_Condensed({
-  variable: "--font-roboto-condensed",
-  subsets: ["latin"],
-  weight: ["300", "400", "700"],
-});
 
 export const metadata: Metadata = {
   title: "CIEPI",
@@ -23,10 +19,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="es">
       <body
-        className={`${robotoCondensed.variable} antialiased min-h-screen flex flex-col font-sans`}
-        style={{ fontFamily: "var(--font-roboto-condensed)" }}
+        className="antialiased min-h-screen flex flex-col"
+        style={{ fontFamily: "'Roboto Condensed', sans-serif" }}
       >
         <AuthProvider>
           <Toaster
