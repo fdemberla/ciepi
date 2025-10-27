@@ -31,10 +31,6 @@ export default function UsuariosAdminPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingUsuario, setEditingUsuario] = useState<Usuario | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedRol, setSelectedRol] = useState<number>(0);
-  const [submitting, setSubmitting] = useState(false);
 
   // Proteger la ruta - solo roles 1 y 2
   useEffect(() => {
@@ -99,50 +95,7 @@ export default function UsuariosAdminPage() {
   };
 
   const handleEditUsuario = (usuario: Usuario) => {
-    setEditingUsuario(usuario);
-    setSelectedRol(usuario.rol_id);
-    setShowEditModal(true);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editingUsuario) return;
-
-    // No permitir cambiar role si es admin
-    if (editingUsuario.rol_id === 1 || editingUsuario.rol_id === 2) {
-      toast.error("No se puede cambiar el rol de un administrador");
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-      const response = await fetch(
-        `${basePath}/api/admin/usuarios/${editingUsuario.id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            rol: selectedRol,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Error al actualizar usuario");
-      }
-
-      toast.success("Usuario actualizado exitosamente");
-      setShowEditModal(false);
-      fetchUsuarios();
-    } catch (error) {
-      console.error("Error saving usuario:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Error al actualizar usuario"
-      );
-    } finally {
-      setSubmitting(false);
-    }
+    router.push(`/admin/usuarios/editar/${usuario.id}`);
   };
 
   const getRolColor = (rolId: number) => {
@@ -226,17 +179,13 @@ export default function UsuariosAdminPage() {
       header: "Acciones",
       cell: ({ row }) => (
         <div className="flex gap-2">
-          {row.original.rol_id !== 1 && row.original.rol_id !== 2 ? (
-            <button
-              onClick={() => handleEditUsuario(row.original)}
-              className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-              title="Cambiar rol"
-            >
-              <Icon icon="solar:pen-linear" className="w-5 h-5" />
-            </button>
-          ) : (
-            <div className="px-2 py-2 text-xs text-gray-400">Administrador</div>
-          )}
+          <button
+            onClick={() => handleEditUsuario(row.original)}
+            className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+            title="Editar usuario"
+          >
+            <Icon icon="solar:pen-linear" className="w-5 h-5" />
+          </button>
         </div>
       ),
     },
@@ -278,6 +227,13 @@ export default function UsuariosAdminPage() {
                 Administra usuarios del sistema y asigna roles
               </p>
             </div>
+            <button
+              onClick={() => router.push("/admin/usuarios/crear")}
+              className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-full hover:bg-primary/90 transition-all duration-300 shadow-lg hover:shadow-xl"
+            >
+              <Icon icon="solar:user-plus-linear" className="w-5 h-5" />
+              <span>Crear Usuario</span>
+            </button>
           </div>
         </div>
 
@@ -297,85 +253,6 @@ export default function UsuariosAdminPage() {
             enablePagination
             searchPlaceholder="Buscar por nombre o correo..."
           />
-        )}
-
-        {/* Modal para cambiar rol */}
-        {showEditModal && editingUsuario && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md">
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-midnight_text dark:text-white">
-                    Cambiar Rol
-                  </h3>
-                  <button
-                    onClick={() => setShowEditModal(false)}
-                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                  >
-                    <Icon
-                      icon="solar:close-circle-linear"
-                      className="w-6 h-6"
-                    />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6 space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-midnight_text dark:text-white mb-2">
-                    Usuario
-                  </p>
-                  <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-midnight_text dark:text-white">
-                    {editingUsuario.nombre} {editingUsuario.apellido}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-midnight_text dark:text-white mb-2">
-                    Nuevo Rol
-                  </label>
-                  <select
-                    value={selectedRol}
-                    onChange={(e) => setSelectedRol(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-midnight_text dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                  >
-                    <option value={0}>Selecciona un rol</option>
-                    {roles
-                      .filter((r) => r.id !== 1 && r.id !== 2)
-                      .map((role) => (
-                        <option key={role.id} value={role.id}>
-                          {role.nombre}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                  <p className="text-xs text-blue-700 dark:text-blue-300">
-                    <strong>Rol actual:</strong>{" "}
-                    {getRoleNombre(editingUsuario.rol_id)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex gap-3">
-                <button
-                  onClick={() => setShowEditModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-midnight_text dark:text-white"
-                  disabled={submitting}
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSaveEdit}
-                  disabled={submitting || selectedRol === 0}
-                  className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-                >
-                  {submitting ? "Guardando..." : "Guardar"}
-                </button>
-              </div>
-            </div>
-          </div>
         )}
       </div>
     </div>

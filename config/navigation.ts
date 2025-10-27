@@ -110,6 +110,16 @@ export const navigationConfig: NavSection[] = [
         },
       },
       {
+        name: "Eventos",
+        href: "/admin/eventos",
+        icon: "solar:calendar-minimalistic-linear",
+        visible: {
+          admin: true,
+          mobile: true,
+          desktop: true,
+        },
+      },
+      {
         name: "Consultas",
         href: "/admin/consultas",
         icon: "solar:chat-round-dots-linear",
