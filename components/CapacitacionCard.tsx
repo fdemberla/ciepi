@@ -40,7 +40,7 @@ const CapacitacionCard = ({
       {/* Banner Image */}
       {capacitacion.banner ? (
         <div className="relative h-56 w-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-          <Image
+          <img
             src={`${basePath}${capacitacion.banner}`}
             alt={capacitacion.nombre}
             fill
