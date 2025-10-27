@@ -43,7 +43,6 @@ const CapacitacionCard = ({
           <img
             src={`${basePath}${capacitacion.banner}`}
             alt={capacitacion.nombre}
-            fill
             className="object-cover group-hover:scale-110 transition-transform duration-300"
           />
         </div>
