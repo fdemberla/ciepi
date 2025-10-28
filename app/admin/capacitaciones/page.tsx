@@ -1,8 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
-import toast from "react-hot-toast";
 import AdminProtection from "@/components/AdminProtection";
 
 interface Capacitacion {
@@ -155,10 +153,9 @@ const CapacitacionesAdmin = () => {
                   {/* Banner */}
                   <div className="relative h-48 bg-gradient-to-br from-blue-500 to-purple-600">
                     {capacitacion.banner ? (
-                      <Image
+                      <img
                         src={`${process.env.NEXT_PUBLIC_BASE_PATH}${capacitacion.banner}`}
                         alt={capacitacion.nombre}
-                        fill
                         className="object-cover"
                       />
                     ) : (

@@ -105,7 +105,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     // Obtener el rol del usuario
     const roleQuery = `
-      SELECT rol FROM ciepi.usuarios_administradores 
+      SELECT rol_id FROM ciepi.usuarios_administradores 
       WHERE id = $1
     `;
     const roleResult = await query(roleQuery, [session.user.adminId]);
@@ -117,7 +117,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       );
     }
 
-    const userRole = roleResult.rows[0].rol;
+    const userRole = roleResult.rows[0].rol_id;
     const { id } = await params;
     const body = await request.json();
     const {
@@ -294,7 +294,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
     // Obtener el rol del usuario
     const roleQuery = `
-      SELECT rol FROM ciepi.usuarios_administradores 
+      SELECT rol_id FROM ciepi.usuarios_administradores 
       WHERE id = $1
     `;
     const roleResult = await query(roleQuery, [session.user.adminId]);
@@ -306,7 +306,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       );
     }
 
-    const userRole = roleResult.rows[0].rol;
+    const userRole = roleResult.rows[0].rol_id;
 
     // Validación de permisos para ELIMINAR
     if (!canDeleteBlog(userRole)) {

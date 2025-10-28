@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
 
     // Obtener el rol del usuario desde la BD
     const roleQuery = `
-      SELECT rol FROM ciepi.usuarios_administradores 
+      SELECT rol_id FROM ciepi.usuarios_administradores 
       WHERE id = $1
     `;
     const roleResult = await query(roleQuery, [session.user.adminId]);
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const userRole = roleResult.rows[0].rol;
+    const userRole = roleResult.rows[0].rol_id;
 
     // Verificar permisos para crear blogs
     if (!canCreateBlog(userRole)) {
