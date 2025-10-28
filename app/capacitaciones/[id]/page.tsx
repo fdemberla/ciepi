@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Image from "next/image";
 import { Icon } from "@iconify/react";
 import SlateRenderer from "@/components/SlateRenderer";
 import { FileDownloadLink } from "@/components/FileDownloadLink";
@@ -148,11 +147,10 @@ const CapacitacionDetailPage = () => {
           {/* Banner */}
           {cap.banner ? (
             <div className="relative h-80 sm:h-96 w-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-              <Image
+              <img
                 src={`${process.env.NEXT_PUBLIC_BASE_PATH}${cap.banner}`}
                 alt={cap.nombre || "Capacitación"}
-                fill
-                className="object-cover"
+                className="object-cover w-full h-full"
               />
             </div>
           ) : (

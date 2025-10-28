@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
-import Image from "next/image";
 
 interface Blog {
   id: string;
@@ -235,11 +234,10 @@ export default function BlogPage() {
                 {/* Blog Image */}
                 <div className="relative h-48 bg-gray-200 dark:bg-gray-700">
                   {blog.imagen_banner ? (
-                    <Image
+                    <img
                       src={blog.imagen_banner}
                       alt={blog.titulo}
-                      fill
-                      className="object-cover"
+                      className="object-cover w-full h-full"
                     />
                   ) : (
                     <div className="flex items-center justify-center h-full">

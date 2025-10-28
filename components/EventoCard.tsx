@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import { Icon } from "@iconify/react";
 import EventoCountdown from "./EventoCountdown";
 
@@ -77,12 +76,10 @@ const EventoCard: React.FC<EventoCardProps> = ({ evento }) => {
       {/* Banner */}
       <div className={`relative h-48 w-full ${bannerBgColor} overflow-hidden`}>
         {evento.banner ? (
-          <Image
+          <img
             src={`${process.env.NEXT_PUBLIC_BASE_PATH}${evento.banner}`}
             alt={evento.nombre}
-            fill
             className="object-cover w-full h-full"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
         ) : (
           <div

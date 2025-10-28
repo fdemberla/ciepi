@@ -3,7 +3,6 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
-import Image from "next/image";
 import SlateRenderer from "@/components/SlateRenderer";
 import { JsonLdScript } from "@/components/JsonLdScript";
 import { sanitizeForJsonLd } from "@/lib/security";
@@ -128,16 +127,6 @@ export default async function BlogPostPage({
     });
   };
 
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-ES", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   return (
     <div className="min-h-screen bg-slateGray dark:bg-gray-900">
       {/* Back Button */}
@@ -192,13 +181,10 @@ export default async function BlogPostPage({
           {/* Featured Image */}
           {blog.imagen_banner && (
             <div className="relative w-full h-64 md:h-96 rounded-xl overflow-hidden mb-8 shadow-lg">
-              <Image
+              <img
                 src={blog.imagen_banner}
                 alt={blog.titulo}
-                fill
-                className="object-cover"
-                priority
-                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 100vw, 896px"
+                className="object-cover w-full h-full"
               />
             </div>
           )}

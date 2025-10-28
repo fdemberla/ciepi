@@ -4,7 +4,6 @@ import { useRouter, useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import { Icon } from "@iconify/react";
-import Image from "next/image";
 import AdminProtection from "@/components/AdminProtection";
 
 interface Blog {
@@ -327,12 +326,10 @@ export default function AprobarBlogPage() {
                   Imagen Banner:
                 </h3>
                 <div className="relative w-full h-48 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700">
-                  <Image
+                  <img
                     src={blog.imagen_banner}
                     alt={blog.titulo}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 100vw, 896px"
+                    className="object-cover w-full h-full"
                   />
                 </div>
               </div>
