@@ -131,7 +131,7 @@ export default function RolesPage() {
     } catch (error) {
       console.error("Error saving role:", error);
       toast.error(
-        error instanceof Error ? error.message : "Error al actualizar rol"
+        error instanceof Error ? error.message : "Error al actualizar rol",
       );
     } finally {
       setSubmitting(false);
@@ -168,7 +168,7 @@ export default function RolesPage() {
     } catch (error) {
       console.error("Error creating role:", error);
       toast.error(
-        error instanceof Error ? error.message : "Error al crear rol"
+        error instanceof Error ? error.message : "Error al crear rol",
       );
     } finally {
       setSubmitting(false);
@@ -219,9 +219,9 @@ export default function RolesPage() {
     <div className="min-h-screen bg-slateGray dark:bg-gray-900 py-8">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
-        <div className="mb-8 flex justify-between items-center">
+        <div className="mb-8 flex justify-between items-center pb-6 border-b border-gray-200 dark:border-gray-700">
           <div>
-            <h1 className="text-3xl font-bold text-midnight_text dark:text-white mb-2">
+            <h1 className="text-3xl font-bold text-midnight_text dark:text-white mb-1">
               Administración de Roles
             </h1>
             <p className="text-dark_grey dark:text-gray-400">
@@ -231,19 +231,19 @@ export default function RolesPage() {
           <div className="flex gap-3">
             <button
               onClick={() => router.push("/admin/usuarios")}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-midnight_text dark:text-white"
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-midnight_text dark:text-white"
             >
               <Icon
                 icon="solar:users-group-rounded-linear"
-                className="w-5 h-5"
+                className="w-4 h-4"
               />
               Gestionar Usuarios
             </button>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors shadow-md hover:shadow-lg"
             >
-              <Icon icon="solar:add-circle-linear" className="w-5 h-5" />
+              <Icon icon="solar:add-circle-linear" className="w-4 h-4" />
               Nuevo Rol
             </button>
           </div>
@@ -254,14 +254,14 @@ export default function RolesPage() {
           {roles.map((role) => (
             <div
               key={role.id}
-              className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow"
+              className="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 p-6 hover:-translate-y-1 hover:shadow-lg transition-all duration-300"
             >
               {/* Encabezado */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <span
                     className={`inline-block px-3 py-1 rounded-full text-xs font-semibold mb-3 ${getRoleColor(
-                      role.id
+                      role.id,
                     )}`}
                   >
                     ID: {role.id}
@@ -313,7 +313,7 @@ export default function RolesPage() {
               {role.id !== 1 && role.id !== 2 && (
                 <button
                   onClick={() => handleEditRole(role)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-primary text-primary hover:bg-primary hover:text-white rounded-lg transition-colors"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-primary text-primary hover:bg-primary hover:text-white rounded-xl transition-colors"
                 >
                   <Icon icon="solar:pen-linear" className="w-4 h-4" />
                   Editar
@@ -337,7 +337,7 @@ export default function RolesPage() {
             <div className="space-y-4">
               {roles.map((role) => {
                 const usuariosDelRol = usuarios.filter(
-                  (u) => u.rol_id === role.id
+                  (u) => u.rol_id === role.id,
                 );
                 if (usuariosDelRol.length === 0) return null;
 
@@ -385,7 +385,7 @@ export default function RolesPage() {
                               <span className="text-xs text-gray-500 dark:text-gray-400">
                                 Último acceso:{" "}
                                 {new Date(
-                                  usuario.ultimo_login
+                                  usuario.ultimo_login,
                                 ).toLocaleDateString("es-PA")}
                               </span>
                             )}

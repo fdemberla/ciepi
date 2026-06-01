@@ -23,7 +23,7 @@ export default function Navbar() {
   // Función para filtrar links visibles según el contexto
   const filterLinks = (
     links: NavLink[],
-    context: "desktop" | "mobile"
+    context: "desktop" | "mobile",
   ): NavLink[] => {
     return links.filter((link) => {
       const { visible } = link;
@@ -91,6 +91,8 @@ export default function Navbar() {
         sticky ? "shadow-lg py-4" : "shadow-none py-6"
       }`}
     >
+      {/* Top accent gradient bar */}
+      <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary via-secondary to-success" />
       <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
@@ -148,11 +150,11 @@ export default function Navbar() {
                 <Link
                   key={`${sectionIdx}-${linkIdx}`}
                   href={link.href}
-                  className="px-6 py-3 text-midnight_text dark:text-gray-300 hover:bg-slateGray dark:hover:bg-gray-800 rounded-full transition-all duration-300 font-medium"
+                  className="px-5 py-2.5 text-midnight_text dark:text-gray-300 hover:bg-slateGray dark:hover:bg-gray-800 hover:text-primary dark:hover:text-primary rounded-full transition-all duration-200 font-medium text-sm"
                 >
                   <Icon
                     icon={link.icon}
-                    className="w-5 h-5 inline-block mr-2"
+                    className="w-4 h-4 inline-block mr-2 opacity-70"
                   />
                   {link.name}
                 </Link>
@@ -249,7 +251,7 @@ export default function Navbar() {
         {/* Mobile Menu */}
         {showMobileMenu && (
           <div
-            className="lg:hidden mt-4 pt-4 border-t border-gray-200 dark:border-gray-700"
+            className="lg:hidden mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 animate-fade-in"
             data-menu
           >
             <nav className="flex flex-col gap-2">

@@ -9,8 +9,9 @@ import { AuthProvider } from "@/components/AuthProvider";
 import { Toaster } from "react-hot-toast";
 
 export const metadata: Metadata = {
-  title: "CIEPI",
-  description: "Centro de Innovacion y Emprendimiento Productivo",
+  title: "CIEPI — Centro de Innovación y Emprendimiento Productivo",
+  description:
+    "Fomentamos el emprendimiento productivo en Panamá: coworking, incubación de proyectos, capacitación tecnológica y acceso a recursos para aprendices, egresados y grupos vulnerables. Una iniciativa de INADEH.",
 };
 
 export default function RootLayout({

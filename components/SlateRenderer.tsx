@@ -105,7 +105,7 @@ const SlateRenderer: React.FC<SlateRendererProps> = ({
           <p
             key={index}
             className={`mb-4 text-dark_grey dark:text-gray-300 text-lg leading-relaxed ${getAlignmentClass(
-              node.align
+              node.align,
             )}`}
             style={getIndentStyle(node.indent)}
           >
@@ -118,7 +118,7 @@ const SlateRenderer: React.FC<SlateRendererProps> = ({
           <h1
             key={index}
             className={`text-4xl font-bold text-midnight_text dark:text-white mb-6 mt-8 ${getAlignmentClass(
-              node.align
+              node.align,
             )}`}
             style={getIndentStyle(node.indent)}
           >
@@ -131,7 +131,7 @@ const SlateRenderer: React.FC<SlateRendererProps> = ({
           <h2
             key={index}
             className={`text-3xl font-bold text-midnight_text dark:text-white mb-4 mt-6 ${getAlignmentClass(
-              node.align
+              node.align,
             )}`}
             style={getIndentStyle(node.indent)}
           >
@@ -144,7 +144,7 @@ const SlateRenderer: React.FC<SlateRendererProps> = ({
           <h3
             key={index}
             className={`text-2xl font-semibold text-midnight_text dark:text-white mb-3 mt-5 ${getAlignmentClass(
-              node.align
+              node.align,
             )}`}
             style={getIndentStyle(node.indent)}
           >
@@ -157,7 +157,7 @@ const SlateRenderer: React.FC<SlateRendererProps> = ({
           <h4
             key={index}
             className={`text-xl font-semibold text-midnight_text dark:text-white mb-3 mt-4 ${getAlignmentClass(
-              node.align
+              node.align,
             )}`}
             style={getIndentStyle(node.indent)}
           >
@@ -169,8 +169,8 @@ const SlateRenderer: React.FC<SlateRendererProps> = ({
         return (
           <blockquote
             key={index}
-            className={`border-l-4 border-[#1A21BC] pl-6 py-2 my-6 bg-gray-50 dark:bg-gray-800 rounded-r-lg italic text-dark_grey dark:text-gray-300 ${getAlignmentClass(
-              node.align
+            className={`border-l-4 border-primary pl-6 py-2 my-6 bg-gray-50 dark:bg-gray-800 rounded-r-lg italic text-dark_grey dark:text-gray-300 ${getAlignmentClass(
+              node.align,
             )}`}
             style={getIndentStyle(node.indent)}
           >
@@ -183,7 +183,7 @@ const SlateRenderer: React.FC<SlateRendererProps> = ({
           <ol
             key={index}
             className={`list-decimal list-inside space-y-2 mb-4 ml-4 text-dark_grey dark:text-gray-300 ${getAlignmentClass(
-              node.align
+              node.align,
             )}`}
             style={getIndentStyle(node.indent)}
           >
@@ -196,7 +196,7 @@ const SlateRenderer: React.FC<SlateRendererProps> = ({
           <ul
             key={index}
             className={`list-disc list-inside space-y-2 mb-4 ml-4 text-dark_grey dark:text-gray-300 ${getAlignmentClass(
-              node.align
+              node.align,
             )}`}
             style={getIndentStyle(node.indent)}
           >
@@ -229,7 +229,7 @@ const SlateRenderer: React.FC<SlateRendererProps> = ({
           <pre
             key={index}
             className={`bg-gray-900 dark:bg-gray-950 text-gray-100 p-4 rounded-lg overflow-x-auto mb-4 text-sm font-mono ${getAlignmentClass(
-              node.align
+              node.align,
             )}`}
             style={getIndentStyle(node.indent)}
           >
@@ -242,7 +242,7 @@ const SlateRenderer: React.FC<SlateRendererProps> = ({
           <p
             key={index}
             className={`mb-4 text-dark_grey dark:text-gray-300 text-lg leading-relaxed ${getAlignmentClass(
-              node.align
+              node.align,
             )}`}
             style={getIndentStyle(node.indent)}
           >

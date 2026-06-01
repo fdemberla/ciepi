@@ -41,7 +41,7 @@ function KeywordsInput({ value, onChange }: KeywordsInputProps) {
             }
           }}
           placeholder="Escribe una palabra y presiona Enter"
-          className="flex-1 rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none"
+          className="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition-colors placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20 focus-visible:shadow-none"
         />
         <button
           type="button"
@@ -163,7 +163,7 @@ function BlogForm({
             id={field.name}
             name={field.name}
             type="text"
-            className="w-full rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
+            className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition-colors placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20 focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
             value={(formData[field.name] as string) || ""}
             onChange={(e) => handleChange(field.name, e.target.value)}
             required={field.required}
@@ -181,7 +181,7 @@ function BlogForm({
       case "file":
         return (
           <div
-            className="w-full flex flex-col items-center justify-center border-2 border-dashed border-black/20 dark:border-gray-600 rounded-md py-12 px-4 bg-white dark:bg-gray-800 text-dark_grey dark:text-gray-300 cursor-pointer transition-all hover:border-[#1A21BC] hover:bg-primary/5 dark:hover:bg-primary/10 focus:outline-none focus:border-[#1A21BC] min-h-[160px]"
+            className="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md py-12 px-4 bg-white dark:bg-gray-800 text-dark_grey dark:text-gray-300 cursor-pointer transition-all hover:border-primary hover:bg-primary/5 dark:hover:bg-primary/10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 min-h-[160px]"
             onClick={() =>
               document.getElementById(`file-input-${field.name}`)?.click()
             }
@@ -243,7 +243,7 @@ function BlogForm({
 
       case "textarea-slate":
         return (
-          <div className="border border-black/20 dark:border-gray-600 rounded-md overflow-hidden min-h-[500px]">
+          <div className="border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden min-h-[500px]">
             <SlateEditorField
               id={field.name}
               name={field.name}
@@ -283,7 +283,7 @@ function BlogForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className={`w-full flex items-center text-lg font-medium justify-center rounded-md px-6 py-4 text-white transition duration-300 ease-in-out border-[#1A21BC] border ${
+          className={`w-full flex items-center text-lg font-medium justify-center rounded-xl px-6 py-4 text-white transition duration-200 ease-in-out border-primary border ${
             isSubmitting
               ? "bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-70"
               : "bg-primary hover:bg-primary/90"
@@ -343,13 +343,13 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
   const { data: session } = useSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedAction, setSelectedAction] = useState<"borrador" | "revision">(
-    "borrador"
+    "borrador",
   );
   const [isChangingState, setIsChangingState] = useState(false);
   const [showStateModal, setShowStateModal] = useState(false);
   const [localBlog, setLocalBlog] = useState<Blog | undefined>(blog);
   const [selectedEstadoId, setSelectedEstadoId] = useState<number | null>(
-    localBlog?.estado ?? null
+    localBlog?.estado ?? null,
   );
   const [comentarioEstado, setComentarioEstado] = useState("");
   const userRole = session?.user?.rolId || 0;
@@ -469,7 +469,7 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
         const errorData = await response.json();
         throw new Error(
           errorData.error ||
-            `Error al ${mode === "create" ? "crear" : "actualizar"} el blog`
+            `Error al ${mode === "create" ? "crear" : "actualizar"} el blog`,
         );
       }
 
@@ -487,12 +487,12 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
     } catch (error) {
       console.error(
         `Error al ${mode === "create" ? "crear" : "actualizar"} blog:`,
-        error
+        error,
       );
       toast.error(
         error instanceof Error
           ? error.message
-          : `Error al ${mode === "create" ? "crear" : "actualizar"} el blog`
+          : `Error al ${mode === "create" ? "crear" : "actualizar"} el blog`,
       );
     } finally {
       setIsSubmitting(false);
@@ -521,31 +521,42 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
   };
 
   return (
-    <div className="min-h-screen bg-slateGray dark:bg-gray-900 py-8">
-      <div className="max-w-6xl mx-auto px-4">
-        {" "}
-        {/* Aumenté el ancho máximo */}
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
+    <div className="min-h-screen bg-slateGray dark:bg-gray-900">
+      {/* Page Header */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-4">
+          <div className="flex items-center gap-1.5 text-xs text-dark_grey dark:text-gray-400 mb-3">
             <button
               onClick={onCancel}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="hover:text-primary transition-colors"
+            >
+              Blog
+            </button>
+            <Icon icon="solar:alt-arrow-right-linear" className="w-3 h-3" />
+            <span className="text-midnight_text dark:text-white font-medium">
+              {mode === "create" ? "Crear Nueva" : "Editar"}
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onCancel}
+              className="group flex-shrink-0 w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all duration-200"
+              aria-label="Volver a Blog"
             >
               <Icon
-                icon="solar:arrow-left-linear"
-                className="w-6 h-6 text-midnight_text dark:text-white"
+                icon="solar:alt-arrow-left-linear"
+                className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform"
               />
             </button>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-midnight_text dark:text-white">
+              <h1 className="text-xl font-bold text-midnight_text dark:text-white">
                 {mode === "create"
                   ? "Crear Nueva Entrada de Blog"
                   : "Editar Blog"}
               </h1>
-              <p className="text-dark_grey dark:text-gray-400">
+              <p className="text-xs text-dark_grey dark:text-gray-400 mt-0.5">
                 {mode === "create"
-                  ? "Crea una nueva entrada para el blog con contenido enriquecido"
+                  ? "Crea una nueva entrada con contenido enriquecido"
                   : "Modifica la información y contenido del blog"}
               </p>
             </div>
@@ -558,7 +569,7 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
                     setComentarioEstado("");
                     setShowStateModal(true);
                   }}
-                  className="flex items-center gap-2 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
+                  className="flex items-center gap-2 px-3 py-2 bg-secondary text-white rounded-xl hover:bg-secondary/90 transition-colors text-sm font-medium"
                 >
                   <Icon icon="solar:check-circle-linear" className="w-4 h-4" />
                   Cambiar Estado
@@ -566,200 +577,199 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
               </div>
             )}
           </div>
+        </div>
+      </div>
 
-          {/* Modal para cambiar estado (rendereado fuera del flex pero dentro del header) */}
-          {showStateModal && localBlog && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg mx-auto">
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-midnight_text dark:text-white">
-                      Cambiar estado del blog
-                    </h3>
-                    <button
-                      onClick={() => setShowStateModal(false)}
-                      className="text-dark_grey dark:text-gray-400 hover:text-midnight_text dark:hover:text-white transition-colors"
-                    >
-                      <Icon
-                        icon="solar:close-circle-linear"
-                        className="w-6 h-6"
-                      />
-                    </button>
-                  </div>
-                  <p className="text-sm text-dark_grey dark:text-gray-400 mt-2">
-                    Estado actual:{" "}
-                    <span className="font-medium">
-                      {localBlog.estado_nombre}
-                    </span>
-                  </p>
+      <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-8">
+        {/* Modal para cambiar estado */}
+        {showStateModal && localBlog && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg mx-auto">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-midnight_text dark:text-white">
+                    Cambiar estado del blog
+                  </h3>
+                  <button
+                    onClick={() => setShowStateModal(false)}
+                    className="text-dark_grey dark:text-gray-400 hover:text-midnight_text dark:hover:text-white transition-colors"
+                  >
+                    <Icon
+                      icon="solar:close-circle-linear"
+                      className="w-6 h-6"
+                    />
+                  </button>
                 </div>
+                <p className="text-sm text-dark_grey dark:text-gray-400 mt-2">
+                  Estado actual:{" "}
+                  <span className="font-medium">{localBlog.estado_nombre}</span>
+                </p>
+              </div>
 
-                <div className="p-6">
-                  <div className="space-y-3">
-                    {/* Lista de estados disponibles */}
-                    {[
-                      {
-                        id: 1,
-                        nombre: "Borrador",
-                        descripcion: "Borrador - editable por el autor",
-                      },
-                      {
-                        id: 2,
-                        nombre: "En Revisión CIEPI",
-                        descripcion: "En revisión por CIEPI",
-                      },
-                      {
-                        id: 3,
-                        nombre: "Rechazado por CIEPI",
-                        descripcion: "Rechazado por CIEPI",
-                      },
-                      {
-                        id: 4,
-                        nombre: "En Revisión Relaciones Públicas",
-                        descripcion: "En revisión por Relaciones Públicas",
-                      },
-                      {
-                        id: 5,
-                        nombre: "Rechazado por Relaciones Públicas",
-                        descripcion: "Rechazado por Relaciones Públicas",
-                      },
-                      {
-                        id: 6,
-                        nombre: "Publicado",
-                        descripcion: "Publicado públicamente",
-                      },
-                    ]
-                      .filter((estado) =>
-                        getAllowedStatesForRole(userRole).includes(estado.id)
-                      )
-                      .map((estado) => (
-                        <label
-                          key={estado.id}
-                          className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                            selectedEstadoId === estado.id
-                              ? "border-primary bg-primary/5 dark:bg-primary/10"
-                              : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="estado"
-                            value={estado.id}
-                            checked={selectedEstadoId === estado.id}
-                            onChange={() => setSelectedEstadoId(estado.id)}
-                            className="mt-1 text-primary focus:ring-primary"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-midnight_text dark:text-white">
-                                {estado.nombre}
-                              </span>
-                            </div>
-                            <p className="text-sm text-dark_grey dark:text-gray-400 mt-1">
-                              {estado.descripcion}
-                            </p>
+              <div className="p-6">
+                <div className="space-y-3">
+                  {/* Lista de estados disponibles */}
+                  {[
+                    {
+                      id: 1,
+                      nombre: "Borrador",
+                      descripcion: "Borrador - editable por el autor",
+                    },
+                    {
+                      id: 2,
+                      nombre: "En Revisión CIEPI",
+                      descripcion: "En revisión por CIEPI",
+                    },
+                    {
+                      id: 3,
+                      nombre: "Rechazado por CIEPI",
+                      descripcion: "Rechazado por CIEPI",
+                    },
+                    {
+                      id: 4,
+                      nombre: "En Revisión Relaciones Públicas",
+                      descripcion: "En revisión por Relaciones Públicas",
+                    },
+                    {
+                      id: 5,
+                      nombre: "Rechazado por Relaciones Públicas",
+                      descripcion: "Rechazado por Relaciones Públicas",
+                    },
+                    {
+                      id: 6,
+                      nombre: "Publicado",
+                      descripcion: "Publicado públicamente",
+                    },
+                  ]
+                    .filter((estado) =>
+                      getAllowedStatesForRole(userRole).includes(estado.id),
+                    )
+                    .map((estado) => (
+                      <label
+                        key={estado.id}
+                        className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                          selectedEstadoId === estado.id
+                            ? "border-primary bg-primary/5 dark:bg-primary/10"
+                            : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="estado"
+                          value={estado.id}
+                          checked={selectedEstadoId === estado.id}
+                          onChange={() => setSelectedEstadoId(estado.id)}
+                          className="mt-1 text-primary focus:ring-primary"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-midnight_text dark:text-white">
+                              {estado.nombre}
+                            </span>
                           </div>
-                        </label>
-                      ))}
-
-                    <div>
-                      <label className="block text-sm font-medium text-midnight_text dark:text-white mb-2">
-                        Comentario (opcional)
+                          <p className="text-sm text-dark_grey dark:text-gray-400 mt-1">
+                            {estado.descripcion}
+                          </p>
+                        </div>
                       </label>
-                      <textarea
-                        value={comentarioEstado}
-                        onChange={(e) => setComentarioEstado(e.target.value)}
-                        placeholder="Agregar comentario sobre este cambio..."
-                        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-midnight_text dark:text-white resize-none"
-                        rows={3}
-                      />
-                    </div>
-                  </div>
-                </div>
+                    ))}
 
-                <div className="p-6 border-t border-gray-200 dark:border-gray-700">
-                  <div className="flex gap-3 justify-end">
-                    <button
-                      onClick={() => setShowStateModal(false)}
-                      disabled={isChangingState}
-                      className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-midnight_text dark:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (!localBlog || selectedEstadoId === null) return;
-                        if (selectedEstadoId === localBlog.estado) {
-                          setShowStateModal(false);
-                          return;
-                        }
-
-                        try {
-                          setIsChangingState(true);
-                          const basePath =
-                            process.env.NEXT_PUBLIC_BASE_PATH || "";
-                          const res = await fetch(
-                            `${basePath}/api/admin/blog/${localBlog.id}`,
-                            {
-                              method: "PUT",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                estado: selectedEstadoId,
-                                comentario_temp: comentarioEstado,
-                              }),
-                            }
-                          );
-
-                          if (!res.ok) {
-                            const err = await res.json();
-                            throw new Error(
-                              err.error || "Error al cambiar estado"
-                            );
-                          }
-
-                          const result = await res.json();
-                          // Actualizar estado localmente
-                          setLocalBlog((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  estado: selectedEstadoId!,
-                                  estado_nombre:
-                                    result.data?.estado_nombre ??
-                                    prev.estado_nombre,
-                                }
-                              : prev
-                          );
-                          toast.success("Estado actualizado correctamente");
-                          setShowStateModal(false);
-                        } catch (error) {
-                          console.error("Error cambiando estado:", error);
-                          toast.error(
-                            error instanceof Error
-                              ? error.message
-                              : "Error al cambiar estado"
-                          );
-                        } finally {
-                          setIsChangingState(false);
-                        }
-                      }}
-                      disabled={
-                        isChangingState ||
-                        selectedEstadoId === localBlog?.estado
-                      }
-                      className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-                    >
-                      {isChangingState ? "Procesando..." : "Confirmar cambio"}
-                    </button>
+                  <div>
+                    <label className="block text-sm font-medium text-midnight_text dark:text-white mb-2">
+                      Comentario (opcional)
+                    </label>
+                    <textarea
+                      value={comentarioEstado}
+                      onChange={(e) => setComentarioEstado(e.target.value)}
+                      placeholder="Agregar comentario sobre este cambio..."
+                      className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-midnight_text dark:text-white resize-none"
+                      rows={3}
+                    />
                   </div>
                 </div>
               </div>
+
+              <div className="p-6 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => setShowStateModal(false)}
+                    disabled={isChangingState}
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-midnight_text dark:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!localBlog || selectedEstadoId === null) return;
+                      if (selectedEstadoId === localBlog.estado) {
+                        setShowStateModal(false);
+                        return;
+                      }
+
+                      try {
+                        setIsChangingState(true);
+                        const basePath =
+                          process.env.NEXT_PUBLIC_BASE_PATH || "";
+                        const res = await fetch(
+                          `${basePath}/api/admin/blog/${localBlog.id}`,
+                          {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              estado: selectedEstadoId,
+                              comentario_temp: comentarioEstado,
+                            }),
+                          },
+                        );
+
+                        if (!res.ok) {
+                          const err = await res.json();
+                          throw new Error(
+                            err.error || "Error al cambiar estado",
+                          );
+                        }
+
+                        const result = await res.json();
+                        // Actualizar estado localmente
+                        setLocalBlog((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                estado: selectedEstadoId!,
+                                estado_nombre:
+                                  result.data?.estado_nombre ??
+                                  prev.estado_nombre,
+                              }
+                            : prev,
+                        );
+                        toast.success("Estado actualizado correctamente");
+                        setShowStateModal(false);
+                      } catch (error) {
+                        console.error("Error cambiando estado:", error);
+                        toast.error(
+                          error instanceof Error
+                            ? error.message
+                            : "Error al cambiar estado",
+                        );
+                      } finally {
+                        setIsChangingState(false);
+                      }
+                    }}
+                    disabled={
+                      isChangingState || selectedEstadoId === localBlog?.estado
+                    }
+                    className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors"
+                  >
+                    {isChangingState ? "Procesando..." : "Confirmar cambio"}
+                  </button>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
         {/* Selector de Acción para creación */}
         {mode === "create" && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm p-6 mb-6">
             <h3 className="text-lg font-medium text-midnight_text dark:text-white mb-4">
               ¿Qué deseas hacer con este blog?
             </h3>
@@ -811,17 +821,17 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
         )}
         {/* Información de estado para edición */}
         {mode === "edit" && blog && blog.estado! > 1 && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+          <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 dark:border-primary/30 rounded-xl p-4 mb-6">
             <div className="flex items-start gap-3">
               <Icon
                 icon="solar:info-circle-linear"
-                className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5"
+                className="w-5 h-5 text-primary dark:text-primary/80 mt-0.5"
               />
               <div>
-                <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-1">
+                <h3 className="text-sm font-semibold text-primary dark:text-primary/80 mb-1">
                   Blog en proceso de revisión
                 </h3>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
+                <p className="text-sm text-primary/80 dark:text-primary/70">
                   Este blog está actualmente en estado &ldquo;
                   {blog.estado_nombre}&rdquo;. Los cambios que hagas se
                   guardarán, pero no afectarán el proceso de revisión actual.
@@ -832,7 +842,7 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
         )}
         {/* Validación de permisos de edición */}
         {mode === "edit" && !canEditBlog(userRole) && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-6">
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-6">
             <div className="flex items-start gap-3">
               <Icon
                 icon="solar:lock-linear"

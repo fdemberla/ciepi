@@ -41,7 +41,7 @@ const CapacitacionDetailPage = () => {
       setLoading(true);
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
       const response = await fetch(
-        `${basePath}/api/capacitaciones/${capacitacionId}`
+        `${basePath}/api/capacitaciones/${capacitacionId}`,
       );
 
       if (!response.ok) {
@@ -53,7 +53,7 @@ const CapacitacionDetailPage = () => {
     } catch (err) {
       console.error("Error fetching capacitacion:", err);
       setError(
-        err instanceof Error ? err.message : "Error al cargar la capacitación"
+        err instanceof Error ? err.message : "Error al cargar la capacitación",
       );
     } finally {
       setLoading(false);
@@ -94,7 +94,7 @@ const CapacitacionDetailPage = () => {
     return (
       <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-[#1A21BC]/20 border-t-[#1A21BC]"></div>
+          <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-primary/20 border-t-primary"></div>
           <p className="mt-6 text-midnight_text dark:text-white text-lg font-medium">
             Cargando información...
           </p>
@@ -250,7 +250,7 @@ const CapacitacionDetailPage = () => {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Inscripción */}
-                <div className="bg-gradient-to-br from-primary/10 to-[#1A21BC]/5 dark:from-primary/20 dark:to-[#1A21BC]/10 rounded-2xl p-6 border-2 border-[#1A21BC]/20 dark:border-[#1A21BC]/30">
+                <div className="bg-gradient-to-br from-primary/10 to-primary/5 dark:from-primary/20 dark:to-primary/10 rounded-2xl p-6 border border-primary/20 dark:border-primary/30">
                   <div className="flex items-center mb-4">
                     <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center mr-3">
                       <Icon

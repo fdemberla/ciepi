@@ -46,7 +46,7 @@ export default function Table<T>({
 }: TableProps<T>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
+    [],
   );
 
   const table = useReactTable({
@@ -94,15 +94,24 @@ export default function Table<T>({
               <div className="relative w-full sm:w-auto sm:min-w-[300px]">
                 <Icon
                   icon="solar:magnifer-linear"
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-dark_grey dark:text-gray-400 w-5 h-5"
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-dark_grey dark:text-gray-400 w-4 h-4"
                 />
                 <input
                   type="text"
                   placeholder={searchPlaceholder}
                   value={searchValue}
                   onChange={(e) => onSearchChange(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white dark:bg-gray-700 text-midnight_text dark:text-white"
+                  className="w-full h-11 pl-9 pr-9 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-gray-700 text-midnight_text dark:text-white text-sm"
                 />
+                {searchValue && (
+                  <button
+                    onClick={() => onSearchChange("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-dark_grey dark:text-gray-400 hover:text-midnight_text dark:hover:text-white transition-colors"
+                    aria-label="Limpiar búsqueda"
+                  >
+                    <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -143,7 +152,7 @@ export default function Table<T>({
                           >
                             {flexRender(
                               header.column.columnDef.header,
-                              header.getContext()
+                              header.getContext(),
                             )}
                             {enableSorting && header.column.getCanSort() && (
                               <Icon
@@ -151,8 +160,8 @@ export default function Table<T>({
                                   header.column.getIsSorted() === "asc"
                                     ? "solar:sort-vertical-linear"
                                     : header.column.getIsSorted() === "desc"
-                                    ? "solar:sort-vertical-linear"
-                                    : "solar:sort-linear"
+                                      ? "solar:sort-vertical-linear"
+                                      : "solar:sort-linear"
                                 }
                                 className={`w-4 h-4 transition-transform ${
                                   header.column.getIsSorted() === "desc"
@@ -178,7 +187,7 @@ export default function Table<T>({
                       <td key={cell.id} className="py-4 px-6 relative">
                         {flexRender(
                           cell.column.columnDef.cell,
-                          cell.getContext()
+                          cell.getContext(),
                         )}
                       </td>
                     ))}
@@ -205,7 +214,7 @@ export default function Table<T>({
                       {Math.min(
                         (table.getState().pagination.pageIndex + 1) *
                           table.getState().pagination.pageSize,
-                        table.getFilteredRowModel().rows.length
+                        table.getFilteredRowModel().rows.length,
                       )}
                     </span>{" "}
                     de{" "}
@@ -219,7 +228,7 @@ export default function Table<T>({
                   <button
                     onClick={() => table.setPageIndex(0)}
                     disabled={!table.getCanPreviousPage()}
-                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:bg-slateGray dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="h-9 w-9 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:bg-slateGray dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <Icon
                       icon="solar:double-alt-arrow-left-linear"
@@ -229,7 +238,7 @@ export default function Table<T>({
                   <button
                     onClick={() => table.previousPage()}
                     disabled={!table.getCanPreviousPage()}
-                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:bg-slateGray dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="h-9 w-9 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:bg-slateGray dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <Icon
                       icon="solar:alt-arrow-left-linear"
@@ -248,7 +257,7 @@ export default function Table<T>({
                   <button
                     onClick={() => table.nextPage()}
                     disabled={!table.getCanNextPage()}
-                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:bg-slateGray dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="h-9 w-9 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:bg-slateGray dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <Icon
                       icon="solar:alt-arrow-right-linear"
@@ -258,7 +267,7 @@ export default function Table<T>({
                   <button
                     onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                     disabled={!table.getCanNextPage()}
-                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:bg-slateGray dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="h-9 w-9 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:bg-slateGray dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <Icon
                       icon="solar:double-alt-arrow-right-linear"

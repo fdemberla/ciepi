@@ -36,7 +36,7 @@ const CapacitacionesPage = () => {
       setLoading(true);
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
       const response = await fetch(
-        `${basePath}/api/capacitaciones?activo=true`
+        `${basePath}/api/capacitaciones?activo=true`,
       );
 
       if (!response.ok) {
@@ -48,7 +48,7 @@ const CapacitacionesPage = () => {
     } catch (err) {
       console.error("Error fetching capacitaciones:", err);
       setError(
-        err instanceof Error ? err.message : "Error al cargar capacitaciones"
+        err instanceof Error ? err.message : "Error al cargar capacitaciones",
       );
     } finally {
       setLoading(false);
@@ -64,7 +64,7 @@ const CapacitacionesPage = () => {
     return (
       <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-[#1A21BC]/20 border-t-[#1A21BC]"></div>
+          <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-primary/20 border-t-primary"></div>
           <p className="mt-6 text-midnight_text dark:text-white text-lg font-medium">
             Cargando capacitaciones...
           </p>
@@ -96,28 +96,33 @@ const CapacitacionesPage = () => {
   }
 
   return (
-    <section className="bg-slateGray dark:bg-gray-900 min-h-screen pt-32 pb-20">
-      <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4">
-        {/* Header with Badge */}
-        <div className="mb-12 text-center">
-          <div className="flex gap-2 items-center justify-center mb-6">
-            <Icon
-              icon="solar:verified-check-bold"
-              className="text-success text-2xl"
-            />
-            <p className="text-success text-base font-semibold">
-              Capacitaciones Profesionales
+    <section className="bg-slateGray dark:bg-gray-900 min-h-screen pb-20">
+      {/* Hero Band */}
+      <div className="bg-gradient-to-b from-primary/8 via-primary/3 to-transparent pt-32 pb-12">
+        <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4">
+          <div className="mb-2 text-center">
+            <div className="flex gap-2 items-center justify-center mb-6">
+              <Icon
+                icon="solar:verified-check-bold"
+                className="text-success text-2xl"
+              />
+              <p className="text-success text-base font-semibold">
+                Capacitaciones Profesionales
+              </p>
+            </div>
+            <h1 className="text-midnight_text dark:text-white text-4xl sm:text-5xl font-bold mb-4 relative inline-block">
+              Capacitaciones Disponibles
+              <span className="block h-1 w-16 bg-secondary rounded-full mx-auto mt-3"></span>
+            </h1>
+            <p className="text-dark_grey dark:text-gray-400 text-lg max-w-2xl mx-auto mt-4">
+              Explora nuestras capacitaciones activas y avanza en tu desarrollo
+              profesional
             </p>
           </div>
-          <h1 className="text-midnight_text dark:text-white text-4xl sm:text-5xl font-bold mb-4">
-            Capacitaciones Disponibles
-          </h1>
-          <p className="text-dark_grey dark:text-gray-400 text-lg max-w-2xl mx-auto">
-            Explora nuestras capacitaciones activas y avanza en tu desarrollo
-            profesional
-          </p>
         </div>
+      </div>
 
+      <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4">
         {/* Capacitaciones Grid */}
         {capacitaciones.length === 0 ? (
           <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-3xl shadow-lg">
@@ -134,13 +139,18 @@ const CapacitacionesPage = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {capacitaciones.map((capacitacion) => (
-              <CapacitacionCard
+            {capacitaciones.map((capacitacion, index) => (
+              <div
                 key={capacitacion.id}
-                capacitacion={capacitacion}
-                onVerMas={handleVerMas}
-                basePath={process.env.NEXT_PUBLIC_BASE_PATH}
-              />
+                className="animate-fade-up"
+                style={{ animationDelay: `${index * 80}ms` }}
+              >
+                <CapacitacionCard
+                  capacitacion={capacitacion}
+                  onVerMas={handleVerMas}
+                  basePath={process.env.NEXT_PUBLIC_BASE_PATH}
+                />
+              </div>
             ))}
           </div>
         )}

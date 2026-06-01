@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": "516bd2154eb843a8240e43d5b285229129853114ad7075a5e141e1c08e408c84"
+    },
+    "ui-ux-pro-max-skill": {
+      "source": "aradotso/trending-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ui-ux-pro-max-skill/SKILL.md",
+      "computedHash": "5468b05b7eebdb29865e456ac81f827e83fd507e1b9ec96882535475387d4a2a"
+    }
+  }
+}

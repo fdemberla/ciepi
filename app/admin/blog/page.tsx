@@ -134,7 +134,7 @@ export default function BlogAdminPage() {
               {row.original.palabras_clave.slice(0, 3).map((palabra, index) => (
                 <span
                   key={index}
-                  className="px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs rounded"
+                  className="px-2 py-1 bg-primary/5 dark:bg-primary/10 text-primary text-xs rounded-full"
                 >
                   {palabra}
                 </span>
@@ -178,7 +178,7 @@ export default function BlogAdminPage() {
                 onClick={() =>
                   router.push(`/admin/blog/editar/${row.original.id}`)
                 }
-                className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                className="p-2 text-primary hover:bg-primary/5 dark:hover:bg-primary/10 rounded-lg transition-colors"
                 title="Editar blog"
               >
                 <Icon icon="solar:pen-linear" className="w-5 h-5" />
@@ -218,40 +218,50 @@ export default function BlogAdminPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-slateGray dark:bg-gray-900 py-8">
-      <div className="max-w-7xl mx-auto px-4">
-        {/* Header */}
-        <div className="mb-8 flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-midnight_text dark:text-white mb-2">
-              Gestión de Blog
-            </h1>
-            <p className="text-dark_grey dark:text-gray-400">
-              Administra las entradas del blog, desde borradores hasta
-              publicaciones
-            </p>
+    <div className="min-h-screen bg-slateGray dark:bg-gray-900">
+      {/* Page Header */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-4">
+          <div className="flex items-center gap-1.5 text-xs text-dark_grey dark:text-gray-400 mb-3">
+            <span className="text-midnight_text dark:text-white font-medium">
+              Blog
+            </span>
+            <Icon icon="solar:alt-arrow-right-linear" className="w-3 h-3" />
+            <span>Gestión</span>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => router.push("/admin/blog/aprobar")}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-              <Icon icon="solar:check-circle-linear" className="w-5 h-5" />
-              Aprobar Blogs
-            </button>
-            <button
-              onClick={() => router.push("/admin/blog/crear")}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-            >
-              <Icon icon="solar:add-circle-linear" className="w-5 h-5" />
-              Crear Blog
-            </button>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h1 className="text-xl font-bold text-midnight_text dark:text-white">
+                Gestión de Blog
+              </h1>
+              <p className="text-xs text-dark_grey dark:text-gray-400 mt-0.5">
+                Administra borradores, revisiones y publicaciones
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => router.push("/admin/blog/aprobar")}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-midnight_text dark:text-white text-sm font-medium"
+              >
+                <Icon icon="solar:check-circle-linear" className="w-4 h-4" />
+                Aprobar Blogs
+              </button>
+              <button
+                onClick={() => router.push("/admin/blog/crear")}
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors shadow-sm text-sm font-medium"
+              >
+                <Icon icon="solar:add-circle-linear" className="w-4 h-4" />
+                Crear Blog
+              </button>
+            </div>
           </div>
         </div>
+      </div>
 
+      <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-8">
         {/* Estadísticas rápidas */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 border-l-4 border-l-gray-400">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -267,7 +277,7 @@ export default function BlogAdminPage() {
               />
             </div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 border-l-4 border-l-primary">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -277,10 +287,10 @@ export default function BlogAdminPage() {
                   {blogs.filter((b) => [2, 4].includes(b.estado)).length}
                 </p>
               </div>
-              <Icon icon="solar:eye-linear" className="w-8 h-8 text-blue-400" />
+              <Icon icon="solar:eye-linear" className="w-8 h-8 text-primary" />
             </div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 border-l-4 border-l-red-400">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -296,7 +306,7 @@ export default function BlogAdminPage() {
               />
             </div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 border-l-4 border-l-success">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -308,7 +318,7 @@ export default function BlogAdminPage() {
               </div>
               <Icon
                 icon="solar:verified-check-linear"
-                className="w-8 h-8 text-green-400"
+                className="w-8 h-8 text-success"
               />
             </div>
           </div>

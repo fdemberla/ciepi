@@ -37,9 +37,9 @@ const EventoCard: React.FC<EventoCardProps> = ({ evento }) => {
   const getStatusColor = () => {
     switch (estado) {
       case "pasado":
-        return "grayscale opacity-75";
+        return "opacity-60";
       case "en-curso":
-        return "ring-2 ring-green-500 dark:ring-green-400";
+        return "ring-2 ring-success dark:ring-success";
       case "futuro":
         return "";
     }
@@ -69,9 +69,7 @@ const EventoCard: React.FC<EventoCardProps> = ({ evento }) => {
 
   return (
     <div
-      className={`bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 ${
-        estado === "pasado" ? "grayscale opacity-80" : ""
-      } ${getStatusColor()}`}
+      className={`bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 ${getStatusColor()}`}
     >
       {/* Banner */}
       <div className={`relative h-48 w-full ${bannerBgColor} overflow-hidden`}>

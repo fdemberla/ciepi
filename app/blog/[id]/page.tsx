@@ -29,8 +29,8 @@ async function getBlog(id: string): Promise<Blog | null> {
     const baseUrl = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
       : process.env.NODE_ENV === "production"
-      ? "https://yourdomain.com"
-      : "http://localhost:3000";
+        ? "https://yourdomain.com"
+        : "http://localhost:3000";
 
     const response = await fetch(`${baseUrl}${basePath}/api/blog/${id}`, {
       next: { revalidate: 3600 }, // Revalidate every hour
@@ -51,9 +51,10 @@ async function getBlog(id: string): Promise<Blog | null> {
 export async function generateMetadata({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }): Promise<Metadata> {
-  const blog = await getBlog(params.id);
+  const { id } = await params;
+  const blog = await getBlog(id);
 
   if (!blog) {
     return {
@@ -111,9 +112,10 @@ export async function generateMetadata({
 export default async function BlogPostPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const blog = await getBlog(params.id);
+  const { id } = await params;
+  const blog = await getBlog(id);
 
   if (!blog) {
     notFound();
@@ -129,14 +131,23 @@ export default async function BlogPostPage({
 
   return (
     <div className="min-h-screen bg-slateGray dark:bg-gray-900">
-      {/* Back Button */}
+      {/* Page Header */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center gap-1.5 text-xs text-dark_grey dark:text-gray-400 mb-3">
+            <Link href="/blog" className="hover:text-primary transition-colors">
+              Blog
+            </Link>
+            <Icon icon="solar:alt-arrow-right-linear" className="w-3 h-3" />
+            <span className="text-midnight_text dark:text-white font-medium truncate max-w-[240px]">
+              {blog.titulo}
+            </span>
+          </div>
           <Link
             href="/blog"
-            className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium transition-colors"
+            className="inline-flex items-center gap-2 text-sm text-dark_grey dark:text-gray-400 hover:text-primary transition-colors"
           >
-            <Icon icon="solar:arrow-left-linear" className="w-5 h-5" />
+            <Icon icon="solar:alt-arrow-left-linear" className="w-4 h-4" />
             Volver al blog
           </Link>
         </div>

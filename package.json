@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@fontsource-variable/syne": "^5.2.7",
     "@fontsource/roboto-condensed": "^5.2.8",
     "@iconify/react": "^6.0.2",
     "@tanstack/react-table": "^8.21.3",

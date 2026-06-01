@@ -46,7 +46,7 @@ const EventosPage = () => {
     } catch (err) {
       console.error("Error fetching eventos:", err);
       setError(
-        err instanceof Error ? err.message : "Error al cargar los eventos"
+        err instanceof Error ? err.message : "Error al cargar los eventos",
       );
     } finally {
       setLoading(false);
@@ -109,54 +109,54 @@ const EventosPage = () => {
           )}
 
           {/* Filtros */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-12">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 p-5 mb-12">
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => setFiltro("todos")}
-                className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm transition-all duration-200 ${
                   filtro === "todos"
-                    ? "bg-primary text-white shadow-lg"
-                    : "bg-gray-100 dark:bg-gray-700 text-midnight_text dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600"
+                    ? "bg-primary text-white shadow-md"
+                    : "bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:border-primary/40 hover:text-primary"
                 }`}
               >
-                <Icon icon="solar:list-bold" className="w-5 h-5" />
-                Todos ({stats.todos})
+                <Icon icon="solar:list-bold" className="w-4 h-4" />
+                Todos <span className="font-bold">({stats.todos})</span>
               </button>
 
               <button
                 onClick={() => setFiltro("futuros")}
-                className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm transition-all duration-200 ${
                   filtro === "futuros"
-                    ? "bg-blue-500 text-white shadow-lg"
-                    : "bg-gray-100 dark:bg-gray-700 text-midnight_text dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600"
+                    ? "bg-primary text-white shadow-md"
+                    : "bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:border-primary/40 hover:text-primary"
                 }`}
               >
-                <Icon icon="solar:calendar-add-bold" className="w-5 h-5" />
-                Próximos ({stats.futuros})
+                <Icon icon="solar:calendar-add-bold" className="w-4 h-4" />
+                Próximos <span className="font-bold">({stats.futuros})</span>
               </button>
 
               <button
                 onClick={() => setFiltro("en-curso")}
-                className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm transition-all duration-200 ${
                   filtro === "en-curso"
-                    ? "bg-green-500 text-white shadow-lg"
-                    : "bg-gray-100 dark:bg-gray-700 text-midnight_text dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600"
+                    ? "bg-primary text-white shadow-md"
+                    : "bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:border-primary/40 hover:text-primary"
                 }`}
               >
-                <Icon icon="solar:play-circle-bold" className="w-5 h-5" />
-                En Curso ({stats.enCurso})
+                <Icon icon="solar:play-circle-bold" className="w-4 h-4" />
+                En Curso <span className="font-bold">({stats.enCurso})</span>
               </button>
 
               <button
                 onClick={() => setFiltro("pasados")}
-                className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition-all duration-300 ${
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm transition-all duration-200 ${
                   filtro === "pasados"
-                    ? "bg-gray-600 text-white shadow-lg"
-                    : "bg-gray-100 dark:bg-gray-700 text-midnight_text dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600"
+                    ? "bg-primary text-white shadow-md"
+                    : "bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:border-primary/40 hover:text-primary"
                 }`}
               >
-                <Icon icon="solar:calendar-2-bold" className="w-5 h-5" />
-                Pasados ({stats.pasados})
+                <Icon icon="solar:calendar-2-bold" className="w-4 h-4" />
+                Pasados <span className="font-bold">({stats.pasados})</span>
               </button>
             </div>
           </div>
@@ -167,7 +167,7 @@ const EventosPage = () => {
       <div className="w-[min(1400px,90%)] mx-auto">
         {loading ? (
           <div className="text-center py-16">
-            <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-[#1A21BC]/20 border-t-[#1A21BC]"></div>
+            <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-primary/20 border-t-primary"></div>
             <p className="mt-6 text-midnight_text dark:text-white text-lg font-medium">
               Cargando eventos...
             </p>
@@ -189,8 +189,14 @@ const EventosPage = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {eventosFiltrados.map((evento) => (
-              <EventoCard key={evento.id} evento={evento} />
+            {eventosFiltrados.map((evento, index) => (
+              <div
+                key={evento.id}
+                className="animate-fade-up"
+                style={{ animationDelay: `${index * 80}ms` }}
+              >
+                <EventoCard evento={evento} />
+              </div>
             ))}
           </div>
         )}

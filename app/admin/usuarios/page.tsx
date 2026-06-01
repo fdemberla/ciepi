@@ -132,7 +132,7 @@ export default function UsuariosAdminPage() {
       cell: ({ row }) => (
         <span
           className={`px-3 py-1 rounded-full text-sm font-semibold ${getRolColor(
-            row.original.rol_id
+            row.original.rol_id,
           )}`}
         >
           {getRoleNombre(row.original.rol_id)}
@@ -143,14 +143,21 @@ export default function UsuariosAdminPage() {
       accessorKey: "activo",
       header: "Estado",
       cell: ({ row }) => (
-        <span
-          className={`px-2 py-1 rounded text-xs font-semibold ${
-            row.original.activo
-              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-              : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
-          }`}
-        >
-          {row.original.activo ? "Activo" : "Inactivo"}
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className={`w-2 h-2 rounded-full flex-shrink-0 ${
+              row.original.activo ? "bg-success" : "bg-red-400"
+            }`}
+          />
+          <span
+            className={`text-xs font-semibold ${
+              row.original.activo
+                ? "text-success dark:text-green-400"
+                : "text-red-600 dark:text-red-400"
+            }`}
+          >
+            {row.original.activo ? "Activo" : "Inactivo"}
+          </span>
         </span>
       ),
     },
@@ -209,7 +216,7 @@ export default function UsuariosAdminPage() {
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-4 mb-4 pb-6 border-b border-gray-200 dark:border-gray-700">
             <button
               onClick={() => router.push("/admin/roles")}
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -229,7 +236,7 @@ export default function UsuariosAdminPage() {
             </div>
             <button
               onClick={() => router.push("/admin/usuarios/crear")}
-              className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-full hover:bg-primary/90 transition-all duration-300 shadow-lg hover:shadow-xl"
+              className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary/90 transition-all duration-300 shadow-md hover:shadow-lg"
             >
               <Icon icon="solar:user-plus-linear" className="w-5 h-5" />
               <span>Crear Usuario</span>

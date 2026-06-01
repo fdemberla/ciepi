@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { Icon } from "@iconify/react";
 import type { FormFieldOrSection } from "@/components/Form.types";
 import Form from "@/components/Form";
 import toast from "react-hot-toast";
@@ -165,16 +166,16 @@ const EditarCapacitacionPage = () => {
           cantidadHoras: data.cantidad_horas || "",
           cantidad_participantes: data.cantidad_participantes || "",
           fechaInicioInscripcion: formatDateForInput(
-            data.fecha_inicio_inscripcion
+            data.fecha_inicio_inscripcion,
           ),
           fechaFinalInscripcion: formatDateForInput(
-            data.fecha_final_inscripcion
+            data.fecha_final_inscripcion,
           ),
           fechaInicioCapacitacion: formatDateForInput(
-            data.fecha_inicio_capacitacion
+            data.fecha_inicio_capacitacion,
           ),
           fechaFinalCapacitacion: formatDateForInput(
-            data.fecha_final_capacitacion
+            data.fecha_final_capacitacion,
           ),
           activo: String(data.activo),
           // Note: Files (Banner, archivoAdjunto) are not pre-loaded
@@ -186,7 +187,7 @@ const EditarCapacitacionPage = () => {
       } catch (err) {
         console.error("Error fetching capacitacion:", err);
         setError(
-          err instanceof Error ? err.message : "Error al cargar capacitación"
+          err instanceof Error ? err.message : "Error al cargar capacitación",
         );
         setLoading(false);
       }
@@ -248,16 +249,19 @@ const EditarCapacitacionPage = () => {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Error al actualizar la capacitación"
+          : "Error al actualizar la capacitación",
       );
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-gray-600 text-lg">Cargando capacitación...</div>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
+          <p className="mt-4 text-dark_grey dark:text-gray-400">
+            Cargando capacitación...
+          </p>
         </div>
       </div>
     );
@@ -265,14 +269,21 @@ const EditarCapacitacionPage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-600 text-lg mb-4">{error}</div>
+      <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-10 max-w-md mx-4">
+          <Icon
+            icon="solar:danger-circle-linear"
+            className="w-12 h-12 text-red-500 mx-auto mb-4"
+          />
+          <p className="text-midnight_text dark:text-white text-lg font-medium mb-2">
+            Error al cargar
+          </p>
+          <p className="text-dark_grey dark:text-gray-400 mb-6">{error}</p>
           <button
             onClick={() => router.push("/admin/capacitaciones")}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+            className="px-6 py-2.5 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors font-medium"
           >
-            Volver a la lista
+            Volver a Capacitaciones
           </button>
         </div>
       </div>
@@ -285,13 +296,57 @@ const EditarCapacitacionPage = () => {
 
   return (
     <AdminProtection>
-      <Form
-        title="Editar Capacitación"
-        fields={fields}
-        onSubmit={handleSubmit}
-        submitLabel="Guardar Cambios"
-        initialValues={initialData}
-      />
+      <div className="min-h-screen bg-slateGray dark:bg-gray-900">
+        {/* Page Header */}
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-4">
+            <div className="flex items-center gap-1.5 text-xs text-dark_grey dark:text-gray-400 mb-3">
+              <a
+                href="/ciepi/admin/capacitaciones"
+                className="hover:text-primary transition-colors"
+              >
+                Capacitaciones
+              </a>
+              <Icon icon="solar:alt-arrow-right-linear" className="w-3 h-3" />
+              <span className="text-midnight_text dark:text-white font-medium">
+                Editar
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              <a
+                href="/ciepi/admin/capacitaciones"
+                className="group flex-shrink-0 w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all duration-200"
+                aria-label="Volver a Capacitaciones"
+              >
+                <Icon
+                  icon="solar:alt-arrow-left-linear"
+                  className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform"
+                />
+              </a>
+              <div>
+                <h1 className="text-xl font-bold text-midnight_text dark:text-white">
+                  Editar Capacitación
+                </h1>
+                <p className="text-xs text-dark_grey dark:text-gray-400 mt-0.5">
+                  Modifique los campos y guarde los cambios
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Form Content */}
+        <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-8">
+          <div className="max-w-4xl mx-auto">
+            <Form
+              fields={fields}
+              onSubmit={handleSubmit}
+              submitLabel="Guardar Cambios"
+              initialValues={initialData}
+            />
+          </div>
+        </div>
+      </div>
     </AdminProtection>
   );
 };

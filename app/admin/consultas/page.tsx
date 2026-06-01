@@ -28,7 +28,7 @@ export default function ConsultasAdminPage() {
   const [consultas, setConsultas] = useState<Consulta[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedConsulta, setSelectedConsulta] = useState<Consulta | null>(
-    null
+    null,
   );
   const [showModal, setShowModal] = useState(false);
   const [respuesta, setRespuesta] = useState("");
@@ -89,7 +89,7 @@ export default function ConsultasAdminPage() {
             respuesta,
             estado: nuevoEstado,
           }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -232,9 +232,9 @@ export default function ConsultasAdminPage() {
     <div className="min-h-screen bg-slateGray dark:bg-gray-900 py-8">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
-        <div className="mb-8 flex justify-between items-center">
+        <div className="mb-8 flex justify-between items-center pb-6 border-b border-gray-200 dark:border-gray-700">
           <div>
-            <h1 className="text-3xl font-bold text-midnight_text dark:text-white mb-2">
+            <h1 className="text-3xl font-bold text-midnight_text dark:text-white mb-1">
               Gestión de Consultas
             </h1>
             <p className="text-dark_grey dark:text-gray-400">
@@ -243,9 +243,9 @@ export default function ConsultasAdminPage() {
           </div>
           <button
             onClick={() => router.push("/admin/tipos-consultas")}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors shadow-md hover:shadow-lg"
           >
-            <Icon icon="solar:settings-linear" className="w-5 h-5" />
+            <Icon icon="solar:settings-linear" className="w-4 h-4" />
             Gestionar Tipos
           </button>
         </div>
@@ -271,8 +271,8 @@ export default function ConsultasAdminPage() {
 
       {/* Modal de Detalles/Respuesta */}
       {showModal && selectedConsulta && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 dark:border-gray-700 animate-fade-up">
             <div className="p-6">
               {/* Header */}
               <div className="flex justify-between items-start mb-6">
@@ -383,7 +383,7 @@ export default function ConsultasAdminPage() {
                 <select
                   value={nuevoEstado}
                   onChange={(e) => setNuevoEstado(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-midnight_text dark:text-white focus:ring-2 focus:ring-primary"
+                  className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-midnight_text dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
                 >
                   <option value="pendiente">Pendiente</option>
                   <option value="en_proceso">En Proceso</option>
@@ -394,22 +394,27 @@ export default function ConsultasAdminPage() {
 
               {/* Respuesta */}
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-midnight_text dark:text-white mb-2">
-                  Respuesta
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-semibold text-midnight_text dark:text-white">
+                    Respuesta
+                  </label>
+                  <span className="text-xs text-dark_grey dark:text-gray-400">
+                    {respuesta.length} caracteres
+                  </span>
+                </div>
                 <textarea
                   value={respuesta}
                   onChange={(e) => setRespuesta(e.target.value)}
                   rows={6}
                   placeholder="Escribe tu respuesta aquí..."
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-midnight_text dark:text-white focus:ring-2 focus:ring-primary resize-none"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-midnight_text dark:text-white focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none transition-colors"
                 />
                 {selectedConsulta.fecha_respuesta && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                     Respondida por{" "}
                     {selectedConsulta.respondido_por_nombre || "Admin"} el{" "}
                     {new Date(selectedConsulta.fecha_respuesta).toLocaleString(
-                      "es-PA"
+                      "es-PA",
                     )}
                   </p>
                 )}
@@ -420,10 +425,10 @@ export default function ConsultasAdminPage() {
                 <button
                   onClick={handleResponder}
                   disabled={isSubmitting}
-                  className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 ${
+                  className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 ${
                     isSubmitting
                       ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-primary hover:bg-primary/90 text-white"
+                      : "bg-primary hover:bg-primary/90 text-white shadow-md hover:shadow-lg"
                   }`}
                 >
                   {isSubmitting ? (
@@ -440,7 +445,7 @@ export default function ConsultasAdminPage() {
                 </button>
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-lg font-semibold text-midnight_text dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  className="px-6 py-3 border border-gray-300 dark:border-gray-600 rounded-xl font-semibold text-midnight_text dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 >
                   Cancelar
                 </button>

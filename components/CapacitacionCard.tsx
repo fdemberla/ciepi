@@ -36,7 +36,7 @@ const CapacitacionCard = ({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 group hover:-translate-y-2 dark:shadow-gray-700">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-xl transition-all duration-300 group hover:-translate-y-1">
       {/* Banner Image */}
       {capacitacion.banner ? (
         <div className="relative h-56 w-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
@@ -65,7 +65,7 @@ const CapacitacionCard = ({
         <div className="space-y-3 mb-5">
           {capacitacion.cantidad_horas && (
             <div className="flex items-center text-sm text-dark_grey dark:text-gray-400">
-              <div className="w-9 h-9 rounded-full bg-slateGray dark:bg-gray-700 flex items-center justify-center mr-3">
+              <div className="w-8 h-8 rounded-full bg-slateGray dark:bg-gray-700 flex items-center justify-center mr-3">
                 <Icon
                   icon="solar:clock-circle-linear"
                   className="w-5 h-5 text-primary dark:text-blue-100"
@@ -80,7 +80,7 @@ const CapacitacionCard = ({
 
           {capacitacion.cantidad_participantes && (
             <div className="flex items-center text-sm text-dark_grey dark:text-gray-400">
-              <div className="w-9 h-9 rounded-full bg-slateGray dark:bg-gray-700 flex items-center justify-center mr-3">
+              <div className="w-8 h-8 rounded-full bg-slateGray dark:bg-gray-700 flex items-center justify-center mr-3">
                 <Icon
                   icon="solar:users-group-rounded-linear"
                   className="w-5 h-5 text-primary dark:text-blue-100"
@@ -94,8 +94,8 @@ const CapacitacionCard = ({
         </div>
 
         {/* Dates Section */}
-        <div className="border-t border-gray-100 dark:border-gray-700 pt-5 mb-6">
-          <div className="space-y-3 text-sm">
+        <div className="border-t border-gray-100 dark:border-gray-700 pt-4 mb-5">
+          <div className="bg-slateGray/60 dark:bg-gray-700/30 rounded-xl px-3 py-3 space-y-3 text-sm">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Icon
@@ -132,7 +132,7 @@ const CapacitacionCard = ({
         {/* Action Button */}
         <button
           onClick={() => onVerMas(capacitacion.id)}
-          className="w-full bg-primary text-white py-4 px-6 rounded-full hover:bg-primary/90 focus:outline-none focus:ring-4 focus:ring-[#1A21BC]/20 transition-all duration-300 font-semibold text-base shadow-lg group-hover:shadow-xl"
+          className="w-full bg-primary text-white py-3.5 px-6 rounded-full hover:bg-primary/90 focus:outline-none focus:ring-4 focus:ring-primary/20 transition-all duration-200 font-semibold text-base shadow-md hover:shadow-lg"
         >
           Más Información
           <Icon

@@ -84,7 +84,7 @@ const EventosPage = () => {
         `${basePath}/api/admin/eventos/${eventoToDelete.id}`,
         {
           method: "DELETE",
-        }
+        },
       );
 
       if (!response.ok) {
@@ -106,7 +106,7 @@ const EventosPage = () => {
     return (
       <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-[#1A21BC]/20 border-t-[#1A21BC]"></div>
+          <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-primary/20 border-t-primary"></div>
           <p className="mt-6 text-midnight_text dark:text-white text-lg font-medium">
             Cargando eventos...
           </p>

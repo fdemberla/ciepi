@@ -44,7 +44,7 @@ declare global {
     grecaptcha?: {
       execute: (
         siteKey: string,
-        options: { action: string }
+        options: { action: string },
       ) => Promise<string>;
     };
   }
@@ -146,7 +146,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
       ) {
         const error = validateField(
           field as FormFieldConfig,
-          formData[(field as FormFieldConfig).name]
+          formData[(field as FormFieldConfig).name],
         );
         if (error) {
           valid = false;
@@ -165,7 +165,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
     if (requireCaptcha && resolvedSiteKey) {
       if (!window.grecaptcha || !window.grecaptcha.execute) {
         setCaptchaError(
-          "No se pudo cargar reCAPTCHA. Intenta de nuevo más tarde."
+          "No se pudo cargar reCAPTCHA. Intenta de nuevo más tarde.",
         );
         return;
       }
@@ -189,7 +189,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
   // Recursive render function for fields and sections
   function renderFields(
     fieldsArr: (FormFieldConfig | FormSection)[],
-    parentKey = ""
+    parentKey = "",
   ): React.ReactNode[] {
     const rendered: React.ReactNode[] = [];
     let i = 0;
@@ -203,13 +203,13 @@ const Form: React.FC<FormWithCaptchaProps> = ({
             key={parentKey + section.name}
             className={`${section.className || ""} mb-8`}
           >
-            <h3 className="mb-6 text-xl font-semibold text-midnight_text dark:text-white border-b border-black/20 dark:border-gray-700 pb-3">
+            <h3 className="mb-6 text-xl font-semibold text-midnight_text dark:text-white border-l-4 border-primary pl-3 pb-1">
               {section.label}
             </h3>
             <div className="grid gap-4 sm:grid-cols-2 sm:gap-6">
               {renderFields(section.fields, parentKey + section.name + "-")}
             </div>
-          </div>
+          </div>,
         );
         i++;
       } else {
@@ -240,7 +240,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
                   >
                     {rf.label}
                     {rf.required && (
-                      <span className="text-red-500 ml-1">*</span>
+                      <span className="text-secondary ml-1">*</span>
                     )}
                   </label>
                   {renderFieldInput(rf)}
@@ -251,7 +251,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
                   )}
                 </div>
               ))}
-            </div>
+            </div>,
           );
           i += rowFields.length;
         } else {
@@ -263,7 +263,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
                 className="block mb-2 text-base font-medium text-midnight_text dark:text-white"
               >
                 {f.label}
-                {f.required && <span className="text-red-500 ml-1">*</span>}
+                {f.required && <span className="text-secondary ml-1">*</span>}
               </label>
               {renderFieldInput(f)}
               {errors[f.name] && (
@@ -271,7 +271,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
                   {errors[f.name]}
                 </span>
               )}
-            </div>
+            </div>,
           );
           i++;
         }
@@ -292,7 +292,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
             id={f.name}
             name={f.name}
             type={f.type}
-            className="w-full rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
+            className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition-colors placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20 focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
             value={(formData[f.name] as string) || ""}
             onChange={(e) => handleChange(f.name, e.target.value)}
             required={f.required}
@@ -301,8 +301,8 @@ const Form: React.FC<FormWithCaptchaProps> = ({
               f.type === "email"
                 ? "ejemplo@correo.com"
                 : f.type === "tel"
-                ? "6666-6666"
-                : undefined
+                  ? "6666-6666"
+                  : undefined
             }
           />
         );
@@ -312,7 +312,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
           <textarea
             id={f.name}
             name={f.name}
-            className="w-full rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
+            className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition-colors placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20 focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
             value={(formData[f.name] as string) || ""}
             onChange={(e) => handleChange(f.name, e.target.value)}
             required={f.required}
@@ -339,7 +339,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
               id={f.name}
               name={f.name}
               type="date"
-              className="w-full rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 pl-10 pr-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
+              className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 pl-10 pr-5 py-3 text-base text-midnight_text dark:text-white outline-none transition-colors placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20 focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
               value={(formData[f.name] as string) || ""}
               onChange={(e) => handleChange(f.name, e.target.value)}
               required={f.required}
@@ -371,7 +371,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
               id={f.name}
               name={f.name}
               type="datetime-local"
-              className="w-full rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 pl-10 pr-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
+              className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 pl-10 pr-5 py-3 text-base text-midnight_text dark:text-white outline-none transition-colors placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20 focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
               value={(formData[f.name] as string) || ""}
               onChange={(e) => handleChange(f.name, e.target.value)}
               required={f.required}
@@ -415,7 +415,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
           <select
             id={f.name}
             name={f.name}
-            className="w-full rounded-md border border-black/20 dark:border-gray-600 border-solid bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-[#1A21BC] dark:focus:border-[#1A21BC] focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
+            className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-5 py-3 text-base text-midnight_text dark:text-white outline-none transition-colors placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20 focus-visible:shadow-none disabled:bg-gray-100 disabled:cursor-not-allowed dark:disabled:bg-gray-800"
             value={(formData[f.name] as string) || ""}
             onChange={(e) => handleChange(f.name, e.target.value)}
             required={f.required}
@@ -433,7 +433,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
       case "file":
         return (
           <div
-            className="w-full flex flex-col items-center justify-center border-2 border-dashed border-black/20 dark:border-gray-600 rounded-md py-8 px-4 bg-white dark:bg-gray-800 text-dark_grey dark:text-gray-300 cursor-pointer transition-all hover:border-[#1A21BC] hover:bg-primary/5 dark:hover:bg-primary/10 focus:outline-none focus:border-[#1A21BC] min-h-[120px] sm:min-h-[140px]"
+            className="w-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md py-8 px-4 bg-white dark:bg-gray-800 text-dark_grey dark:text-gray-300 cursor-pointer transition-all hover:border-primary hover:bg-primary/5 dark:hover:bg-primary/10 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 min-h-[120px] sm:min-h-[140px]"
             onClick={() =>
               document.getElementById(`file-input-${f.name}`)?.click()
             }
@@ -518,7 +518,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className={`flex w-full items-center text-lg font-medium justify-center rounded-md px-5 py-3 text-white transition duration-300 ease-in-out border-[#1A21BC] border ${
+                className={`flex w-full items-center text-lg font-medium justify-center rounded-xl px-5 py-3 text-white transition duration-200 ease-in-out border-primary border ${
                   isSubmitting
                     ? "bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-70"
                     : "bg-primary hover:bg-primary/90"
@@ -556,7 +556,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
             <div className="flex justify-center">
               <button
                 type="button"
-                className="text-midnight_text dark:text-white inline-flex items-center hover:text-primary dark:hover:text-primary border border-black/20 dark:border-gray-600 hover:border-[#1A21BC] focus:outline-none font-medium rounded-md text-base px-5 py-3 text-center transition duration-300"
+                className="text-midnight_text dark:text-white inline-flex items-center hover:text-primary dark:hover:text-primary border border-gray-300 dark:border-gray-600 hover:border-primary focus:outline-none font-medium rounded-xl text-base px-5 py-3 text-center transition-colors duration-200"
                 onClick={() => window.history.back()}
               >
                 <svg

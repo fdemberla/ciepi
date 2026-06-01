@@ -44,7 +44,7 @@ export default function AprobarBlogsPage() {
         }
 
         const response = await fetch(
-          `${basePath}/api/admin/blog?limit=100${estadoFilter}`
+          `${basePath}/api/admin/blog?limit=100${estadoFilter}`,
         );
 
         if (!response.ok) {
@@ -78,7 +78,7 @@ export default function AprobarBlogsPage() {
       }
 
       const response = await fetch(
-        `${basePath}/api/admin/blog?limit=100${estadoFilter}`
+        `${basePath}/api/admin/blog?limit=100${estadoFilter}`,
       );
 
       if (!response.ok) {
@@ -98,7 +98,7 @@ export default function AprobarBlogsPage() {
   const handleEstadoChange = async (
     blogId: string,
     nuevoEstado: number,
-    comentario?: string
+    comentario?: string,
   ) => {
     try {
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
@@ -123,7 +123,7 @@ export default function AprobarBlogsPage() {
     } catch (error) {
       console.error("Error cambiando estado:", error);
       toast.error(
-        error instanceof Error ? error.message : "Error al cambiar estado"
+        error instanceof Error ? error.message : "Error al cambiar estado",
       );
     }
   };
@@ -185,7 +185,7 @@ export default function AprobarBlogsPage() {
             title="Aprobar y enviar a RR.PP"
           >
             <Icon icon="solar:check-circle-linear" className="w-5 h-5" />
-          </button>
+          </button>,
         );
         acciones.push(
           <button
@@ -195,7 +195,7 @@ export default function AprobarBlogsPage() {
             title="Rechazar blog"
           >
             <Icon icon="solar:close-circle-linear" className="w-5 h-5" />
-          </button>
+          </button>,
         );
       }
 
@@ -209,7 +209,7 @@ export default function AprobarBlogsPage() {
             title="Revisar y aprobar detalladamente"
           >
             <Icon icon="solar:document-check-linear" className="w-5 h-5" />
-          </button>
+          </button>,
         );
         acciones.push(
           <button
@@ -219,7 +219,7 @@ export default function AprobarBlogsPage() {
             title="Publicar directamente"
           >
             <Icon icon="solar:verified-check-linear" className="w-5 h-5" />
-          </button>
+          </button>,
         );
         acciones.push(
           <button
@@ -229,7 +229,7 @@ export default function AprobarBlogsPage() {
             title="Rechazar blog"
           >
             <Icon icon="solar:close-circle-linear" className="w-5 h-5" />
-          </button>
+          </button>,
         );
       }
 
@@ -245,7 +245,7 @@ export default function AprobarBlogsPage() {
             title="Reenviar a revisión"
           >
             <Icon icon="solar:refresh-linear" className="w-5 h-5" />
-          </button>
+          </button>,
         );
       }
 
@@ -268,7 +268,7 @@ export default function AprobarBlogsPage() {
         {/* Modal de confirmación */}
         {showModal && accionSeleccionada && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
               <h3 className="text-lg font-semibold text-midnight_text dark:text-white mb-4">
                 {accionSeleccionada.tipo}
               </h3>
@@ -286,7 +286,7 @@ export default function AprobarBlogsPage() {
                   value={comentario}
                   onChange={(e) => setComentario(e.target.value)}
                   placeholder="Agregar comentario sobre esta acción..."
-                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-midnight_text dark:text-white resize-none"
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-midnight_text dark:text-white resize-none"
                   rows={3}
                 />
               </div>
@@ -294,13 +294,13 @@ export default function AprobarBlogsPage() {
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-midnight_text dark:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-midnight_text dark:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={confirmarAccion}
-                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                  className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors"
                 >
                   Confirmar
                 </button>
@@ -350,38 +350,57 @@ export default function AprobarBlogsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-slateGray dark:bg-gray-900 py-8">
-      <div className="max-w-7xl mx-auto px-4">
-        {/* Header */}
-        <div className="mb-8 flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-midnight_text dark:text-white mb-2">
-              Aprobar Blogs
-            </h1>
-            <p className="text-dark_grey dark:text-gray-400">
-              Gestiona la aprobación y revisión de entradas de blog
-            </p>
+    <div className="min-h-screen bg-slateGray dark:bg-gray-900">
+      {/* Page Header */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-4">
+          <div className="flex items-center gap-1.5 text-xs text-dark_grey dark:text-gray-400 mb-3">
+            <button
+              onClick={() => router.push("/admin/blog")}
+              className="hover:text-primary transition-colors"
+            >
+              Blog
+            </button>
+            <Icon icon="solar:alt-arrow-right-linear" className="w-3 h-3" />
+            <span className="text-midnight_text dark:text-white font-medium">
+              Aprobar
+            </span>
           </div>
-          <button
-            onClick={() => router.push("/admin/blog")}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            <Icon icon="solar:arrow-left-linear" className="w-5 h-5" />
-            Volver al listado
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push("/admin/blog")}
+              className="group flex-shrink-0 w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all duration-200"
+              aria-label="Volver a Blog"
+            >
+              <Icon
+                icon="solar:alt-arrow-left-linear"
+                className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform"
+              />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-midnight_text dark:text-white">
+                Aprobar Blogs
+              </h1>
+              <p className="text-xs text-dark_grey dark:text-gray-400 mt-0.5">
+                Gestiona la aprobación y revisión de entradas de blog
+              </p>
+            </div>
+          </div>
         </div>
+      </div>
 
+      <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-8">
         {/* Filtros */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
-          <h3 className="text-lg font-semibold text-midnight_text dark:text-white mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm p-6 mb-8">
+          <h3 className="text-sm font-semibold text-midnight_text dark:text-white mb-4 uppercase tracking-wide">
             Filtrar blogs
           </h3>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-3">
             <button
               onClick={() => setSelectedFilter("pendientes")}
-              className={`px-4 py-2 rounded-lg transition-colors ${
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                 selectedFilter === "pendientes"
-                  ? "bg-primary text-white"
+                  ? "bg-primary text-white shadow-sm"
                   : "bg-gray-100 dark:bg-gray-700 text-midnight_text dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600"
               }`}
             >
@@ -389,9 +408,9 @@ export default function AprobarBlogsPage() {
             </button>
             <button
               onClick={() => setSelectedFilter("revision")}
-              className={`px-4 py-2 rounded-lg transition-colors ${
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                 selectedFilter === "revision"
-                  ? "bg-primary text-white"
+                  ? "bg-primary text-white shadow-sm"
                   : "bg-gray-100 dark:bg-gray-700 text-midnight_text dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600"
               }`}
             >
@@ -399,9 +418,9 @@ export default function AprobarBlogsPage() {
             </button>
             <button
               onClick={() => setSelectedFilter("todos")}
-              className={`px-4 py-2 rounded-lg transition-colors ${
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                 selectedFilter === "todos"
-                  ? "bg-primary text-white"
+                  ? "bg-primary text-white shadow-sm"
                   : "bg-gray-100 dark:bg-gray-700 text-midnight_text dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600"
               }`}
             >
@@ -412,7 +431,7 @@ export default function AprobarBlogsPage() {
 
         {/* Estadísticas */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 border-l-4 border-l-primary">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -422,10 +441,10 @@ export default function AprobarBlogsPage() {
                   {blogs.filter((b) => b.estado === 2).length}
                 </p>
               </div>
-              <Icon icon="solar:eye-linear" className="w-8 h-8 text-blue-400" />
+              <Icon icon="solar:eye-linear" className="w-8 h-8 text-primary" />
             </div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 border-l-4 border-l-purple-400">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -441,7 +460,7 @@ export default function AprobarBlogsPage() {
               />
             </div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 border-l-4 border-l-red-400">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -457,7 +476,7 @@ export default function AprobarBlogsPage() {
               />
             </div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 border-l-4 border-l-success">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -469,7 +488,7 @@ export default function AprobarBlogsPage() {
               </div>
               <Icon
                 icon="solar:verified-check-linear"
-                className="w-8 h-8 text-green-400"
+                className="w-8 h-8 text-success"
               />
             </div>
           </div>

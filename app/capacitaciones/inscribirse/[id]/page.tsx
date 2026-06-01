@@ -507,7 +507,7 @@ export default function InscribirsePage() {
                     value={cedula}
                     onChange={(e) => setCedula(e.target.value)}
                     placeholder="Ej: 8-123-456"
-                    className="w-full pl-14 pr-4 py-4 border-2 border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-[#1A21BC]/20 focus:border-[#1A21BC] transition-all text-midnight_text dark:text-white bg-white dark:bg-gray-700 font-medium text-lg shadow-lg placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                    className="w-full pl-14 pr-4 py-4 border-2 border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary/20 focus:border-primary transition-all text-midnight_text dark:text-white bg-white dark:bg-gray-700 font-medium text-lg shadow-lg placeholder:text-gray-400 dark:placeholder:text-gray-500"
                     style={{ boxShadow: "0 4px 15px rgba(0, 0, 0, 0.08)" }}
                     required
                   />
@@ -548,7 +548,7 @@ export default function InscribirsePage() {
     return (
       <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-[#1A21BC]/20 border-t-[#1A21BC]"></div>
+          <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-primary/20 border-t-primary"></div>
           <p className="mt-6 text-midnight_text dark:text-white text-lg font-medium">
             Verificando cédula...
           </p>
@@ -629,7 +629,7 @@ export default function InscribirsePage() {
                       }
                     }}
                     placeholder="DD/MM/YYYY (ej: 15/03/1990)"
-                    className="w-full pl-14 pr-4 py-4 border-2 border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-[#1A21BC]/20 focus:border-[#1A21BC] transition-all text-midnight_text dark:text-white bg-white dark:bg-gray-700 font-medium text-lg shadow-lg placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                    className="w-full pl-14 pr-4 py-4 border-2 border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary/20 focus:border-primary transition-all text-midnight_text dark:text-white bg-white dark:bg-gray-700 font-medium text-lg shadow-lg placeholder:text-gray-400 dark:placeholder:text-gray-500"
                     style={{ boxShadow: "0 4px 15px rgba(0, 0, 0, 0.08)" }}
                     required
                     maxLength={10}
@@ -837,7 +837,7 @@ export default function InscribirsePage() {
         <div className="max-w-4xl mx-auto px-4 mb-6">
           <div className="bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-lg">
             <div className="flex items-center gap-4">
-              <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#1A21BC]/20 border-t-[#1A21BC]"></div>
+              <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary/20 border-t-primary"></div>
               <p className="text-midnight_text dark:text-white font-medium">
                 Verificando disponibilidad del correo...
               </p>
@@ -899,3 +899,4 @@ export default function InscribirsePage() {
     </section>
   );
 }
+

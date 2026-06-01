@@ -111,11 +111,12 @@ export default function BlogPage() {
   return (
     <div className="min-h-screen bg-slateGray dark:bg-gray-900">
       {/* Hero Section */}
-      <div className="bg-gradient-to-b from-primary/10 to-transparent py-16">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-midnight_text dark:text-white mb-4">
+      <div className="bg-gradient-to-b from-primary/8 via-primary/3 to-transparent pt-32 pb-12">
+        <div className="max-w-7xl mx-auto px-4 text-center animate-fade-up">
+          <h1 className="text-4xl md:text-5xl font-bold text-midnight_text dark:text-white mb-3">
             Blog CIEPI
           </h1>
+          <span className="block h-1 w-14 bg-secondary rounded-full mx-auto mb-4"></span>
           <p className="text-lg text-dark_grey dark:text-gray-400 max-w-2xl mx-auto">
             Descubre las últimas investigaciones, análisis y reflexiones del
             Centro de Investigación en Economía y Políticas Internacionales
@@ -125,21 +126,29 @@ export default function BlogPage() {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Search and Filters */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700 p-5 mb-8">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
             {/* Search Bar */}
             <div className="relative flex-1 max-w-md">
               <Icon
                 icon="solar:magnifer-linear"
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-dark_grey dark:text-gray-400 w-5 h-5"
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-dark_grey dark:text-gray-400 w-4 h-4"
               />
               <input
                 type="text"
                 placeholder="Buscar por título o palabras clave..."
                 value={searchTerm}
                 onChange={handleSearch}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-midnight_text dark:text-white placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full h-11 pl-9 pr-9 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-midnight_text dark:text-white placeholder:text-dark_grey dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
               />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-dark_grey dark:text-gray-400 hover:text-midnight_text dark:hover:text-white"
+                >
+                  <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             {/* Sort Options */}
@@ -150,10 +159,10 @@ export default function BlogPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => handleSortChange("fecha_creacion")}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                     sortBy === "fecha_creacion"
-                      ? "bg-primary text-white"
-                      : "bg-gray-100 dark:bg-gray-700 text-midnight_text dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600"
+                      ? "bg-primary text-white shadow-md"
+                      : "bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:border-primary/40 hover:text-primary"
                   }`}
                 >
                   Fecha
@@ -170,10 +179,10 @@ export default function BlogPage() {
                 </button>
                 <button
                   onClick={() => handleSortChange("titulo")}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                     sortBy === "titulo"
-                      ? "bg-primary text-white"
-                      : "bg-gray-100 dark:bg-gray-700 text-midnight_text dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600"
+                      ? "bg-primary text-white shadow-md"
+                      : "bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:border-primary/40 hover:text-primary"
                   }`}
                 >
                   Título
@@ -207,7 +216,7 @@ export default function BlogPage() {
         {/* Blog Grid */}
         {loading ? (
           <div className="flex justify-center items-center py-16">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
           </div>
         ) : blogs.length === 0 ? (
           <div className="text-center py-16">
@@ -226,10 +235,11 @@ export default function BlogPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {blogs.map((blog) => (
+            {blogs.map((blog, index) => (
               <article
                 key={blog.id}
-                className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
+                className="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden hover:-translate-y-1 hover:shadow-lg transition-all duration-300 animate-fade-up"
+                style={{ animationDelay: `${index * 80}ms` }}
               >
                 {/* Blog Image */}
                 <div className="relative h-48 bg-gray-200 dark:bg-gray-700">
@@ -336,7 +346,7 @@ export default function BlogPage() {
                       {pageNum}
                     </button>
                   );
-                }
+                },
               )}
             </div>
 

@@ -4,7 +4,7 @@ import { Icon } from "@iconify/react";
 
 const Footer = () => {
   return (
-    <footer className="bg-slateGray dark:bg-gray-800 py-16 mt-auto border-t border-gray-200 dark:border-gray-700">
+    <footer className="bg-slateGray dark:bg-gray-800 py-16 mt-auto border-t-2 border-t-primary/20 border-b-0 border-l-0 border-r-0 border border-gray-200 dark:border-gray-700">
       <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4">
         <div className="grid grid-cols-1 gap-y-12 gap-x-8 sm:grid-cols-2 lg:grid-cols-12">
           {/* Logo y Redes Sociales */}
@@ -29,21 +29,21 @@ const Footer = () => {
             <div className="flex items-center gap-3">
               <Link
                 href="#"
-                className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 hover:bg-primary text-midnight_text dark:text-gray-200 hover:text-white flex items-center justify-center transition-all duration-300 shadow-md hover:shadow-lg"
+                className="w-10 h-10 rounded-full bg-white dark:bg-gray-700 hover:bg-primary/10 dark:hover:bg-primary/20 text-dark_grey dark:text-gray-300 hover:text-primary flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md"
               >
-                <Icon icon="tabler:brand-facebook" className="text-2xl" />
+                <Icon icon="tabler:brand-facebook" className="text-xl" />
               </Link>
               <Link
                 href="#"
-                className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 hover:bg-primary text-midnight_text dark:text-gray-200 hover:text-white flex items-center justify-center transition-all duration-300 shadow-md hover:shadow-lg"
+                className="w-10 h-10 rounded-full bg-white dark:bg-gray-700 hover:bg-primary/10 dark:hover:bg-primary/20 text-dark_grey dark:text-gray-300 hover:text-primary flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md"
               >
-                <Icon icon="tabler:brand-twitter" className="text-2xl" />
+                <Icon icon="tabler:brand-twitter" className="text-xl" />
               </Link>
               <Link
                 href="#"
-                className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 hover:bg-primary text-midnight_text dark:text-gray-200 hover:text-white flex items-center justify-center transition-all duration-300 shadow-md hover:shadow-lg"
+                className="w-10 h-10 rounded-full bg-white dark:bg-gray-700 hover:bg-primary/10 dark:hover:bg-primary/20 text-dark_grey dark:text-gray-300 hover:text-primary flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md"
               >
-                <Icon icon="tabler:brand-instagram" className="text-2xl" />
+                <Icon icon="tabler:brand-instagram" className="text-xl" />
               </Link>
             </div>
           </div>
@@ -94,7 +94,7 @@ const Footer = () => {
           </div>
 
           {/* Administración */}
-          <div className="col-span-1 lg:col-span-2">
+          <div className="col-span-1 sm:col-span-1 lg:col-span-3">
             <h3 className="mb-6 text-xl font-bold text-midnight_text dark:text-white">
               Administración
             </h3>
@@ -115,7 +115,7 @@ const Footer = () => {
           </div>
 
           {/* Información de Contacto */}
-          <div className="col-span-1 sm:col-span-2 lg:col-span-4">
+          <div className="col-span-1 sm:col-span-2 lg:col-span-3">
             <h3 className="mb-6 text-xl font-bold text-midnight_text dark:text-white">
               Contacto
             </h3>
@@ -163,6 +163,19 @@ const Footer = () => {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Copyright Row */}
+      <div className="border-t border-gray-200 dark:border-gray-700 mt-12 pt-6">
+        <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <p className="text-xs text-dark_grey dark:text-gray-500">
+            &copy; {new Date().getFullYear()} CIEPI &mdash; Centro de Innovación
+            y Emprendimiento Productivo
+          </p>
+          <p className="text-xs text-dark_grey dark:text-gray-500">
+            INADEH &mdash; República de Panamá
+          </p>
         </div>
       </div>
     </footer>

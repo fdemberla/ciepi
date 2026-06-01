@@ -4,6 +4,7 @@ import type { FormFieldOrSection } from "@/components/Form.types";
 import Form from "@/components/Form";
 import toast from "react-hot-toast";
 import AdminProtection from "@/components/AdminProtection";
+import { Icon } from "@iconify/react";
 
 const fields: FormFieldOrSection[] = [
   {
@@ -159,22 +160,65 @@ const Page = () => {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Error al crear la capacitación"
+          : "Error al crear la capacitación",
       );
     }
   };
 
   return (
     <AdminProtection>
-      <div className="w-full flex justify-center">
-        {/* Ensure the form takes at least 90% of available width, but stays responsive */}
-        <div className="w-full px-4 py-6">
-          <Form
-            title={"Crear Nueva Capacitación"}
-            fields={fields}
-            onSubmit={handleSubmit}
-            submitLabel="Guardar"
-          />
+      <div className="min-h-screen bg-slateGray dark:bg-gray-900">
+        {/* Page Header */}
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-4">
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-1.5 text-xs text-dark_grey dark:text-gray-400 mb-3">
+              <a
+                href="/ciepi/admin/capacitaciones"
+                className="hover:text-primary transition-colors"
+              >
+                Capacitaciones
+              </a>
+              <Icon icon="solar:alt-arrow-right-linear" className="w-3 h-3" />
+              <span className="text-midnight_text dark:text-white font-medium">
+                Crear Nueva
+              </span>
+            </div>
+
+            {/* Header row */}
+            <div className="flex items-center gap-4">
+              <a
+                href="/ciepi/admin/capacitaciones"
+                className="group flex-shrink-0 w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all duration-200"
+                aria-label="Volver a Capacitaciones"
+              >
+                <Icon
+                  icon="solar:alt-arrow-left-linear"
+                  className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform"
+                />
+              </a>
+              <div>
+                <h1 className="text-xl font-bold text-midnight_text dark:text-white">
+                  Crear Nueva Capacitación
+                </h1>
+                <p className="text-xs text-dark_grey dark:text-gray-400 mt-0.5">
+                  Complete los campos requeridos y guarde la capacitación
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Form Content — constrained width */}
+        <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-8">
+          <div className="max-w-4xl mx-auto">
+            <Form
+              title={"Crear Nueva Capacitación"}
+              fields={fields}
+              onSubmit={handleSubmit}
+              submitLabel="Guardar"
+            />
+          </div>
         </div>
       </div>
     </AdminProtection>

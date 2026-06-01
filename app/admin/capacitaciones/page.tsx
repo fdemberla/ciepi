@@ -96,7 +96,7 @@ const CapacitacionesAdmin = () => {
             </h1>
             <Link
               href="/admin/capacitaciones/crear"
-              className="bg-primary text-white px-6 py-3 rounded-full hover:bg-primary/90 transition-all duration-300 font-medium shadow-lg hover:shadow-xl"
+              className="bg-primary text-white px-6 py-3 rounded-xl hover:bg-primary/90 transition-all duration-300 font-medium shadow-md hover:shadow-lg"
             >
               + Nueva Capacitación
             </Link>
@@ -104,28 +104,85 @@ const CapacitacionesAdmin = () => {
 
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
-              <div className="text-dark_grey dark:text-gray-400 text-sm font-medium">
-                Total
-              </div>
-              <div className="text-3xl font-bold text-midnight_text dark:text-white">
-                {capacitaciones.length}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 border-l-4 border-l-primary">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-dark_grey dark:text-gray-400 text-sm font-medium">
+                    Total
+                  </div>
+                  <div className="text-3xl font-bold text-midnight_text dark:text-white">
+                    {capacitaciones.length}
+                  </div>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <svg
+                    className="w-6 h-6 text-primary"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                    />
+                  </svg>
+                </div>
               </div>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
-              <div className="text-dark_grey dark:text-gray-400 text-sm font-medium">
-                Activas
-              </div>
-              <div className="text-3xl font-bold text-success">
-                {capacitaciones.filter((c) => c.activo).length}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 border-l-4 border-l-success">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-dark_grey dark:text-gray-400 text-sm font-medium">
+                    Activas
+                  </div>
+                  <div className="text-3xl font-bold text-success">
+                    {capacitaciones.filter((c) => c.activo).length}
+                  </div>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center">
+                  <svg
+                    className="w-6 h-6 text-success"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
               </div>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg">
-              <div className="text-dark_grey dark:text-gray-400 text-sm font-medium">
-                Inactivas
-              </div>
-              <div className="text-3xl font-bold text-red-600 dark:text-red-500">
-                {capacitaciones.filter((c) => !c.activo).length}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 border-l-4 border-l-red-400">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-dark_grey dark:text-gray-400 text-sm font-medium">
+                    Inactivas
+                  </div>
+                  <div className="text-3xl font-bold text-red-600 dark:text-red-500">
+                    {capacitaciones.filter((c) => !c.activo).length}
+                  </div>
+                </div>
+                <div className="w-12 h-12 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
+                  <svg
+                    className="w-6 h-6 text-red-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                    />
+                  </svg>
+                </div>
               </div>
             </div>
           </div>
@@ -151,7 +208,7 @@ const CapacitacionesAdmin = () => {
                   className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                 >
                   {/* Banner */}
-                  <div className="relative h-48 bg-gradient-to-br from-blue-500 to-purple-600">
+                  <div className="relative h-48 bg-gradient-to-br from-primary/80 to-primary">
                     {capacitacion.banner ? (
                       <img
                         src={`${process.env.NEXT_PUBLIC_BASE_PATH}${capacitacion.banner}`}
@@ -180,7 +237,7 @@ const CapacitacionesAdmin = () => {
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-semibold ${
                           capacitacion.activo
-                            ? "bg-green-500 text-white"
+                            ? "bg-success text-white"
                             : "bg-red-500 text-white"
                         }`}
                       >
@@ -234,7 +291,7 @@ const CapacitacionesAdmin = () => {
                     </div>
 
                     {/* Dates */}
-                    <div className="border-t border-black/10 dark:border-white/10 pt-3 mb-4 space-y-1 text-xs text-dark_grey dark:text-gray-400">
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mb-4 space-y-1 text-xs text-dark_grey dark:text-gray-400">
                       <div>
                         <span className="font-semibold">Inscripción:</span>{" "}
                         {formatDate(capacitacion.fecha_inicio_inscripcion)} -{" "}
@@ -251,13 +308,13 @@ const CapacitacionesAdmin = () => {
                     <div className="flex gap-2">
                       <Link
                         href={`/admin/capacitaciones/editar/${capacitacion.id}`}
-                        className="flex-1 bg-primary text-white text-center py-2 px-4 rounded-full hover:bg-primary/90 transition-all duration-300 font-medium text-sm"
+                        className="flex-1 bg-primary text-white text-center py-2 px-4 rounded-xl hover:bg-primary/90 transition-all duration-300 font-medium text-sm"
                       >
                         Editar
                       </Link>
                       <Link
                         href={`/admin/capacitaciones/detalles/${capacitacion.id}`}
-                        className="flex-1 bg-gray-200 dark:bg-gray-700 text-midnight_text dark:text-white py-2 px-4 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-300 font-medium text-sm"
+                        className="flex-1 bg-gray-100 dark:bg-gray-700 text-midnight_text dark:text-white py-2 px-4 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-300 font-medium text-sm"
                       >
                         Ver Detalles
                       </Link>

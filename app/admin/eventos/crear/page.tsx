@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Icon } from "@iconify/react";
 import Form from "@/components/Form";
 import type { FormFieldConfig } from "@/components/Form.types";
 
@@ -77,7 +78,7 @@ const CrearEventoPage = () => {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
-          errorData.message || errorData.error || "Error al crear evento"
+          errorData.message || errorData.error || "Error al crear evento",
         );
       }
 
@@ -91,13 +92,57 @@ const CrearEventoPage = () => {
   };
 
   return (
-    <Form
-      fields={formFields}
-      onSubmit={handleSubmit}
-      title="Crear Nuevo Evento"
-      submitLabel="Crear Evento"
-      isSubmitting={isSubmitting}
-    />
+    <div className="min-h-screen bg-slateGray dark:bg-gray-900">
+      {/* Page Header */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-4">
+          <div className="flex items-center gap-1.5 text-xs text-dark_grey dark:text-gray-400 mb-3">
+            <button
+              onClick={() => router.push("/admin/eventos")}
+              className="hover:text-primary transition-colors"
+            >
+              Eventos
+            </button>
+            <Icon icon="solar:alt-arrow-right-linear" className="w-3 h-3" />
+            <span className="text-midnight_text dark:text-white font-medium">
+              Crear Nuevo
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push("/admin/eventos")}
+              className="group flex-shrink-0 w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all duration-200"
+              aria-label="Volver a Eventos"
+            >
+              <Icon
+                icon="solar:alt-arrow-left-linear"
+                className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform"
+              />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-midnight_text dark:text-white">
+                Crear Nuevo Evento
+              </h1>
+              <p className="text-xs text-dark_grey dark:text-gray-400 mt-0.5">
+                Complete los campos requeridos y guarde el evento
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Form Content */}
+      <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          <Form
+            fields={formFields}
+            onSubmit={handleSubmit}
+            submitLabel="Crear Evento"
+            isSubmitting={isSubmitting}
+          />
+        </div>
+      </div>
+    </div>
   );
 };
 

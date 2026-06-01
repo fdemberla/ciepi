@@ -13,7 +13,7 @@ console.log("  - rawBasePath:", rawBasePath);
 console.log("  - normalizedBasePath:", normalizedBasePath);
 console.log(
   "  - NEXT_PUBLIC_BASE_PATH env:",
-  process.env.NEXT_PUBLIC_BASE_PATH
+  process.env.NEXT_PUBLIC_BASE_PATH,
 );
 
 const withBasePath = (pathname: string) => {
@@ -44,10 +44,17 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div
+      className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8"
+      style={{
+        backgroundImage:
+          "radial-gradient(circle, rgba(0,74,152,0.07) 1px, transparent 1px)",
+        backgroundSize: "24px 24px",
+      }}
+    >
       <div className="max-w-md w-full space-y-8">
         <div>
-          <div className="mx-auto h-16 w-16 flex items-center justify-center rounded-full bg-gradient-to-br from-primary to-blue-700 shadow-lg">
+          <div className="mx-auto h-16 w-16 flex items-center justify-center rounded-full bg-gradient-to-br from-primary to-blue-700 shadow-lg ring-4 ring-secondary/20">
             <svg
               className="h-8 w-8 text-white"
               fill="none"
@@ -71,7 +78,7 @@ const AdminLogin = () => {
           </p>
         </div>
 
-        <div className="mt-8 space-y-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
+        <div className="mt-8 space-y-6 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 p-8">
           <div className="text-center">
             <p className="text-base text-dark_grey dark:text-gray-300 mb-6">
               Para acceder al portal de administración, inicie sesión con su
@@ -113,7 +120,7 @@ const AdminLogin = () => {
               type="button"
               onClick={handleSamlLogin}
               disabled={isLoading}
-              className="group relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-lg font-medium rounded-md text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1A21BC] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+              className="group relative w-full flex justify-center items-center py-3 px-4 border border-transparent text-lg font-medium rounded-xl text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
               {isLoading ? (
                 <div className="flex items-center">

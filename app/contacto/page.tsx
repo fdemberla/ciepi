@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { Icon } from "@iconify/react";
 import type { FormFieldOrSection } from "@/components/Form.types";
 import Form from "@/components/Form";
 
@@ -12,10 +13,10 @@ const Page = () => {
     Array<{ label: string; value: number }>
   >([]);
   const [sedes, setSedes] = useState<Array<{ label: string; value: number }>>(
-    []
+    [],
   );
   const [areas, setAreas] = useState<Array<{ label: string; value: number }>>(
-    []
+    [],
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -41,7 +42,7 @@ const Page = () => {
             .map((t: { id: number; nombre: string }) => ({
               label: t.nombre,
               value: t.id,
-            }))
+            })),
         );
       }
 
@@ -51,7 +52,7 @@ const Page = () => {
           sedesData.sedes?.map((s: { id: number; nombre: string }) => ({
             label: s.nombre,
             value: s.id,
-          })) || []
+          })) || [],
         );
       }
 
@@ -61,7 +62,7 @@ const Page = () => {
           areasData.areas?.map((a: { id: number; nombre: string }) => ({
             label: a.nombre,
             value: a.id,
-          })) || []
+          })) || [],
         );
       }
     } catch (error) {
@@ -173,7 +174,7 @@ const Page = () => {
       toast.success(
         result.message ||
           "Consulta enviada exitosamente. Nos pondremos en contacto contigo pronto.",
-        { duration: 5000 }
+        { duration: 5000 },
       );
 
       // Redirigir a inicio después de 2 segundos
@@ -183,7 +184,7 @@ const Page = () => {
     } catch (error) {
       console.error("Error enviando consulta:", error);
       toast.error(
-        error instanceof Error ? error.message : "Error al enviar la consulta"
+        error instanceof Error ? error.message : "Error al enviar la consulta",
       );
     } finally {
       setIsSubmitting(false);
@@ -204,15 +205,145 @@ const Page = () => {
   }
 
   return (
-    <Form
-      title="Contacto"
-      fields={fields}
-      onSubmit={handleSubmit}
-      submitLabel="Enviar Consulta"
-      requireCaptcha={true}
-      siteKey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
-      isSubmitting={isSubmitting}
-    />
+    <div className="min-h-screen bg-slateGray dark:bg-gray-900">
+      {/* Hero Band */}
+      <div className="bg-gradient-to-b from-primary/8 via-primary/3 to-transparent pt-28 pb-10">
+        <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4">
+          <div className="text-center animate-fade-up">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Icon
+                icon="solar:chat-line-bold"
+                className="text-success text-xl"
+              />
+              <p className="text-success text-sm font-semibold uppercase tracking-wide">
+                Estamos aquí para ayudarte
+              </p>
+            </div>
+            <h1 className="text-midnight_text dark:text-white text-4xl sm:text-5xl font-bold mb-3 relative inline-block">
+              Contacto
+              <span className="block h-1 w-12 bg-secondary rounded-full mx-auto mt-3"></span>
+            </h1>
+            <p className="text-dark_grey dark:text-gray-400 text-lg max-w-xl mx-auto mt-4">
+              Envíanos tu consulta y te responderemos a la brevedad posible.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Two-column layout */}
+      <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-10 pb-20">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left: Contact Info Panel */}
+          <aside className="lg:col-span-4 space-y-5 animate-fade-up delay-100">
+            {/* Contact details card */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 p-8">
+              <h2 className="text-xl font-bold text-midnight_text dark:text-white mb-6 border-l-4 border-primary pl-3">
+                Información de Contacto
+              </h2>
+              <div className="space-y-5">
+                <div className="flex items-start gap-4">
+                  <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Icon
+                      icon="solar:map-point-bold"
+                      className="text-primary text-xl"
+                    />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-midnight_text dark:text-white text-sm">
+                      Ubicación
+                    </p>
+                    <p className="text-dark_grey dark:text-gray-400 text-sm mt-1">
+                      Panamá, República de Panamá
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Icon
+                      icon="solar:phone-bold"
+                      className="text-primary text-xl"
+                    />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-midnight_text dark:text-white text-sm">
+                      Teléfono
+                    </p>
+                    <p className="text-dark_grey dark:text-gray-400 text-sm mt-1">
+                      +507 0000-0000
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Icon
+                      icon="solar:letter-bold"
+                      className="text-primary text-xl"
+                    />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-midnight_text dark:text-white text-sm">
+                      Correo Electrónico
+                    </p>
+                    <p className="text-dark_grey dark:text-gray-400 text-sm mt-1">
+                      info@ciepi.pa
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Icon
+                      icon="solar:clock-circle-bold"
+                      className="text-primary text-xl"
+                    />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-midnight_text dark:text-white text-sm">
+                      Horario de Atención
+                    </p>
+                    <p className="text-dark_grey dark:text-gray-400 text-sm mt-1">
+                      Lunes a Viernes
+                      <br />
+                      8:00am – 4:00pm
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Promo info card */}
+            <div className="bg-gradient-to-br from-primary to-blue-700 rounded-2xl p-6 text-white shadow-md">
+              <Icon
+                icon="solar:info-circle-bold"
+                className="text-white/70 text-3xl mb-3"
+              />
+              <h3 className="font-bold text-lg mb-2">
+                ¿Necesitas ayuda inmediata?
+              </h3>
+              <p className="text-white/80 text-sm leading-relaxed">
+                También puedes visitar nuestras instalaciones durante el horario
+                de atención o llamarnos directamente.
+              </p>
+            </div>
+          </aside>
+
+          {/* Right: Form */}
+          <div className="lg:col-span-8 animate-fade-up delay-200">
+            <Form
+              title="Envía tu Consulta"
+              fields={fields}
+              onSubmit={handleSubmit}
+              submitLabel="Enviar Consulta"
+              requireCaptcha={true}
+              siteKey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+              isSubmitting={isSubmitting}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 

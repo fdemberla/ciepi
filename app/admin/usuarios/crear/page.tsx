@@ -59,7 +59,12 @@ export default function CrearUsuarioPage() {
       setSubmitting(true);
 
       // Validaciones
-      if (!formData.correo || !formData.nombre || !formData.apellido || !formData.rol_id) {
+      if (
+        !formData.correo ||
+        !formData.nombre ||
+        !formData.apellido ||
+        !formData.rol_id
+      ) {
         toast.error("Todos los campos son obligatorios");
         return;
       }
@@ -88,7 +93,7 @@ export default function CrearUsuarioPage() {
     } catch (error) {
       console.error("Error creating usuario:", error);
       toast.error(
-        error instanceof Error ? error.message : "Error al crear usuario"
+        error instanceof Error ? error.message : "Error al crear usuario",
       );
     } finally {
       setSubmitting(false);
@@ -143,42 +148,55 @@ export default function CrearUsuarioPage() {
       <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary/20 border-t-primary"></div>
-          <p className="mt-4 text-dark_grey dark:text-gray-400">
-            Cargando...
-          </p>
+          <p className="mt-4 text-dark_grey dark:text-gray-400">Cargando...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slateGray dark:bg-gray-900 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
+    <div className="min-h-screen bg-slateGray dark:bg-gray-900">
+      {/* Page Header */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-4">
+          <div className="flex items-center gap-1.5 text-xs text-dark_grey dark:text-gray-400 mb-3">
             <button
               onClick={() => router.push("/admin/usuarios")}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="hover:text-primary transition-colors"
+            >
+              Usuarios
+            </button>
+            <Icon icon="solar:alt-arrow-right-linear" className="w-3 h-3" />
+            <span className="text-midnight_text dark:text-white font-medium">
+              Crear Nuevo
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push("/admin/usuarios")}
+              className="group flex-shrink-0 w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all duration-200"
+              aria-label="Volver a Usuarios"
             >
               <Icon
-                icon="solar:arrow-left-linear"
-                className="w-6 h-6 text-midnight_text dark:text-white"
+                icon="solar:alt-arrow-left-linear"
+                className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform"
               />
             </button>
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-midnight_text dark:text-white mb-2">
+            <div>
+              <h1 className="text-xl font-bold text-midnight_text dark:text-white">
                 Crear Nuevo Usuario
               </h1>
-              <p className="text-dark_grey dark:text-gray-400">
+              <p className="text-xs text-dark_grey dark:text-gray-400 mt-0.5">
                 Agrega un nuevo usuario administrador al sistema
               </p>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Formulario */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
+      {/* Form Content */}
+      <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-8">
+        <div className="max-w-4xl mx-auto">
           <Form
             fields={fields}
             onSubmit={handleSubmit}
@@ -186,31 +204,26 @@ export default function CrearUsuarioPage() {
             isSubmitting={submitting}
             initialValues={{ activo: "true" }}
           />
-          <div className="mt-4 flex justify-end">
-            <button
-              onClick={() => router.push("/admin/usuarios")}
-              className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-midnight_text dark:text-white"
-              disabled={submitting}
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
 
-        {/* Información adicional */}
-        <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <Icon
-              icon="solar:info-circle-linear"
-              className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5"
-            />
-            <div className="text-sm text-blue-700 dark:text-blue-300">
-              <p className="font-semibold mb-1">Información importante:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>El correo electrónico debe ser único en el sistema</li>
-                <li>El usuario podrá iniciar sesión con su cuenta de Azure AD</li>
-                <li>Los permisos del usuario dependerán del rol asignado</li>
-              </ul>
+          {/* Información adicional */}
+          <div className="mt-4 bg-primary/5 dark:bg-primary/10 border border-primary/20 dark:border-primary/30 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <Icon
+                icon="solar:info-circle-linear"
+                className="w-5 h-5 text-primary flex-shrink-0 mt-0.5"
+              />
+              <div className="text-sm">
+                <p className="font-semibold text-midnight_text dark:text-white mb-1">
+                  Información importante:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-dark_grey dark:text-gray-400">
+                  <li>El correo electrónico debe ser único en el sistema</li>
+                  <li>
+                    El usuario podrá iniciar sesión con su cuenta de Azure AD
+                  </li>
+                  <li>Los permisos del usuario dependerán del rol asignado</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
