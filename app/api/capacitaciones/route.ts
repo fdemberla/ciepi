@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { safeErrorDetail } from "@/lib/apiError";
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: "Error al obtener capacitaciones",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: safeErrorDetail(error),
       },
       { status: 500 }
     );

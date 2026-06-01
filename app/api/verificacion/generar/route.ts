@@ -121,7 +121,6 @@ export async function POST(request: NextRequest) {
         success: true,
         message: "Correo de verificación enviado exitosamente",
         data: {
-          token,
           correo: estudiante.correo,
           fecha_expiracion,
           duracion_minutos,

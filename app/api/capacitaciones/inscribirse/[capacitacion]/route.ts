@@ -83,7 +83,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Si el estudiante ya tiene ID, verificar que existe y actualizar datos
     if (estudiante.id) {
       const existingEstudiante = await query(
-        "SELECT id, correo, correo_verificado FROM ciepi.estudiantes WHERE id = $1",
+        "SELECT id, correo, correo_verificado, cedula FROM ciepi.estudiantes WHERE id = $1",
         [estudiante.id]
       );
 
@@ -91,6 +91,17 @@ export async function POST(request: NextRequest, { params }: Params) {
         return NextResponse.json(
           { error: "Estudiante no encontrado" },
           { status: 404 }
+        );
+      }
+
+      // IDOR protection: verify submitted cedula matches the stored student cedula
+      if (
+        !estudiante.cedula ||
+        existingEstudiante.rows[0].cedula !== estudiante.cedula
+      ) {
+        return NextResponse.json(
+          { error: "Datos de verificación no coinciden" },
+          { status: 403 }
         );
       }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
+import { safeErrorDetail } from "@/lib/apiError";
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,9 +18,9 @@ export async function GET(request: NextRequest) {
 
     // Obtener parámetros de búsqueda
     const searchParams = request.nextUrl.searchParams;
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10");
-    const search = searchParams.get("search") || "";
+    const page = Math.max(parseInt(searchParams.get("page") || "1"), 1);
+    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "10"), 1), 100);
+    const search = (searchParams.get("search") || "").slice(0, 100);
     const estado = searchParams.get("estado") || "";
     const tipoConsulta = searchParams.get("tipo_consulta_id") || "";
 
@@ -127,7 +128,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: "Error al obtener consultas",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );

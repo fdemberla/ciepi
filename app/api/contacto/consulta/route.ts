@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { safeErrorDetail } from "@/lib/apiError";
 
 // Función para verificar reCAPTCHA
 async function verifyRecaptcha(
@@ -187,7 +188,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: "Error al procesar la consulta",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );

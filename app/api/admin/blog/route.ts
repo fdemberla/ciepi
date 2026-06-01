@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
 import { canCreateBlog } from "@/lib/permissions";
+import { safeErrorDetail } from "@/lib/apiError";
 
 // GET: Listar todos los blogs con filtros
 export async function GET(request: NextRequest) {
@@ -21,9 +22,14 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
-    const search = searchParams.get("search") || "";
-    const estado = searchParams.get("estado") || "";
+    const search = (searchParams.get("search") || "").slice(0, 100); // limit search length
+    const estadoParam = searchParams.get("estado") || "";
     const creadoPor = searchParams.get("creado_por") || "";
+
+    // Validate estado is a valid blog state (1-6)
+    const VALID_ESTADOS = [1, 2, 3, 4, 5, 6];
+    const estadoParsed = estadoParam ? parseInt(estadoParam) : NaN;
+    const estado = !isNaN(estadoParsed) && VALID_ESTADOS.includes(estadoParsed) ? estadoParam : "";
 
     const offset = (page - 1) * limit;
 
@@ -118,7 +124,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: "Error al obtener blogs",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );
@@ -219,7 +225,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: "Error al crear blog",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );

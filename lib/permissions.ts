@@ -71,14 +71,10 @@ export function getAllowedStatesForRole(role: number): number[] {
     ];
   }
 
-  // Relaciones Públicas (rol 4): puede mover a cualquier estado EXCEPTO editar
+  // Relaciones Públicas (rol 4): solo puede aprobar o rechazar en su etapa del flujo.
+  // No puede revertir un blog a Borrador ni a estados de revisión CIEPI.
   if (role === Role.RELACIONES_PUBLICAS) {
-    // Puede cambiar a cualquier estado
     return [
-      BlogState.BORRADOR,
-      BlogState.EN_REVISION_CIEPI,
-      BlogState.RECHAZADO_CIEPI,
-      BlogState.EN_REVISION_RP,
       BlogState.RECHAZADO_RP,
       BlogState.PUBLICADO,
     ];

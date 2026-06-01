@@ -9,12 +9,26 @@ export interface EmailTemplate {
 }
 
 /**
+ * Escapa caracteres HTML especiales para prevenir XSS en plantillas de correo.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/**
  * Plantilla de bienvenida para nuevos estudiantes
  */
 export function getWelcomeEmailTemplate(
   nombre: string,
   apellido: string
 ): EmailTemplate {
+  const sNombre = escapeHtml(nombre);
+  const sApellido = escapeHtml(apellido);
   return {
     subject: "¡Bienvenido a CIEPI - INADEH!",
     text: `Hola ${nombre} ${apellido},
@@ -45,7 +59,7 @@ Equipo CIEPI - INADEH`,
       <h1>¡Bienvenido a CIEPI!</h1>
     </div>
     <div class="content">
-      <p>Hola <strong>${nombre} ${apellido}</strong>,</p>
+      <p>Hola <strong>${sNombre} ${sApellido}</strong>,</p>
       <p>¡Bienvenido al <strong>Centro de Innovación y Emprendimiento (CIEPI)</strong> del INADEH!</p>
       <p>Nos complace tenerte como parte de nuestra comunidad. A través de nuestros programas de capacitación, podrás desarrollar nuevas habilidades y alcanzar tus metas profesionales.</p>
       <p>Para cualquier consulta o información adicional, no dudes en contactarnos.</p>
@@ -68,8 +82,11 @@ export function getEnrollmentConfirmationTemplate(
   nombreCapacitacion: string,
   fechaInicio?: string
 ): EmailTemplate {
+  const sNombre = escapeHtml(nombre);
+  const sApellido = escapeHtml(apellido);
+  const sNombreCapacitacion = escapeHtml(nombreCapacitacion);
   const fechaTexto = fechaInicio
-    ? `La capacitación inicia el ${fechaInicio}.`
+    ? `La capacitación inicia el ${escapeHtml(fechaInicio)}.`
     : "Te informaremos la fecha de inicio próximamente.";
 
   return {
@@ -105,10 +122,10 @@ Equipo CIEPI - INADEH`,
       <h1>✓ Inscripción Confirmada</h1>
     </div>
     <div class="content">
-      <p>Hola <strong>${nombre} ${apellido}</strong>,</p>
+      <p>Hola <strong>${sNombre} ${sApellido}</strong>,</p>
       <p>Tu inscripción ha sido confirmada exitosamente.</p>
       <div class="info-box">
-        <h3>Capacitación: ${nombreCapacitacion}</h3>
+        <h3>Capacitación: ${sNombreCapacitacion}</h3>
         <p>${fechaTexto}</p>
       </div>
       <p>Pronto recibirás más información sobre el lugar, horarios y materiales necesarios.</p>
@@ -133,6 +150,11 @@ export function getTrainingReminderTemplate(
   fechaHora: string,
   lugar: string
 ): EmailTemplate {
+  const sNombre = escapeHtml(nombre);
+  const sApellido = escapeHtml(apellido);
+  const sNombreCapacitacion = escapeHtml(nombreCapacitacion);
+  const sFechaHora = escapeHtml(fechaHora);
+  const sLugar = escapeHtml(lugar);
   return {
     subject: `Recordatorio - ${nombreCapacitacion}`,
     text: `Hola ${nombre} ${apellido},
@@ -167,12 +189,12 @@ Equipo CIEPI - INADEH`,
       <h1>⏰ Recordatorio de Capacitación</h1>
     </div>
     <div class="content">
-      <p>Hola <strong>${nombre} ${apellido}</strong>,</p>
+      <p>Hola <strong>${sNombre} ${sApellido}</strong>,</p>
       <p>Te recordamos que tu capacitación está próxima:</p>
       <div class="info-box">
-        <h3>${nombreCapacitacion}</h3>
-        <p><strong>Fecha y Hora:</strong> ${fechaHora}</p>
-        <p><strong>Lugar:</strong> ${lugar}</p>
+        <h3>${sNombreCapacitacion}</h3>
+        <p><strong>Fecha y Hora:</strong> ${sFechaHora}</p>
+        <p><strong>Lugar:</strong> ${sLugar}</p>
       </div>
       <p>Por favor, llega puntualmente y trae los materiales necesarios.</p>
       <p>¡Te esperamos!</p>
@@ -195,6 +217,11 @@ export function getGenericNotificationTemplate(
   titulo: string,
   mensaje: string
 ): EmailTemplate {
+  const sNombre = escapeHtml(nombre);
+  const sApellido = escapeHtml(apellido);
+  const sTitulo = escapeHtml(titulo);
+  // mensaje may contain limited safe HTML from internal sources; escape for safety
+  const sMensaje = escapeHtml(mensaje);
   return {
     subject: titulo,
     text: `Hola ${nombre} ${apellido},
@@ -218,11 +245,11 @@ Equipo CIEPI - INADEH`,
 <body>
   <div class="container">
     <div class="header">
-      <h1>${titulo}</h1>
+      <h1>${sTitulo}</h1>
     </div>
     <div class="content">
-      <p>Hola <strong>${nombre} ${apellido}</strong>,</p>
-      <p>${mensaje}</p>
+      <p>Hola <strong>${sNombre} ${sApellido}</strong>,</p>
+      <p>${sMensaje}</p>
     </div>
     <div class="footer">
       <p>Equipo CIEPI - INADEH</p>
@@ -242,8 +269,13 @@ export function getCertificateReadyTemplate(
   nombreCapacitacion: string,
   urlCertificado?: string
 ): EmailTemplate {
-  const downloadLink = urlCertificado
-    ? `Puedes descargar tu certificado desde el siguiente enlace: ${urlCertificado}`
+  const sNombre = escapeHtml(nombre);
+  const sApellido = escapeHtml(apellido);
+  const sNombreCapacitacion = escapeHtml(nombreCapacitacion);
+  // urlCertificado must be a trusted internal URL; validate before use
+  const safeCertUrl = urlCertificado && /^https?:\/\//.test(urlCertificado) ? urlCertificado : null;
+  const downloadLink = safeCertUrl
+    ? `Puedes descargar tu certificado desde el siguiente enlace: ${safeCertUrl}`
     : "Puedes descargar tu certificado desde tu perfil en el sistema.";
 
   return {
@@ -278,15 +310,15 @@ Equipo CIEPI - INADEH`,
       <h1>🎓 ¡Certificado Listo!</h1>
     </div>
     <div class="content">
-      <p>Hola <strong>${nombre} ${apellido}</strong>,</p>
+      <p>Hola <strong>${sNombre} ${sApellido}</strong>,</p>
       <p>¡Felicitaciones! Has completado exitosamente la capacitación:</p>
       <div class="info-box">
-        <h3>${nombreCapacitacion}</h3>
+        <h3>${sNombreCapacitacion}</h3>
       </div>
       <p>Tu certificado está listo.</p>
       ${
-        urlCertificado
-          ? `<center><a href="${urlCertificado}" class="button">Descargar Certificado</a></center>`
+        safeCertUrl
+          ? `<center><a href="${safeCertUrl}" class="button">Descargar Certificado</a></center>`
           : "<p>Puedes descargar tu certificado desde tu perfil en el sistema.</p>"
       }
       <p>Estamos orgullosos de tu logro. Te invitamos a seguir formándote con nosotros.</p>
@@ -310,6 +342,12 @@ export function getEmailVerificationTemplate(
   nombreCapacitacion: string,
   duracion_minutos: number = 15
 ): EmailTemplate {
+  const sNombre = escapeHtml(nombre);
+  const sApellido = escapeHtml(apellido);
+  const sNombreCapacitacion = escapeHtml(nombreCapacitacion);
+  // verificationUrl is server-generated; validate it starts with the expected scheme
+  const safeUrl = /^https?:\/\//.test(verificationUrl) ? verificationUrl : "#";
+  const sUrl = escapeHtml(safeUrl);
   return {
     subject: "Verifica tu correo electrónico - CIEPI",
     text: `Hola ${nombre} ${apellido},
@@ -346,19 +384,19 @@ Equipo CIEPI - INADEH`,
       <h1>✉️ Verifica tu Correo Electrónico</h1>
     </div>
     <div class="content">
-      <p>Hola <strong>${nombre} ${apellido}</strong>,</p>
-      <p>Para completar tu inscripción en <strong>"${nombreCapacitacion}"</strong>, necesitamos verificar tu correo electrónico.</p>
+      <p>Hola <strong>${sNombre} ${sApellido}</strong>,</p>
+      <p>Para completar tu inscripción en <strong>"${sNombreCapacitacion}"</strong>, necesitamos verificar tu correo electrónico.</p>
       <div class="info-box">
         <p style="margin: 0; font-size: 14px;">Haz clic en el botón de abajo para verificar tu correo y completar tu inscripción:</p>
       </div>
       <center>
-        <a href="${verificationUrl}" class="button">✓ Verificar mi Correo</a>
+        <a href="${sUrl}" class="button">✓ Verificar mi Correo</a>
       </center>
       <div class="warning">
         <p style="margin: 0;"><strong>⏰ Importante:</strong> Este enlace expirará en <strong>${duracion_minutos} minutos</strong>.</p>
       </div>
       <p style="font-size: 14px; color: #666;">Si no puedes hacer clic en el botón, copia y pega este enlace en tu navegador:</p>
-      <p style="font-size: 12px; word-break: break-all; color: #0066cc;">${verificationUrl}</p>
+      <p style="font-size: 12px; word-break: break-all; color: #0066cc;">${sUrl}</p>
       <p style="font-size: 14px; color: #666; margin-top: 30px;">Si no solicitaste esta inscripción, puedes ignorar este mensaje.</p>
     </div>
     <div class="footer">

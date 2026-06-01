@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
 
 export async function GET(
@@ -7,6 +9,14 @@ export async function GET(
 ) {
   let id: string = "";
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.isAdmin) {
+      return NextResponse.json(
+        { error: "No autorizado. Se requieren permisos de administrador." },
+        { status: 401 }
+      );
+    }
+
     const resolvedParams = await params;
     id = resolvedParams.id;
 
@@ -73,6 +83,14 @@ export async function PUT(
 ) {
   let id: string = "";
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.isAdmin) {
+      return NextResponse.json(
+        { error: "No autorizado. Se requieren permisos de administrador." },
+        { status: 401 }
+      );
+    }
+
     const resolvedParams = await params;
     id = resolvedParams.id;
     const formData = await request.formData();

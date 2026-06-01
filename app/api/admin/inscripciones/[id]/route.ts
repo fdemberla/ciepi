@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
+import { safeErrorDetail } from "@/lib/apiError";
 
 interface Params {
   params: Promise<{
@@ -10,6 +13,14 @@ interface Params {
 // PUT - Actualizar el estado de una inscripción
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.isAdmin) {
+      return NextResponse.json(
+        { error: "No autorizado. Se requieren permisos de administrador." },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
     const inscripcionId = parseInt(id, 10);
 
@@ -89,7 +100,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     return NextResponse.json(
       {
         error: "Error interno del servidor",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );

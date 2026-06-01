@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
 import { saveFile } from "@/lib/fileUpload";
+import { safeErrorDetail } from "@/lib/apiError";
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.isAdmin) {
+      return NextResponse.json(
+        { error: "No autorizado. Se requieren permisos de administrador." },
+        { status: 401 }
+      );
+    }
+
     const formData = await request.formData();
 
     console.log("🔍 [POST /api/admin/capacitaciones/crear] Processing request");
@@ -59,9 +70,23 @@ export async function POST(request: NextRequest) {
       ? parseInt(formData.get("cantidadHoras") as string)
       : null;
 
+    if (cantidadHoras !== null && (isNaN(cantidadHoras) || cantidadHoras < 0 || cantidadHoras > 9999)) {
+      return NextResponse.json(
+        { success: false, error: "cantidadHoras debe ser un número entre 0 y 9999" },
+        { status: 400 }
+      );
+    }
+
     const cantidadParticipantes = formData.get("cantidad_participantes")
       ? parseInt(formData.get("cantidad_participantes") as string)
       : null;
+
+    if (cantidadParticipantes !== null && (isNaN(cantidadParticipantes) || cantidadParticipantes < 1 || cantidadParticipantes > 99999)) {
+      return NextResponse.json(
+        { success: false, error: "cantidad_participantes debe ser un entero positivo" },
+        { status: 400 }
+      );
+    }
 
     const fechaInicioInscripcion =
       (formData.get("fechaInicioInscripcion") as string) || null;
@@ -125,7 +150,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: "Error al crear capacitación",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: safeErrorDetail(error),
       },
       { status: 500 }
     );

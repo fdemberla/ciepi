@@ -21,6 +21,15 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file") as File;
     const directory = (formData.get("directory") as string) || "general";
 
+    // Validate directory against allowlist to prevent path traversal
+    const ALLOWED_DIRECTORIES = ["banners", "blogs", "attachments", "general"];
+    if (!ALLOWED_DIRECTORIES.includes(directory)) {
+      return NextResponse.json(
+        { error: "Directorio no permitido" },
+        { status: 400 }
+      );
+    }
+
     if (!file) {
       return NextResponse.json(
         { error: "No se encontró archivo para subir" },
@@ -36,6 +45,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate file extension against allowlist
+    const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp"];
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      return NextResponse.json(
+        { error: "Tipo de archivo no permitido. Solo se permiten: jpg, jpeg, png, gif, webp" },
+        { status: 400 }
+      );
+    }
+
     // Validar tamaño del archivo (max 5MB)
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
@@ -47,7 +66,8 @@ export async function POST(request: NextRequest) {
 
     // Generar nombre único para el archivo
     const timestamp = Date.now();
-    const filename = `${timestamp}-${file.name.replace(/\s+/g, "-")}`;
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+    const filename = `${timestamp}-${sanitizedName}`;
 
     // Crear directorio si no existe
     const uploadDir = join(process.cwd(), "public", "uploads", directory);

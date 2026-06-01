@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { safeErrorDetail } from "@/lib/apiError";
 
 export async function GET() {
   try {
@@ -19,7 +20,7 @@ export async function GET() {
     return NextResponse.json(
       {
         error: "Error al obtener corregimientos",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );

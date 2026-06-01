@@ -22,17 +22,20 @@ export function getSmtpTransporter(): Transporter {
     throw new Error("Faltan configuraciones SMTP en las variables de entorno");
   }
 
+  const port = parseInt(smtpPort);
+  const useSecure = port === 465;
+
   transporter = nodemailer.createTransport({
     host: smtpServer,
-    port: parseInt(smtpPort),
-    secure: false, // true for 465, false for other ports
+    port,
+    secure: useSecure,
     auth: {
       user: smtpUser,
       pass: smtpPass,
     },
     tls: {
-      ciphers: "SSLv3",
-      rejectUnauthorized: false,
+      minVersion: "TLSv1.2",
+      rejectUnauthorized: true,
     },
   });
 

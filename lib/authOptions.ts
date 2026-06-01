@@ -2,10 +2,6 @@ import type { NextAuthOptions } from "next-auth";
 import AzureADProvider from "next-auth/providers/azure-ad";
 import { query } from "@/lib/db";
 
-console.log("🔍 [authOptions] Environment variables:");
-console.log("  - NEXTAUTH_URL:", process.env.NEXTAUTH_URL);
-console.log("  - AZURE_AD_CLIENT_ID:", process.env.AZURE_AD_CLIENT_ID);
-console.log("  - AZURE_AD_TENANT_ID:", process.env.AZURE_AD_TENANT_ID);
 
 // Function to check if user is in admin table
 async function getUserAdminData(email: string) {
@@ -16,16 +12,20 @@ async function getUserAdminData(email: string) {
     );
 
     if (result.rows.length > 0) {
-      console.log(
-        "✅ [Auth] User found in admin table:",
-        email,
-        "- rol_id:",
-        result.rows[0].rol_id
-      );
+      if (process.env.NODE_ENV === "development") {
+        console.log(
+          "✅ [Auth] User found in admin table:",
+          email,
+          "- rol_id:",
+          result.rows[0].rol_id
+        );
+      }
       return result.rows[0];
     }
 
-    console.log("❌ [Auth] User NOT found in admin table:", email);
+    if (process.env.NODE_ENV === "development") {
+      console.log("❌ [Auth] User NOT found in admin table:", email);
+    }
     return null;
   } catch (error) {
     console.error("❌ [Auth] Error checking admin user:", error);
@@ -59,17 +59,21 @@ export const authOptions: NextAuthOptions = {
       if (user.email) {
         const adminUser = await getUserAdminData(user.email);
         if (!adminUser) {
-          console.log(
-            "🚫 [Auth] Sign-in BLOCKED - User not found in usuarios_administradores table:",
-            user.email
-          );
+          if (process.env.NODE_ENV === "development") {
+            console.log(
+              "🚫 [Auth] Sign-in BLOCKED - User not found in usuarios_administradores table:",
+              user.email
+            );
+          }
           // Return false to block the sign-in
           return false;
         }
-        console.log(
-          "✅ [Auth] Sign-in ALLOWED - User found in admin table:",
-          user.email
-        );
+        if (process.env.NODE_ENV === "development") {
+          console.log(
+            "✅ [Auth] Sign-in ALLOWED - User found in admin table:",
+            user.email
+          );
+        }
       }
       return true;
     },
@@ -117,19 +121,14 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async redirect({ url, baseUrl }) {
-      console.log("🔄 [NextAuth Redirect]");
-      console.log("  - url:", url);
-      console.log("  - baseUrl:", baseUrl);
-
       // After successful login, redirect to admin capacitaciones
       // If the URL is the callback URL or signin URL, redirect to capacitaciones
       if (
-        url.includes("/callback/") ||
-        url.includes("/signin/") ||
+        url.startsWith(`${baseUrl}/api/auth/callback/`) ||
+        url.startsWith(`${baseUrl}/api/auth/signin/`) ||
         url === baseUrl
       ) {
         const redirectTo = "/ciepi/admin/capacitaciones";
-        console.log("  - Redirecting to:", redirectTo);
         return redirectTo;
       }
 

@@ -7,6 +7,7 @@ import {
   canChangeToState,
   canDeleteBlog,
 } from "@/lib/permissions";
+import { safeErrorDetail } from "@/lib/apiError";
 
 interface Params {
   params: Promise<{
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       {
         success: false,
         error: "Error al obtener blog",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );
@@ -146,16 +147,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
     const isCreator = currentBlog.creado_por === session.user.adminId;
 
     // Validación de permisos para EDITAR (no cambiar estado)
+    // Solo el creador o el SUPER_ADMIN (role 1) pueden modificar el contenido del blog.
+    // ADMIN (role 2) NO puede editar contenido de blogs que no creó.
     if (titulo || contenido || imagen_banner || palabras_clave) {
-      // Solo el creador (CIEPI) o admins pueden editar
-      if (
-        !canEditBlog(userRole) ||
-        (!isCreator && userRole !== 1 && userRole !== 2)
-      ) {
+      if (!canEditBlog(userRole) || (!isCreator && userRole !== 1)) {
         return NextResponse.json(
           {
             error:
-              "No tiene permisos para editar este blog. Solo Relaciones Públicas puede cambiar estados sin editar.",
+              "No tiene permisos para editar este blog. Solo el creador o el Super Administrador pueden editar el contenido.",
           },
           { status: 403 }
         );
@@ -272,7 +271,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       {
         success: false,
         error: "Error al actualizar blog",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );
@@ -346,7 +345,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       {
         success: false,
         error: "Error al eliminar blog",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );

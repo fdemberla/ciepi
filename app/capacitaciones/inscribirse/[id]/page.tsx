@@ -143,11 +143,11 @@ export default function InscribirsePage() {
     }
   };
 
-  const fetchStudentLocation = async (studentId: number) => {
+  const fetchStudentLocation = async (studentId: number, cedulaValue: string) => {
     try {
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
       const response = await fetch(
-        `${basePath}/api/estudiante/ubicacion/${studentId}`
+        `${basePath}/api/estudiante/ubicacion/${studentId}?cedula=${encodeURIComponent(cedulaValue)}`
       );
       const data = await response.json();
       if (data.success && data.data) {
@@ -221,7 +221,7 @@ export default function InscribirsePage() {
         setIsExistingStudent(true);
 
         // Fetch existing location data
-        await fetchStudentLocation(data.estudiante.id);
+        await fetchStudentLocation(data.estudiante.id, cedula);
 
         // Show birth date confirmation for existing students
         setShowBirthDateConfirmation(true);

@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
+import { safeErrorDetail } from "@/lib/apiError";
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.isAdmin) {
+      return NextResponse.json(
+        { error: "No autorizado. Se requieren permisos de administrador." },
+        { status: 401 }
+      );
+    }
+
     const searchParams = request.nextUrl.searchParams;
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "50"), 1), 100);
+    const offset = Math.max(parseInt(searchParams.get("offset") || "0"), 0);
 
     console.log(`🔍 [GET /api/admin/eventos] Fetching eventos`);
 
@@ -42,7 +53,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: "Error al obtener eventos",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: safeErrorDetail(error),
       },
       { status: 500 }
     );
@@ -51,6 +62,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.isAdmin) {
+      return NextResponse.json(
+        { error: "No autorizado. Se requieren permisos de administrador." },
+        { status: 401 }
+      );
+    }
+
     const formData = await request.formData();
 
     console.log(`🔍 [POST /api/admin/eventos] Creating new evento`);

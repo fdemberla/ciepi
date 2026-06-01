@@ -48,6 +48,7 @@ export async function createVerificationToken(
   } = params;
 
   const token = generateSecureToken();
+  const tokenHash = hashToken(token);
   const fecha_expiracion = new Date();
   fecha_expiracion.setMinutes(fecha_expiracion.getMinutes() + duracion_minutos);
 
@@ -56,10 +57,10 @@ export async function createVerificationToken(
       id_estudiante, token, correo, tipo, metadata, 
       fecha_expiracion, ip_creacion
     ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-    RETURNING id, token, fecha_expiracion`,
+    RETURNING id, fecha_expiracion`,
     [
       id_estudiante,
-      token,
+      tokenHash,
       correo,
       tipo,
       JSON.stringify(metadata),
@@ -102,12 +103,14 @@ export interface ValidateTokenResult {
 export async function validateVerificationToken(
   token: string
 ): Promise<ValidateTokenResult> {
+  const tokenHash = hashToken(token);
+
   const result = await query(
     `SELECT id, id_estudiante, correo, tipo, metadata, usado,
             fecha_creacion, fecha_expiracion
      FROM ciepi.verificacion_correo
      WHERE token = $1`,
-    [token]
+    [tokenHash]
   );
 
   if (result.rows.length === 0) {

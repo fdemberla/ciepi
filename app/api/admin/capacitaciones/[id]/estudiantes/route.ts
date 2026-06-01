@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
 
 interface Params {
@@ -10,6 +12,14 @@ interface Params {
 // GET - Obtener estudiantes inscritos en una capacitación
 export async function GET(request: NextRequest, { params }: Params) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user?.isAdmin) {
+      return NextResponse.json(
+        { error: "No autorizado. Se requieren permisos de administrador." },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
     const capacitacionId = parseInt(id, 10);
 

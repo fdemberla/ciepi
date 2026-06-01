@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
+import { safeErrorDetail } from "@/lib/apiError";
 
 // GET: Listar todos los usuarios
 export async function GET() {
@@ -59,7 +60,7 @@ export async function GET() {
       {
         success: false,
         error: "Error al obtener usuarios",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );
@@ -114,6 +115,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validar formato de correo electrónico
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(correo)) {
+      return NextResponse.json(
+        { error: "Formato de correo electrónico inválido" },
+        { status: 400 }
+      );
+    }
+
     // Verificar que el correo no exista
     const checkQuery = `
       SELECT id FROM ciepi.usuarios_administradores 
@@ -155,7 +165,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: "Error al crear usuario",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );

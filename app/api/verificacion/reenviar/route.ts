@@ -103,7 +103,6 @@ export async function POST(request: NextRequest) {
           success: true,
           message: "Correo de verificación reenviado exitosamente",
           data: {
-            token: newToken,
             correo: estudiante.correo,
             fecha_expiracion,
             duracion_minutos,
@@ -187,7 +186,6 @@ export async function POST(request: NextRequest) {
           success: true,
           message: "Correo de verificación enviado exitosamente",
           data: {
-            token: newToken,
             correo: estudiante.correo,
             fecha_expiracion,
             duracion_minutos,

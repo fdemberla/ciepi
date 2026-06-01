@@ -24,7 +24,17 @@ export async function saveFile(
 
     // Generate unique filename with timestamp
     const timestamp = Date.now();
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
+    const sanitizedName = file.name
+      .replace(/[^a-zA-Z0-9.-]/g, "_")  // replace unsafe chars
+      .replace(/\.{2,}/g, "_");          // collapse consecutive dots (prevents .. traversal in returned path)
+
+    // Validate extension against allowlist
+    const ALLOWED_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "pdf", "doc", "docx"];
+    const ext = sanitizedName.split(".").pop()?.toLowerCase() ?? "";
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      throw new Error(`Tipo de archivo no permitido: .${ext}`);
+    }
+
     const filename = `${timestamp}-${sanitizedName}`;
 
     // Create directory path

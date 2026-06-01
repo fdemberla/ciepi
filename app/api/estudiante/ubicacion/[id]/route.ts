@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { safeErrorDetail } from "@/lib/apiError";
 
 interface Params {
   params: Promise<{
@@ -27,9 +28,18 @@ export async function GET(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Verificar que el estudiante existe
+    // Require cedula as identity verification (IDOR protection)
+    const cedulaParam = request.nextUrl.searchParams.get("cedula");
+    if (!cedulaParam || !cedulaParam.trim()) {
+      return NextResponse.json(
+        { error: "Se requiere cédula para acceder a este recurso" },
+        { status: 400 }
+      );
+    }
+
+    // Verify student exists and cedula matches (ownership verification)
     const estudianteResult = await query(
-      "SELECT id FROM ciepi.estudiantes WHERE id = $1",
+      "SELECT id, cedula FROM ciepi.estudiantes WHERE id = $1",
       [estudianteId]
     );
 
@@ -40,15 +50,23 @@ export async function GET(request: NextRequest, { params }: Params) {
       );
     }
 
+    // IDOR protection: cedula must match the stored student cedula
+    if (estudianteResult.rows[0].cedula !== cedulaParam.trim()) {
+      return NextResponse.json(
+        { error: "Datos de verificación no coinciden" },
+        { status: 403 }
+      );
+    }
+
     // Buscar la ubicación del estudiante
+    // Note: calle (street address) is intentionally excluded to limit PII exposure on this public endpoint
     const ubicacionResult = await query(
       `SELECT 
         id,
         id_usuario,
         provincia_id,
         distrito_id,
-        corregimiento_id,
-        calle
+        corregimiento_id
       FROM ciepi.estudiantes_ubicacion 
       WHERE id_usuario = $1`,
       [estudianteId]
@@ -75,7 +93,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json(
       {
         error: "Error al obtener la ubicación del estudiante",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );

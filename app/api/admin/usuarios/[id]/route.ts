@@ -156,6 +156,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
       );
     }
 
+    // Solo SUPER_ADMIN (rol 1) puede cambiar el rol de otros usuarios
+    if (rol_id !== undefined && userRole !== 1) {
+      return NextResponse.json(
+        { error: "Solo el Super Administrador puede cambiar roles de usuarios" },
+        { status: 403 }
+      );
+    }
+
     // Construir query de actualización dinámicamente
     const updates: string[] = [];
     const values: (string | number | boolean)[] = [];
