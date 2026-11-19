@@ -91,6 +91,100 @@ export function canChangeToState(role: number, targetState: number): boolean {
   return allowedStates.includes(targetState);
 }
 
+const ALL_BLOG_STATES: readonly BlogState[] = [
+  BlogState.BORRADOR,
+  BlogState.EN_REVISION_CIEPI,
+  BlogState.RECHAZADO_CIEPI,
+  BlogState.EN_REVISION_RP,
+  BlogState.RECHAZADO_RP,
+  BlogState.PUBLICADO,
+];
+
+export function isValidBlogState(value: number): value is BlogState {
+  return ALL_BLOG_STATES.includes(value as BlogState);
+}
+
+/**
+ * Mapa estricto de transiciones válidas para BlogState (con chequeo exhaustivo).
+ * 1→2; 2→3|4; 3→1; 4→5|6; 5→1; 6 sin salida.
+ */
+export function getNextBlogStates(currentState: BlogState): BlogState[] {
+  switch (currentState) {
+    case BlogState.BORRADOR:
+      return [BlogState.EN_REVISION_CIEPI];
+    case BlogState.EN_REVISION_CIEPI:
+      return [BlogState.RECHAZADO_CIEPI, BlogState.EN_REVISION_RP];
+    case BlogState.RECHAZADO_CIEPI:
+      return [BlogState.BORRADOR];
+    case BlogState.EN_REVISION_RP:
+      return [BlogState.RECHAZADO_RP, BlogState.PUBLICADO];
+    case BlogState.RECHAZADO_RP:
+      return [BlogState.BORRADOR];
+    case BlogState.PUBLICADO:
+      return [];
+    default: {
+      const _exhaustive: never = currentState;
+      return _exhaustive;
+    }
+  }
+}
+
+export interface BlogTransitionResult {
+  allowed: boolean;
+  isOverride?: boolean;
+  status?: number;
+  reason?: string;
+}
+
+/**
+ * Valida una transición de estado de blog considerando rol y grafo estricto.
+ * Admin (1) y Super Admin (2) mantienen override entre estados válidos 1-6.
+ */
+export function validateBlogStateTransition(
+  currentState: number,
+  targetState: number,
+  role: number,
+): BlogTransitionResult {
+  if (!isValidBlogState(currentState) || !isValidBlogState(targetState)) {
+    return {
+      allowed: false,
+      status: 400,
+      reason: "Estado de blog inválido.",
+    };
+  }
+
+  if (currentState === targetState) {
+    return {
+      allowed: false,
+      status: 400,
+      reason: "El estado destino debe ser distinto del estado actual.",
+    };
+  }
+
+  if (!canChangeToState(role, targetState)) {
+    return {
+      allowed: false,
+      status: 403,
+      reason: "No tiene permisos para cambiar el blog a ese estado.",
+    };
+  }
+
+  const isStrictNext = getNextBlogStates(currentState).includes(targetState);
+  if (role === Role.ADMIN || role === Role.SUPER_ADMIN) {
+    return { allowed: true, isOverride: !isStrictNext };
+  }
+
+  if (!isStrictNext) {
+    return {
+      allowed: false,
+      status: 400,
+      reason: `Transición no permitida de estado ${currentState} a ${targetState}.`,
+    };
+  }
+
+  return { allowed: true, isOverride: false };
+}
+
 /**
  * Obtiene los permisos del rol del usuario
  */

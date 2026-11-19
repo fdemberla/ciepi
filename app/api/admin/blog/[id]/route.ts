@@ -4,8 +4,8 @@ import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
 import {
   canEditBlog,
-  canChangeToState,
   canDeleteBlog,
+  validateBlogStateTransition,
 } from "@/lib/permissions";
 import { safeErrorDetail } from "@/lib/apiError";
 
@@ -161,15 +161,30 @@ export async function PUT(request: NextRequest, { params }: Params) {
       }
     }
 
-    // Validación de permisos para CAMBIAR ESTADO
-    if (estado !== undefined && estado !== currentBlog.estado) {
-      if (!canChangeToState(userRole, estado)) {
-        return NextResponse.json(
-          {
-            error: "No tiene permisos para cambiar el blog a ese estado.",
-          },
-          { status: 403 }
+    // Validación de permisos y grafo de transiciones para CAMBIAR ESTADO
+    if (estado !== undefined) {
+      const targetEstado = Number(estado);
+      if (targetEstado !== currentBlog.estado) {
+        const transition = validateBlogStateTransition(
+          currentBlog.estado,
+          targetEstado,
+          userRole,
         );
+        if (!transition.allowed) {
+          return NextResponse.json(
+            {
+              error:
+                transition.reason ||
+                "No tiene permisos para cambiar el blog a ese estado.",
+            },
+            { status: transition.status || 403 }
+          );
+        }
+        if (transition.isOverride) {
+          console.warn(
+            `[Blog State Override] Admin ${session.user.adminId} (rol ${userRole}) saltó etapa en blog ${id}: ${currentBlog.estado} -> ${targetEstado}`,
+          );
+        }
       }
     }
 
