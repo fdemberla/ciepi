@@ -7,6 +7,7 @@ import {
   canCreateBlog,
   canEditBlog,
   canDeleteBlog,
+  validateBlogStateTransition,
 } from "@/lib/permissions";
 
 // ─── Role Enum Sanity Check ──────────────────────────────────────────────────
@@ -139,4 +140,58 @@ describe("canDeleteBlog", () => {
   it("CIEPI cannot delete", () => expect(canDeleteBlog(Role.CIEPI)).toBe(false));
   it("RELACIONES_PUBLICAS cannot delete", () =>
     expect(canDeleteBlog(Role.RELACIONES_PUBLICAS)).toBe(false));
+});
+
+describe("validateBlogStateTransition", () => {
+  it("allows strict step transitions for CIEPI and RELACIONES_PUBLICAS", () => {
+    expect(
+      validateBlogStateTransition(
+        BlogState.BORRADOR,
+        BlogState.EN_REVISION_CIEPI,
+        Role.CIEPI,
+      ),
+    ).toEqual({ allowed: true, isOverride: false });
+
+    expect(
+      validateBlogStateTransition(
+        BlogState.EN_REVISION_RP,
+        BlogState.PUBLICADO,
+        Role.RELACIONES_PUBLICAS,
+      ),
+    ).toEqual({ allowed: true, isOverride: false });
+  });
+
+  it("blocks stage skips for non-admin roles", () => {
+    const skip = validateBlogStateTransition(
+      BlogState.BORRADOR,
+      BlogState.EN_REVISION_RP,
+      Role.CIEPI,
+    );
+    expect(skip.allowed).toBe(false);
+
+    const exitPublished = validateBlogStateTransition(
+      BlogState.PUBLICADO,
+      BlogState.RECHAZADO_RP,
+      Role.RELACIONES_PUBLICAS,
+    );
+    expect(exitPublished.allowed).toBe(false);
+  });
+
+  it("allows ADMIN override with isOverride flag and rejects same/invalid states", () => {
+    const override = validateBlogStateTransition(
+      BlogState.BORRADOR,
+      BlogState.PUBLICADO,
+      Role.ADMIN,
+    );
+    expect(override).toEqual({ allowed: true, isOverride: true });
+
+    expect(
+      validateBlogStateTransition(BlogState.BORRADOR, BlogState.BORRADOR, Role.ADMIN)
+        .allowed,
+    ).toBe(false);
+
+    expect(
+      validateBlogStateTransition(BlogState.BORRADOR, 99, Role.ADMIN).allowed,
+    ).toBe(false);
+  });
 });
