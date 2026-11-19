@@ -1,6 +1,7 @@
 "use client";
 import { Icon } from "@iconify/react";
 import EventoCountdown from "./EventoCountdown";
+import { getBasePath } from "@/lib/basePath";
 
 interface Evento {
   id: number;
@@ -42,6 +43,10 @@ const EventoCard: React.FC<EventoCardProps> = ({ evento }) => {
         return "ring-2 ring-success dark:ring-success";
       case "futuro":
         return "";
+      default: {
+        const _exhaustive: never = estado;
+        return _exhaustive;
+      }
     }
   };
 
@@ -75,7 +80,7 @@ const EventoCard: React.FC<EventoCardProps> = ({ evento }) => {
       <div className={`relative h-48 w-full ${bannerBgColor} overflow-hidden`}>
         {evento.banner ? (
           <img
-            src={`${process.env.NEXT_PUBLIC_BASE_PATH}${evento.banner}`}
+            src={`${getBasePath()}${evento.banner}`}
             alt={evento.nombre}
             className="object-cover w-full h-full"
           />
