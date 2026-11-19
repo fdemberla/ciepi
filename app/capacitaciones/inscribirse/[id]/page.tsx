@@ -1,10 +1,27 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useReducer } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Icon } from "@iconify/react";
 import Form from "@/components/Form";
 import type { FormFieldOrSection } from "@/components/Form.types";
+import PrivacyConsentCheckbox from "@/components/PrivacyConsentCheckbox";
+import TurnstileWidget, {
+  isTurnstileClientEnabled,
+} from "@/components/TurnstileWidget";
+import { withBasePath } from "@/lib/basePath";
+import {
+  INITIAL_INSCRIPCION_FLOW_STATE,
+  inscripcionFlowReducer,
+} from "@/lib/inscripcionFlow";
+import {
+  iniciarValidacionBiometrica,
+  getStoredBiometriaResult,
+  clearBiometriaResult,
+  isBiometriaEnabled,
+  BIOMETRIA_STORAGE_KEYS,
+  BiometriaResult,
+} from "@/lib/biometria";
 
 interface Capacitacion {
   id: number;
@@ -33,7 +50,10 @@ export default function InscribirsePage() {
   const router = useRouter();
   const capacitacionId = params.id as string;
 
-  const [step, setStep] = useState<"cedula" | "form" | "loading">("cedula");
+  const [flow, dispatchFlow] = useReducer(
+    inscripcionFlowReducer,
+    INITIAL_INSCRIPCION_FLOW_STATE,
+  );
   const [cedula, setCedula] = useState("");
   const [capacitacion, setCapacitacion] = useState<Capacitacion | null>(null);
   const [estudianteData, setEstudianteData] = useState<EstudianteData | null>(
@@ -59,20 +79,61 @@ export default function InscribirsePage() {
     number | null
   >(null);
   const [formKey, setFormKey] = useState(0); // Para forzar re-render del Form
-  const [birthDateConfirmed, setBirthDateConfirmed] = useState(false);
   const [birthDateInput, setBirthDateInput] = useState("");
-  const [showBirthDateConfirmation, setShowBirthDateConfirmation] =
-    useState(false);
   const [currentFormData, setCurrentFormData] = useState<
     Record<string, unknown>
   >({});
   const [emailError, setEmailError] = useState<string | null>(null);
-  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [biometriaResult, setBiometriaResult] =
+    useState<BiometriaResult | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [aceptoPoliticaCedula, setAceptoPoliticaCedula] = useState(false);
+  const biometriaEnabled = isBiometriaEnabled();
+
+  const isSubmitting = flow.step === "form" && flow.busy;
+  const isCheckingEmail = flow.step === "form" && flow.isCheckingEmail;
+  const isInitiatingBiometria =
+    flow.step === "metodo" && flow.isInitiatingBiometria;
+  const metodoValidacion =
+    flow.step === "form" ? flow.metodoValidacion : null;
+  const birthDateConfirmed =
+    flow.step === "form" ? flow.birthDateConfirmed : false;
 
   useEffect(() => {
     fetchCapacitacion();
     fetchProvincias();
+
+    if (!biometriaEnabled) {
+      return;
+    }
+
+    // Comprobar si el usuario retorna con validación biométrica aprobada
+    const storedBio = getStoredBiometriaResult();
+    if (storedBio && storedBio.valido && storedBio.cedula) {
+      setBiometriaResult(storedBio);
+      setCedula(storedBio.cedula);
+      dispatchFlow({ type: "BIOMETRIA_RETURN" });
+      return;
+    }
+
+    // Si retorna desde el callback biométrico optando por modo manual o volver a opciones
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const modoParam = searchParams.get("modo");
+      const savedCedula = sessionStorage.getItem(BIOMETRIA_STORAGE_KEYS.CEDULA);
+      if (savedCedula) {
+        setCedula(savedCedula);
+        if (modoParam === "manual") {
+          dispatchFlow({
+            type: "CEDULA_FOUND",
+            cedula: savedCedula,
+            isExistingStudent: false,
+          });
+        } else {
+          cargarDatosEstudiante(savedCedula);
+        }
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [capacitacionId]);
 
@@ -196,55 +257,97 @@ export default function InscribirsePage() {
     };
   };
 
-  const handleVerificarCedula = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!cedula.trim()) {
-      toast.error("Por favor ingrese su cédula");
-      return;
-    }
-
-    setStep("loading");
+  const cargarDatosEstudiante = async (cedulaValue: string) => {
+    dispatchFlow({ type: "START_BUSY" });
 
     try {
-      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-      const response = await fetch(`${basePath}/api/verificar/${cedula}`);
+      const headers: Record<string, string> = {};
+      if (turnstileToken) {
+        headers["x-turnstile-token"] = turnstileToken;
+      }
+
+      const response = await fetch(
+        withBasePath(`/api/verificar/${encodeURIComponent(cedulaValue)}`),
+        { headers },
+      );
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error || "Error al verificar la cédula");
       }
 
-      if (data.exists) {
-        // El estudiante ya existe
-        setEstudianteData(data.estudiante);
-        setIsExistingStudent(true);
-
-        // Fetch existing location data
-        await fetchStudentLocation(data.estudiante.id, cedula);
-
-        // Show birth date confirmation for existing students
-        setShowBirthDateConfirmation(true);
-        toast.success(
-          "¡Bienvenido de nuevo! Por favor confirme su fecha de nacimiento para continuar."
-        );
-      } else {
-        // Estudiante nuevo, usar datos del API externo
-        setEstudianteData(data.external_data);
-        setIsExistingStudent(false);
-        toast.success(
-          "Cédula verificada. Por favor complete sus datos de inscripción."
-        );
-      }
-
-      setStep("form");
+      const resolvedCedula = data.cedula || cedulaValue;
+      setCedula(resolvedCedula);
+      setIsExistingStudent(Boolean(data.exists));
+      dispatchFlow({
+        type: "CEDULA_FOUND",
+        cedula: resolvedCedula,
+        isExistingStudent: Boolean(data.exists),
+      });
     } catch (error) {
       console.error("Error verificando cédula:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Error al verificar la cédula"
-      );
-      setStep("cedula");
+      const msg =
+        error instanceof Error ? error.message : "Error al verificar la cédula";
+      toast.error(msg);
+      dispatchFlow({ type: "FAIL", error: msg });
     }
+  };
+
+  const handleVerificarCedula = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (flow.busy) return;
+
+    if (!cedula.trim()) {
+      toast.error("Por favor ingrese su cédula");
+      return;
+    }
+
+    if (!aceptoPoliticaCedula) {
+      toast.error(
+        "Debes aceptar la Política de Privacidad para consultar tu cédula.",
+      );
+      return;
+    }
+
+    if (isTurnstileClientEnabled() && !turnstileToken) {
+      toast.error("Completa la verificación de seguridad para continuar.");
+      return;
+    }
+
+    await cargarDatosEstudiante(cedula.trim());
+  };
+
+  const handleIniciarBiometria = async () => {
+    const cedulaEfectiva = estudianteData?.cedula || cedula.trim();
+    if (!cedulaEfectiva) {
+      toast.error("Primero debe verificar su número de cédula");
+      dispatchFlow({ type: "BACK_TO_CEDULA" });
+      return;
+    }
+
+    try {
+      dispatchFlow({ type: "START_BIOMETRIA" });
+      await iniciarValidacionBiometrica({
+        capacitacionId,
+        cedula: cedulaEfectiva,
+      });
+    } catch (error) {
+      console.error("Error iniciando validación biométrica:", error);
+      toast.error("Error al iniciar el servicio de validación biométrica");
+      dispatchFlow({
+        type: "FAIL",
+        error: "Error al iniciar el servicio de validación biométrica",
+      });
+    }
+  };
+
+  const handleSeleccionarManual = () => {
+    clearBiometriaResult();
+    setBiometriaResult(null);
+    dispatchFlow({ type: "SELECT_MANUAL" });
+    toast.success(
+      "Validación manual seleccionada. Su inscripción quedará como pendiente hasta que un administrador la valide."
+    );
   };
 
   const handleBirthDateConfirmation = async (e: React.FormEvent) => {
@@ -252,11 +355,6 @@ export default function InscribirsePage() {
 
     if (!birthDateInput.trim()) {
       toast.error("Por favor ingrese su fecha de nacimiento");
-      return;
-    }
-
-    if (!estudianteData?.fecha_nacimiento) {
-      toast.error("No se encontró fecha de nacimiento en el sistema");
       return;
     }
 
@@ -297,20 +395,56 @@ export default function InscribirsePage() {
       return;
     }
 
-    // Convertir a formato YYYY-MM-DD para comparar con la BD
-    const formattedDate = `${year}-${month}-${day}`;
-
-    // Compare birth dates
-    if (formattedDate === estudianteData.fecha_nacimiento) {
-      setBirthDateConfirmed(true);
-      setShowBirthDateConfirmation(false);
-      setStep("form");
-      toast.success(
-        "Fecha de nacimiento confirmada. Puede continuar con la inscripción."
+    if (flow.busy) return;
+    try {
+      dispatchFlow({ type: "START_BUSY" });
+      const response = await fetch(
+        withBasePath(`/api/verificar/${encodeURIComponent(cedula.trim())}`),
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fechaNacimiento: birthDateInput }),
+        },
       );
-    } else {
-      toast.error("La fecha de nacimiento no coincide con nuestros registros");
-      setBirthDateInput("");
+      const data = await response.json();
+
+      if (!response.ok || !data.verified) {
+        const msg =
+          data.error || "La fecha de nacimiento no coincide con nuestros registros";
+        toast.error(msg);
+        setBirthDateInput("");
+        dispatchFlow({ type: "FAIL", error: msg });
+        return;
+      }
+
+      const record = data.exists ? data.estudiante : data.external_data;
+      setEstudianteData(record);
+      setIsExistingStudent(Boolean(data.exists));
+      if (data.exists && record?.id) {
+        await fetchStudentLocation(record.id, record.cedula);
+      }
+
+      const nombreCompleto =
+        record?.nombre_cedula ||
+        `${record?.nombres || ""} ${record?.apellidos || ""}`.trim();
+
+      dispatchFlow({
+        type: "BIRTHDATE_VERIFIED",
+        biometriaEnabled,
+      });
+
+      toast.success(
+        nombreCompleto
+          ? `Identidad verificada: ${nombreCompleto}`
+          : "Fecha de nacimiento confirmada. Puede continuar con la inscripción.",
+      );
+    } catch (error) {
+      console.error("Error confirmando fecha de nacimiento:", error);
+      toast.error("Error al confirmar la fecha de nacimiento");
+      dispatchFlow({
+        type: "FAIL",
+        error: "Error al confirmar la fecha de nacimiento",
+      });
     }
   };
 
@@ -320,7 +454,7 @@ export default function InscribirsePage() {
       return;
     }
 
-    setIsCheckingEmail(true);
+    dispatchFlow({ type: "SET_CHECKING_EMAIL", checking: true });
     try {
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
       const response = await fetch(`${basePath}/api/verificar/${cedula}`, {
@@ -344,9 +478,11 @@ export default function InscribirsePage() {
     } catch (error) {
       console.error("Error checking email:", error);
     } finally {
-      setIsCheckingEmail(false);
+      dispatchFlow({ type: "SET_CHECKING_EMAIL", checking: false });
     }
   };
+
+  const [aceptoPolitica, setAceptoPolitica] = useState(false);
 
   const handleSubmit = async (formData: Record<string, unknown>) => {
     // Prevenir múltiples envíos
@@ -355,15 +491,25 @@ export default function InscribirsePage() {
     }
 
     try {
+      if (!aceptoPolitica) {
+        toast.error(
+          "Debes aceptar la Política de Privacidad para completar tu inscripción.",
+        );
+        return;
+      }
+
       // Validate birth date for existing students
       if (isExistingStudent && !birthDateConfirmed) {
         toast.error("Debe confirmar su fecha de nacimiento para continuar");
         return;
       }
 
-      setIsSubmitting(true);
+      dispatchFlow({ type: "START_BUSY" });
 
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+      const esBiometricaValida = Boolean(
+        metodoValidacion === "biometrica" && biometriaResult?.valido
+      );
 
       // Preparar los datos para enviar
       const payload = {
@@ -391,6 +537,22 @@ export default function InscribirsePage() {
         },
         // ID de la capacitación
         capacitacion_id: capacitacionId,
+        acepto_politica: aceptoPolitica,
+        // Método de validación elegido ("biometrica" | "manual")
+        metodo_validacion: esBiometricaValida ? "biometrica" : "manual",
+        // Auditoría Biométrica (Tribunal Electoral / INADEH)
+        biometria:
+          esBiometricaValida && biometriaResult
+            ? {
+                valido: biometriaResult.valido,
+                id_auditoria: biometriaResult.id_auditoria,
+                score_similitud: biometriaResult.score_similitud,
+                liveness_score: biometriaResult.liveness_score,
+                estado: biometriaResult.estado,
+                access_token: biometriaResult.access_token,
+                metodo_autenticacion: biometriaResult.metodo_autenticacion,
+              }
+            : null,
       };
 
       const response = await fetch(
@@ -406,12 +568,6 @@ export default function InscribirsePage() {
 
       const result = await response.json();
 
-      console.log("📝 Respuesta del API:", {
-        status: response.status,
-        ok: response.ok,
-        result: result,
-      });
-
       if (!response.ok) {
         // Manejar errores específicos de duplicación
         if (response.status === 409) {
@@ -422,6 +578,10 @@ export default function InscribirsePage() {
           } else {
             toast.error(result.message || "Error: Datos duplicados");
           }
+          dispatchFlow({
+            type: "FAIL",
+            error: result.message || "Error: Datos duplicados",
+          });
           return;
         }
 
@@ -430,69 +590,108 @@ export default function InscribirsePage() {
 
       // Verificar si requiere verificación de correo
       if (result.verification_required) {
-        console.log("✉️ Requiere verificación, token:", result.token);
+        clearBiometriaResult();
         toast.success(
-          "Correo de verificación enviado. Por favor revisa tu email.",
-          { duration: 5000 }
+          esBiometricaValida
+            ? "Correo de verificación enviado. Por favor revisa tu email."
+            : "Correo enviado. Al verificar tu correo, tu inscripción quedará como Pendiente hasta que un administrador la valide.",
+          { duration: 6000 }
         );
-        // Redirigir a página de espera con el token
         setTimeout(() => {
-          console.log(
-            "🔄 Redirigiendo a:",
-            `/verificacion/esperando/${result.token}`
-          );
           router.push(`/verificacion/esperando/${result.token}`);
         }, 1500);
       } else {
-        // Inscripción completada inmediatamente (correo ya verificado)
-        console.log("✅ Inscripción completada sin verificación");
-        toast.success("¡Inscripción exitosa!");
+        clearBiometriaResult();
+        toast.success(
+          esBiometricaValida
+            ? "¡Inscripción exitosa!"
+            : "Inscripción registrada como Pendiente de validación por un administrador."
+        );
         setTimeout(() => {
           router.push("/capacitaciones");
         }, 1500);
       }
     } catch (error) {
       console.error("Error en inscripción:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Error al inscribirse"
-      );
-      setIsSubmitting(false); // Reactivar el botón en caso de error
+      const msg =
+        error instanceof Error ? error.message : "Error al inscribirse";
+      toast.error(msg);
+      dispatchFlow({ type: "FAIL", error: msg });
     }
   };
 
-  // Formulario de cédula
-  if (step === "cedula") {
+  // Loading al consultar cédula
+  if (flow.step === "cedula" && flow.busy) {
     return (
-      <section className="min-h-screen bg-slateGray dark:bg-gray-900 py-20 px-4">
-        <div className="max-w-lg mx-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-10">
-            {/* Badge */}
-            <div className="flex gap-2 items-center justify-center mb-6">
+      <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-primary/20 border-t-primary"></div>
+          <p className="mt-6 text-midnight_text dark:text-white text-lg font-medium">
+            Consultando datos en el Tribunal Electoral...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // PASO 1: Ingreso obligatorio de cédula y consulta con el Tribunal Electoral
+  if (flow.step === "cedula") {
+    return (
+      <section className="min-h-screen bg-slateGray dark:bg-gray-900 py-16 px-4">
+        <div className="max-w-xl mx-auto space-y-6">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8 sm:p-10 border border-gray-100 dark:border-gray-700">
+            {/* Indicador de pasos */}
+            <div className="flex items-center justify-center gap-2 mb-6 text-xs font-semibold">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-white">
+                <span>1</span>
+                <span>Cédula</span>
+              </span>
+              <div className="w-6 h-0.5 bg-gray-200 dark:bg-gray-700" />
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                <span>2</span>
+                <span>Validación</span>
+              </span>
+              <div className="w-6 h-0.5 bg-gray-200 dark:bg-gray-700" />
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                <span>3</span>
+                <span>Datos</span>
+              </span>
+            </div>
+
+            {/* Badge de Verificación */}
+            <div className="flex gap-2 items-center justify-center mb-3">
               <Icon
-                icon="solar:verified-check-bold"
-                className="text-success text-2xl"
+                icon="solar:shield-check-bold"
+                className="text-primary text-2xl"
               />
-              <p className="text-success text-base font-semibold">
-                Verificación Segura
+              <p className="text-primary text-sm font-semibold tracking-wide">
+                Paso 1: Consulta Oficial con el Tribunal Electoral
               </p>
             </div>
 
-            <h1 className="text-3xl font-bold text-midnight_text dark:text-white mb-3 text-center">
+            <h1 className="text-2xl sm:text-3xl font-bold text-midnight_text dark:text-white mb-2 text-center">
               Inscripción a Capacitación
             </h1>
             {capacitacion && (
-              <p className="text-dark_grey dark:text-gray-300 text-center mb-8 text-lg">
+              <p className="text-dark_grey dark:text-gray-300 text-center mb-6 text-base sm:text-lg font-medium">
                 {capacitacion.nombre}
               </p>
             )}
 
+            <p className="text-sm text-dark_grey dark:text-gray-300 text-center mb-8 leading-relaxed">
+              Ingrese su número de cédula para obtener sus datos del Tribunal
+              Electoral. En el siguiente paso podrá elegir entre validación
+              biométrica facial o validación presencial/manual.
+            </p>
+
+            {/* FORMULARIO OBLIGATORIO DE CÉDULA */}
             <form onSubmit={handleVerificarCedula}>
-              <div className="mb-8">
+              <div className="mb-6">
                 <label
                   htmlFor="cedula"
-                  className="block text-sm font-semibold text-midnight_text dark:text-white mb-3"
+                  className="block text-sm font-semibold text-midnight_text dark:text-white mb-2"
                 >
-                  Número de Cédula
+                  Número de Cédula <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -507,32 +706,44 @@ export default function InscribirsePage() {
                     value={cedula}
                     onChange={(e) => setCedula(e.target.value)}
                     placeholder="Ej: 8-123-456"
-                    className="w-full pl-14 pr-4 py-4 border-2 border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary/20 focus:border-primary transition-all text-midnight_text dark:text-white bg-white dark:bg-gray-700 font-medium text-lg shadow-lg placeholder:text-gray-400 dark:placeholder:text-gray-500"
-                    style={{ boxShadow: "0 4px 15px rgba(0, 0, 0, 0.08)" }}
+                    className="w-full pl-14 pr-4 py-4 border-2 border-gray-200 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-primary/20 focus:border-primary transition-all text-midnight_text dark:text-white bg-white dark:bg-gray-700 font-medium text-base shadow-sm placeholder:text-gray-400 dark:placeholder:text-gray-500"
                     required
                   />
                 </div>
-                <p className="mt-3 text-sm text-dark_grey dark:text-gray-300 flex items-center gap-2">
-                  <Icon icon="solar:info-circle-linear" className="w-4 h-4" />
-                  Ingrese su cédula para verificar su información
+                <p className="mt-2 text-xs text-dark_grey dark:text-gray-400 flex items-center gap-1.5">
+                  <Icon
+                    icon="solar:info-circle-linear"
+                    className="w-4 h-4 flex-shrink-0"
+                  />
+                  Sus datos serán validados de forma segura contra el padrón
+                  oficial.
                 </p>
               </div>
 
+              <PrivacyConsentCheckbox
+                id="cedula-privacidad"
+                checked={aceptoPoliticaCedula}
+                onChange={setAceptoPoliticaCedula}
+                purpose="para consultar su identidad y gestionar su inscripción en esta capacitación"
+              />
+
+              <TurnstileWidget
+                onVerify={setTurnstileToken}
+                onExpire={() => setTurnstileToken("")}
+              />
+
               <button
                 type="submit"
-                className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-5 px-6 rounded-full transition-all duration-300 shadow-xl hover:shadow-2xl text-lg mb-4"
+                className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 px-6 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl text-base mb-3 flex items-center justify-center gap-2"
               >
-                Verificar Cédula
-                <Icon
-                  icon="solar:arrow-right-linear"
-                  className="w-6 h-6 inline-block ml-2"
-                />
+                <span>Validar Cédula y Continuar</span>
+                <Icon icon="solar:arrow-right-linear" className="w-5 h-5" />
               </button>
 
               <button
                 onClick={() => router.push("/capacitaciones")}
                 type="button"
-                className="w-full bg-slateGray dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-midnight_text dark:text-white font-semibold py-5 px-6 rounded-full transition-all duration-300"
+                className="w-full bg-slateGray dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-midnight_text dark:text-white font-semibold py-3.5 px-6 rounded-full transition-all text-sm"
               >
                 Cancelar
               </button>
@@ -543,22 +754,8 @@ export default function InscribirsePage() {
     );
   }
 
-  // Loading
-  if (step === "loading") {
-    return (
-      <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-primary/20 border-t-primary"></div>
-          <p className="mt-6 text-midnight_text dark:text-white text-lg font-medium">
-            Verificando cédula...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Birth date confirmation for existing students
-  if (showBirthDateConfirmation) {
+  // Confirmación de fecha de nacimiento
+  if (flow.step === "confirmar_nacimiento") {
     return (
       <section className="min-h-screen bg-slateGray dark:bg-gray-900 py-20 px-4">
         <div className="max-w-lg mx-auto">
@@ -570,15 +767,20 @@ export default function InscribirsePage() {
                 className="text-primary text-2xl"
               />
               <p className="text-primary text-base font-semibold">
-                Confirmación de Identidad
+                Confirmación de Identidad (Modo Manual)
               </p>
             </div>
 
             <h1 className="text-3xl font-bold text-midnight_text dark:text-white mb-3 text-center">
-              Confirmar Identidad
+              Confirmar Fecha de Nacimiento
             </h1>
             <p className="text-dark_grey dark:text-gray-300 text-center mb-8">
-              Para editar sus datos, por favor confirme su fecha de nacimiento
+              Introdujiste la cédula{" "}
+              <strong className="text-midnight_text dark:text-white">
+                {cedula}
+              </strong>
+              . Ingresa tu fecha de nacimiento para verificar tu identidad y
+              mostrar tu nombre.
             </p>
 
             <form onSubmit={handleBirthDateConfirmation}>
@@ -638,7 +840,7 @@ export default function InscribirsePage() {
                 <p className="mt-3 text-sm text-dark_grey dark:text-gray-300 flex items-center gap-2">
                   <Icon icon="solar:info-circle-linear" className="w-4 h-4" />
                   Ingrese su fecha de nacimiento en formato DD/MM/YYYY para
-                  verificar su identidad
+                  continuar
                 </p>
               </div>
 
@@ -646,7 +848,7 @@ export default function InscribirsePage() {
                 type="submit"
                 className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-5 px-6 rounded-full transition-all duration-300 shadow-xl hover:shadow-2xl text-lg mb-4"
               >
-                Confirmar
+                Confirmar y Continuar
                 <Icon
                   icon="solar:check-circle-linear"
                   className="w-6 h-6 inline-block ml-2"
@@ -655,14 +857,13 @@ export default function InscribirsePage() {
 
               <button
                 onClick={() => {
-                  setShowBirthDateConfirmation(false);
-                  setStep("cedula");
+                  dispatchFlow({ type: "BACK_TO_CEDULA" });
                   setBirthDateInput("");
                 }}
                 type="button"
                 className="w-full bg-slateGray dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-midnight_text dark:text-white font-semibold py-5 px-6 rounded-full transition-all duration-300"
               >
-                Volver
+                Cambiar Cédula
               </button>
             </form>
           </div>
@@ -671,7 +872,192 @@ export default function InscribirsePage() {
     );
   }
 
-  // Formulario completo
+  // PASO 2: Selección de método de validación (Biométrica vs Presencial/Manual)
+  if (flow.step === "metodo") {
+    return (
+      <section className="min-h-screen bg-slateGray dark:bg-gray-900 py-16 px-4">
+        <div className="max-w-2xl mx-auto space-y-6">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8 sm:p-10 border border-gray-100 dark:border-gray-700">
+            {/* Indicador de pasos */}
+            <div className="flex items-center justify-center gap-2 mb-6 text-xs font-semibold">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
+                <span>Cédula</span>
+              </span>
+              <div className="w-6 h-0.5 bg-primary" />
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-white">
+                <span>2</span>
+                <span>Validación</span>
+              </span>
+              <div className="w-6 h-0.5 bg-gray-200 dark:bg-gray-700" />
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                <span>3</span>
+                <span>Datos</span>
+              </span>
+            </div>
+
+            <div className="flex gap-2 items-center justify-center mb-3">
+              <Icon
+                icon="solar:user-check-rounded-bold"
+                className="text-primary text-2xl"
+              />
+              <p className="text-primary text-sm font-semibold tracking-wide">
+                Paso 2: Elija Cómo Validar su Identidad
+              </p>
+            </div>
+
+            <h1 className="text-2xl sm:text-3xl font-bold text-midnight_text dark:text-white mb-2 text-center">
+              Participante Identificado
+            </h1>
+            {capacitacion && (
+              <p className="text-dark_grey dark:text-gray-300 text-center mb-6 text-base font-medium">
+                {capacitacion.nombre}
+              </p>
+            )}
+
+            {/* Resumen de datos obtenidos del Tribunal Electoral */}
+            {estudianteData && (
+              <div className="bg-slate-50 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 sm:p-5 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center text-primary flex-shrink-0">
+                    <Icon icon="solar:user-id-bold" className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                      Datos del Tribunal Electoral • Cédula{" "}
+                      <span className="text-midnight_text dark:text-white font-bold">
+                        {estudianteData.cedula}
+                      </span>
+                    </p>
+                    <p className="text-base sm:text-lg font-bold text-midnight_text dark:text-white">
+                      {estudianteData.nombre_cedula ||
+                        `${estudianteData.nombres} ${estudianteData.apellidos}`}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearBiometriaResult();
+                    setBiometriaResult(null);
+                    setEstudianteData(null);
+                    dispatchFlow({ type: "BACK_TO_CEDULA" });
+                  }}
+                  className="text-xs font-semibold text-primary hover:underline self-start sm:self-center"
+                >
+                  Cambiar cédula
+                </button>
+              </div>
+            )}
+
+            {/* OPCIÓN 1: VALIDACIÓN BIOMÉTRICA (RECOMENDADO) */}
+            <div className="rounded-2xl p-6 mb-5 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-teal-500/10 dark:from-emerald-950/40 dark:via-gray-800 dark:to-teal-950/30 border-2 border-emerald-500/40 dark:border-emerald-500/30 shadow-lg">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-emerald-500/20 dark:bg-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 flex-shrink-0">
+                    <Icon icon="solar:camera-square-bold" className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center flex-wrap gap-2">
+                      <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                        Opción 1: Validación Biométrica Facial
+                      </h2>
+                      <span className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-emerald-600 text-white rounded-full">
+                        Recomendado • Inmediato
+                      </span>
+                    </div>
+                    <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">
+                      Tribunal Electoral • INADEH
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-5 leading-relaxed">
+                Confirme su identidad en segundos mediante reconocimiento facial
+                con su cámara. Su inscripción quedará validada de forma
+                automática sin requerir revisión presencial previa.
+              </p>
+
+              <button
+                type="button"
+                onClick={handleIniciarBiometria}
+                disabled={isInitiatingBiometria}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-75 text-white font-bold py-4 px-6 rounded-full transition-all duration-300 shadow-lg hover:shadow-emerald-600/25 flex items-center justify-center gap-2 text-base group"
+              >
+                {isInitiatingBiometria ? (
+                  <>
+                    <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    <span>Conectando con Tribunal Electoral...</span>
+                  </>
+                ) : (
+                  <>
+                    <Icon
+                      icon="solar:verified-check-bold"
+                      className="w-5 h-5 group-hover:scale-110 transition-transform"
+                    />
+                    <span>Realizar Validación Biométrica</span>
+                    <Icon
+                      icon="solar:arrow-right-linear"
+                      className="w-5 h-5 group-hover:translate-x-1 transition-transform"
+                    />
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* OPCIÓN 2: VALIDACIÓN PRESENCIAL O MANUAL */}
+            <div className="rounded-2xl p-6 bg-amber-50/70 dark:bg-amber-950/20 border-2 border-amber-300/70 dark:border-amber-700/50">
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-amber-500/20 dark:bg-amber-500/30 flex items-center justify-center text-amber-700 dark:text-amber-400 flex-shrink-0">
+                    <Icon
+                      icon="solar:user-hand-up-bold"
+                      className="w-6 h-6"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center flex-wrap gap-2">
+                      <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                        Opción 2: Validación Presencial o Manual
+                      </h2>
+                      <span className="px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-amber-500 text-white rounded-full">
+                        Estado: Pendiente de Validación
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-800 dark:text-amber-300 font-medium">
+                      Sujeto a revisión por un administrador
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-5 leading-relaxed">
+                Si no dispone de cámara o prefiere validar su identidad de
+                manera presencial/manual, puede completar sus datos ahora. Su
+                inscripción quedará marcada como{" "}
+                <strong className="text-amber-800 dark:text-amber-300">
+                  &ldquo;Pendiente de validación&rdquo;
+                </strong>{" "}
+                hasta que un administrador la valide.
+              </p>
+
+              <button
+                type="button"
+                onClick={handleSeleccionarManual}
+                className="w-full bg-white dark:bg-gray-800 hover:bg-amber-100/60 dark:hover:bg-gray-700 text-amber-900 dark:text-amber-200 border-2 border-amber-400 dark:border-amber-600 font-bold py-3.5 px-6 rounded-full transition-all duration-300 flex items-center justify-center gap-2 text-sm sm:text-base"
+              >
+                <Icon icon="solar:document-text-bold" className="w-5 h-5" />
+                <span>Continuar con Validación Manual / Presencial</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // Formulario completo (Paso 3)
   const ubicacionFields: Array<FormFieldOrSection> = [
     {
       name: "provincia_id",
@@ -846,6 +1232,102 @@ export default function InscribirsePage() {
         </div>
       )}
 
+      {/* Banner de Verificación Biométrica si está activo */}
+      {metodoValidacion === "biometrica" && biometriaResult ? (
+        <div className="max-w-4xl mx-auto px-4 mb-6">
+          <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 dark:from-emerald-950/40 dark:via-gray-800 dark:to-teal-950/30 border-2 border-emerald-500/40 dark:border-emerald-600/40 rounded-2xl p-5 shadow-md">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-emerald-500/20 dark:bg-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 flex-shrink-0">
+                  <Icon icon="solar:verified-check-bold" className="w-7 h-7" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-emerald-900 dark:text-emerald-200 font-bold text-base sm:text-lg">
+                      Identidad Certificada Biométricamente
+                    </h3>
+                    <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-600 text-white rounded-full">
+                      {biometriaResult.estado}
+                    </span>
+                  </div>
+                  <p className="text-emerald-800/80 dark:text-emerald-300/80 text-xs sm:text-sm font-medium mt-0.5">
+                    Cédula:{" "}
+                    <strong className="text-emerald-950 dark:text-emerald-100">
+                      {biometriaResult.cedula}
+                    </strong>
+                    {biometriaResult.id_auditoria && (
+                      <span className="hidden sm:inline">
+                        {" "}
+                        • ID Auditoría:{" "}
+                        <code className="font-mono text-[11px] bg-emerald-100/70 dark:bg-emerald-900/60 px-1.5 py-0.5 rounded">
+                          {biometriaResult.id_auditoria.slice(0, 8)}...
+                        </code>
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  clearBiometriaResult();
+                  setBiometriaResult(null);
+                  dispatchFlow({ type: "BACK_TO_METODO" });
+                }}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 underline font-medium"
+              >
+                Cambiar método
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="max-w-4xl mx-auto px-4 mb-6">
+          <div className="bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-700/60 rounded-2xl p-5 shadow-md">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-xl bg-amber-500/20 dark:bg-amber-500/30 flex items-center justify-center text-amber-700 dark:text-amber-400 flex-shrink-0">
+                  <Icon icon="solar:clock-circle-bold" className="w-7 h-7" />
+                </div>
+                <div>
+                  <div className="flex items-center flex-wrap gap-2">
+                    <h3 className="text-amber-950 dark:text-amber-200 font-bold text-base sm:text-lg">
+                      Validación Presencial / Manual Seleccionada
+                    </h3>
+                    <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-white rounded-full">
+                      Pendiente de Validación
+                    </span>
+                  </div>
+                  <p className="text-amber-900/80 dark:text-amber-300/80 text-xs sm:text-sm font-medium mt-1">
+                    Titular verificado:{" "}
+                    <strong>
+                      {estudianteData?.nombre_cedula ||
+                        `${estudianteData?.nombres || ""} ${estudianteData?.apellidos || ""}`.trim()}
+                    </strong>{" "}
+                    &middot; Cédula:{" "}
+                    <strong>{estudianteData?.cedula || cedula}</strong>. Al
+                    completar su registro, su inscripción quedará en estado{" "}
+                    <strong>&ldquo;Pendiente de validación&rdquo;</strong> hasta
+                    que un administrador la valide.
+                  </p>
+                </div>
+              </div>
+
+              {biometriaEnabled && (
+                <button
+                  type="button"
+                  onClick={() => dispatchFlow({ type: "BACK_TO_METODO" })}
+                  className="text-xs text-amber-800 dark:text-amber-300 hover:text-emerald-700 dark:hover:text-emerald-400 underline font-semibold whitespace-nowrap"
+                >
+                  Cambiar a validación biométrica
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Formulario */}
       <Form
         key={formKey}
@@ -895,8 +1377,15 @@ export default function InscribirsePage() {
             setSelectedCorregimientoId(corregimientoId);
           }
         }}
-      />
+      >
+        <PrivacyConsentCheckbox
+          id="inscripcion-privacidad"
+          checked={aceptoPolitica}
+          onChange={setAceptoPolitica}
+          disabled={isSubmitting}
+          purpose="para gestionar mi inscripción, verificar mi correo electrónico, validar mi identidad y recibir notificaciones relacionadas con esta capacitación"
+        />
+      </Form>
     </section>
   );
 }
-
