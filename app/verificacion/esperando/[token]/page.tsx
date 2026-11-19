@@ -29,64 +29,74 @@ export default function EsperandoVerificacionPage() {
   };
 
   // Verificar estado del token
-  const verificarEstado = useCallback(async () => {
-    try {
-      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-      const response = await fetch(
-        `${basePath}/api/verificacion/estado/${token}`
-      );
+  const verificarEstado = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+        const response = await fetch(
+          `${basePath}/api/verificacion/estado/${token}`,
+          { signal },
+        );
 
-      if (!response.ok) {
-        if (response.status === 404) {
+        if (!response.ok) {
+          if (response.status === 404) {
+            setEstado("expirado");
+            toast.error("Token no encontrado");
+            return;
+          }
+          throw new Error("Error al verificar estado");
+        }
+
+        const data = await response.json();
+
+        if (data.data.estado === "verificado") {
+          setEstado("verificado");
+          toast.success("¡Correo verificado exitosamente!");
+          // Redirigir después de 2 segundos
+          setTimeout(() => {
+            router.push("/capacitaciones");
+          }, 2000);
+        } else if (data.data.estado === "expirado") {
           setEstado("expirado");
-          toast.error("Token no encontrado");
+          toast.error("El enlace de verificación ha expirado");
+        }
+      } catch (error) {
+        if ((error as { name?: string })?.name === "AbortError") {
           return;
         }
-        throw new Error("Error al verificar estado");
+        console.error("Error al verificar estado:", error);
       }
+    },
+    [token, router],
+  );
 
-      const data = await response.json();
-
-      if (data.data.estado === "verificado") {
-        setEstado("verificado");
-        toast.success("¡Correo verificado exitosamente!");
-        // Redirigir después de 2 segundos
-        setTimeout(() => {
-          router.push("/capacitaciones");
-        }, 2000);
-      } else if (data.data.estado === "expirado") {
-        setEstado("expirado");
-        toast.error("El enlace de verificación ha expirado");
-      }
-    } catch (error) {
-      console.error("Error al verificar estado:", error);
-    }
-  }, [token, router]);
-
-  // Polling cada 3 segundos
+  // Polling cada 3 segundos (con AbortController en cleanup)
   useEffect(() => {
-    if (estado === "pendiente") {
-      const interval = setInterval(() => {
-        verificarEstado();
-      }, 3000);
+    if (estado !== "pendiente") return;
 
-      return () => clearInterval(interval);
-    }
+    const controller = new AbortController();
+    verificarEstado(controller.signal);
+
+    const interval = setInterval(() => {
+      verificarEstado(controller.signal);
+    }, 3000);
+
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, [estado, verificarEstado]);
 
-  // Contador de tiempo
+  // Contador de tiempo (se detiene en estados finales)
   useEffect(() => {
+    if (estado !== "pendiente") return;
+
     const interval = setInterval(() => {
       setTiempoTranscurrido((prev) => prev + 1);
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
-
-  // Verificación inicial
-  useEffect(() => {
-    verificarEstado();
-  }, [verificarEstado]);
+  }, [estado]);
 
   // Reenviar correo
   const handleReenviar = async () => {
