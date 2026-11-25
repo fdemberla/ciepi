@@ -1,381 +1,195 @@
 import { Icon } from "@iconify/react";
 import Link from "next/link";
+import { withBasePath } from "@/lib/basePath";
+import { getLatestPublishedBlogs, type PublishedBlogSummary } from "@/lib/blogPublic";
+import BoomerangFrame from "@/components/brand/BoomerangFrame";
+import ButtonLink from "@/components/brand/ButtonLink";
+import SectionTitle from "@/components/brand/SectionTitle";
+import QuickAccess from "@/components/brand/QuickAccess";
+import NewsCard from "@/components/brand/NewsCard";
 
-export default function Home() {
+// La portada muestra las últimas noticias desde la BD: se genera en cada visita
+// (evita además depender de la BD durante `next build`).
+export const dynamic = "force-dynamic";
+
+const CONTAINER = "container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4";
+
+/** Palabra destacada del lema: blanca, con subrayado verde oficial (contraste AA sobre el azul). */
+function Highlight({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="font-bold underline decoration-brand-green decoration-[5px] underline-offset-[6px]">
+      {children}
+    </span>
+  );
+}
+
+const AREAS = [
+  {
+    key: "innovacion",
+    title: "Innovación",
+    text: "Explora, crea y transforma ideas en soluciones con capacitación técnica certificada y acceso a tecnología.",
+    icon: "solar:lightbulb-bolt-linear",
+    color: "primary" as const,
+    cta: { href: "/capacitaciones", label: "Ver capacitaciones" },
+  },
+  {
+    key: "emprendimiento",
+    title: "Emprendimiento",
+    text: "Desarrolla tu idea, fortalece tu negocio y hazlo crecer con coworking, incubación de proyectos y mentoría especializada.",
+    icon: "solar:rocket-2-linear",
+    color: "brand-green" as const,
+    cta: { href: "/contacto", label: "Contáctanos" },
+  },
+];
+
+export default async function Home() {
+  let noticias: PublishedBlogSummary[] = [];
+  try {
+    noticias = await getLatestPublishedBlogs(4);
+  } catch (error) {
+    console.error("Error al cargar noticias de la portada:", error);
+  }
+
   return (
     <div className="bg-white dark:bg-gray-900 overflow-hidden">
       {/* ============================================================
-          HERO
+          HERO — azul oficial, foto en marco "boomerang" (manual p. 110-113)
       ============================================================ */}
-      <section className="relative min-h-[90vh] flex items-center py-0">
-        {/* Background layers */}
-        <div className="absolute inset-0 z-0 pointer-events-none">
-          {/* Dot grid pattern */}
-          <div
-            className="absolute inset-0 opacity-[0.035] dark:opacity-[0.07]"
-            style={{
-              backgroundImage:
-                "radial-gradient(circle, #004a98 1.5px, transparent 1.5px)",
-              backgroundSize: "28px 28px",
-            }}
-          />
-          {/* Diagonal soft panel */}
-          <div className="absolute right-0 top-0 w-[52%] h-full bg-gradient-to-bl from-primary/6 via-primary/3 to-transparent dark:from-primary/12 dark:via-primary/6" />
-          {/* Orange accent glow */}
-          <div className="absolute right-[8%] top-[12%] w-80 h-80 bg-secondary/12 dark:bg-secondary/18 rounded-full blur-[80px]" />
-          {/* Blue bottom glow */}
-          <div className="absolute left-[15%] bottom-[8%] w-[500px] h-52 bg-primary/6 dark:bg-primary/12 rounded-full blur-[80px]" />
-        </div>
-
-        <div className="relative z-10 container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 pt-28 pb-20">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-6 items-center">
-            {/* Left: Copy */}
-            <div className="col-span-6 flex flex-col gap-6 animate-fade-up">
-              {/* Eyebrow */}
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-[3px] bg-secondary rounded-full" />
-                <span className="text-secondary text-xs font-bold uppercase tracking-[0.18em]">
-                  INADEH — República de Panamá
-                </span>
-              </div>
-
-              {/* Main heading */}
-              <h1 className="text-midnight_text dark:text-white font-bold leading-[0.92] tracking-tight">
-                <span className="block text-5xl sm:text-6xl lg:text-7xl">
-                  Centro de
-                </span>
-                <span className="block text-5xl sm:text-6xl lg:text-7xl text-primary">
-                  Innovación
-                </span>
-                <span className="block text-4xl sm:text-5xl lg:text-6xl mt-1">
-                  y Emprendimiento
-                </span>
-              </h1>
-
-              {/* Description */}
-              <p className="text-dark_grey dark:text-gray-300 text-lg leading-relaxed max-w-[50ch]">
-                Fomentamos el emprendimiento productivo ofreciendo coworking,
-                incubación de proyectos, tecnología y capacitación para
-                aprendices, egresados y grupos vulnerables.
+      <section className="relative bg-primary text-white py-0">
+        <div className="absolute inset-0 bg-inadeh-pattern opacity-[0.045] pointer-events-none" aria-hidden="true" />
+        <div className={`relative ${CONTAINER} py-14 lg:py-20`}>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+            <div className="lg:col-span-6 flex flex-col gap-6 animate-fade-up">
+              <span aria-hidden="true" className="block w-14 h-1.5 rounded-full bg-brand-green" />
+              <h1 className="font-extrabold leading-none text-7xl sm:text-8xl tracking-wide">CIEPI</h1>
+              <p className="font-[family-name:var(--font-display)] text-2xl sm:text-3xl leading-snug font-semibold max-w-[24ch]">
+                <Highlight>Ideas</Highlight> que se convierten en <Highlight>proyectos</Highlight>, proyectos que{" "}
+                <Highlight>generan oportunidades</Highlight>.
               </p>
-
-              {/* CTA buttons */}
+              <p className="text-white/85 text-lg leading-relaxed max-w-[52ch]">
+                En el Centro de Innovación y Emprendimiento Productivo del INADEH impulsamos tu talento:
+                coworking, incubación de proyectos, tecnología y capacitación para aprendices, egresados y
+                grupos vulnerables.
+              </p>
               <div className="flex flex-wrap gap-3 pt-1">
-                <Link
-                  href="/capacitaciones"
-                  className="inline-flex items-center gap-2.5 bg-primary hover:bg-primary/90 text-white font-semibold px-7 py-3.5 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5"
-                >
-                  <Icon icon="solar:diploma-bold" className="text-xl" />
-                  Ver Capacitaciones
-                </Link>
-                <Link
-                  href="/eventos"
-                  className="inline-flex items-center gap-2.5 bg-white dark:bg-gray-800 text-midnight_text dark:text-white font-semibold px-7 py-3.5 rounded-xl border border-gray-200 dark:border-gray-600 hover:border-primary hover:text-primary dark:hover:text-primary transition-all duration-200"
-                >
-                  <Icon icon="solar:calendar-bold" className="text-xl" />
-                  Próximos Eventos
-                </Link>
-              </div>
-
-              {/* Trust signals */}
-              <div className="flex items-center gap-5 pt-2">
-                <div className="flex items-center gap-2">
-                  <Icon
-                    icon="solar:verified-check-bold"
-                    className="text-success text-xl flex-shrink-0"
-                  />
-                  <span className="text-sm text-dark_grey dark:text-gray-400 font-medium">
-                    Institución Pública
-                  </span>
-                </div>
-                <div className="w-px h-4 bg-gray-200 dark:bg-gray-700" />
-                <div className="flex items-center gap-2">
-                  <Icon
-                    icon="solar:medal-ribbons-star-bold"
-                    className="text-success text-xl flex-shrink-0"
-                  />
-                  <span className="text-sm text-dark_grey dark:text-gray-400 font-medium">
-                    Certificación INADEH
-                  </span>
-                </div>
+                <ButtonLink href="/capacitaciones" variant="orange">
+                  Ver capacitaciones
+                </ButtonLink>
+                <ButtonLink href="/eventos" variant="outline-white">
+                  Próximos eventos
+                </ButtonLink>
               </div>
             </div>
 
-            {/* Right: Interactive service cards */}
-            <div className="col-span-6 relative animate-fade-up delay-200">
-              {/* Ambient glow behind cards */}
-              <div className="absolute inset-4 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-3xl blur-3xl" />
-
-              <div className="relative grid grid-cols-2 gap-4">
-                {/* Card 1 - Capacitaciones */}
-                <Link
-                  href="/capacitaciones"
-                  className="group bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 p-6 flex flex-col gap-3 hover:-translate-y-1.5 hover:shadow-xl hover:border-primary/25 transition-all duration-200"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 group-hover:bg-primary/15 flex items-center justify-center transition-colors">
-                    <Icon
-                      icon="solar:diploma-bold"
-                      className="text-primary text-2xl"
-                    />
-                  </div>
-                  <div>
-                    <p className="font-bold text-midnight_text dark:text-white text-sm">
-                      Capacitaciones
-                    </p>
-                    <p className="text-xs text-dark_grey dark:text-gray-400 mt-0.5 leading-relaxed">
-                      Cursos y talleres técnicos certificados
-                    </p>
-                  </div>
-                  <Icon
-                    icon="solar:arrow-right-up-linear"
-                    className="text-primary text-sm self-end opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-200"
-                  />
-                </Link>
-
-                {/* Card 2 - Eventos */}
-                <Link
-                  href="/eventos"
-                  className="group bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 p-6 flex flex-col gap-3 hover:-translate-y-1.5 hover:shadow-xl hover:border-secondary/30 transition-all duration-200"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-secondary/10 group-hover:bg-secondary/15 flex items-center justify-center transition-colors">
-                    <Icon
-                      icon="solar:calendar-bold"
-                      className="text-secondary text-2xl"
-                    />
-                  </div>
-                  <div>
-                    <p className="font-bold text-midnight_text dark:text-white text-sm">
-                      Eventos
-                    </p>
-                    <p className="text-xs text-dark_grey dark:text-gray-400 mt-0.5 leading-relaxed">
-                      Networking y conferencias
-                    </p>
-                  </div>
-                  <Icon
-                    icon="solar:arrow-right-up-linear"
-                    className="text-secondary text-sm self-end opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-200"
-                  />
-                </Link>
-
-                {/* Card 3 - Blog */}
-                <Link
-                  href="/blog"
-                  className="group bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 p-6 flex flex-col gap-3 hover:-translate-y-1.5 hover:shadow-xl hover:border-success/30 transition-all duration-200"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-success/10 group-hover:bg-success/15 flex items-center justify-center transition-colors">
-                    <Icon
-                      icon="solar:document-text-bold"
-                      className="text-success text-2xl"
-                    />
-                  </div>
-                  <div>
-                    <p className="font-bold text-midnight_text dark:text-white text-sm">
-                      Blog CIEPI
-                    </p>
-                    <p className="text-xs text-dark_grey dark:text-gray-400 mt-0.5 leading-relaxed">
-                      Investigaciones y artículos
-                    </p>
-                  </div>
-                  <Icon
-                    icon="solar:arrow-right-up-linear"
-                    className="text-success text-sm self-end opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-200"
-                  />
-                </Link>
-
-                {/* Card 4 - Contacto (primary tinted bg) */}
-                <Link
-                  href="/contacto"
-                  className="group bg-primary/5 dark:bg-primary/12 rounded-2xl border border-primary/15 dark:border-primary/25 p-6 flex flex-col gap-3 hover:-translate-y-1.5 hover:shadow-xl hover:bg-primary/8 transition-all duration-200"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center">
-                    <Icon
-                      icon="solar:chat-line-bold"
-                      className="text-primary text-2xl"
-                    />
-                  </div>
-                  <div>
-                    <p className="font-bold text-midnight_text dark:text-white text-sm">
-                      Contacto
-                    </p>
-                    <p className="text-xs text-dark_grey dark:text-gray-400 mt-0.5 leading-relaxed">
-                      Envíanos tu consulta
-                    </p>
-                  </div>
-                  <Icon
-                    icon="solar:arrow-right-up-linear"
-                    className="text-primary text-sm self-end opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-200"
-                  />
-                </Link>
-              </div>
+            <div className="lg:col-span-6 animate-fade-up delay-200">
+              {/* Foto provisional: reemplazar por fotografía de CIEPI según el estilo del manual (p. 108-109). */}
+              <BoomerangFrame className="aspect-[4/3] shadow-2xl">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={withBasePath("/brand/hero-placeholder.jpg")}
+                  alt="Vista aérea de las instalaciones del INADEH"
+                  className="w-full h-full object-cover"
+                />
+              </BoomerangFrame>
             </div>
           </div>
         </div>
       </section>
 
       {/* ============================================================
-          STATS STRIP
+          ÁREAS — Innovación (azul) y Emprendimiento (verde)
       ============================================================ */}
-      <div className="bg-primary">
-        <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-2 text-center">
-            {[
-              {
-                number: "50+",
-                label: "Capacitaciones",
-                icon: "solar:diploma-bold",
-              },
-              {
-                number: "100+",
-                label: "Eventos Realizados",
-                icon: "solar:calendar-bold",
-              },
-              {
-                number: "1,000+",
-                label: "Personas Capacitadas",
-                icon: "solar:users-group-rounded-bold",
-              },
-              {
-                number: "24/7",
-                label: "Acceso Digital",
-                icon: "solar:monitor-smartphone-bold",
-              },
-            ].map((stat, i) => (
-              <div key={i} className="flex flex-col items-center gap-2 py-2">
-                <Icon icon={stat.icon} className="text-white/30 text-3xl" />
-                <span className="text-white text-4xl lg:text-5xl font-bold tracking-tight leading-none">
-                  {stat.number}
-                </span>
-                <span className="text-white/65 text-sm font-medium">
-                  {stat.label}
-                </span>
-              </div>
-            ))}
-          </div>
+      <section className="pt-12 pb-8 md:pt-16 md:pb-10">
+        <div className={`${CONTAINER} grid grid-cols-1 md:grid-cols-2 gap-6`}>
+          {AREAS.map((a) => {
+            const blue = a.color === "primary";
+            return (
+              <article
+                key={a.key}
+                className="relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 border border-gray-200/80 dark:border-gray-700 shadow-sm p-8 pr-28 sm:pr-36 animate-fade-up"
+              >
+                {/* Forma angulada decorativa en el color del área */}
+                <span
+                  aria-hidden="true"
+                  className={`absolute -right-10 -bottom-10 w-44 h-44 rounded-[2.5rem] rotate-[30deg] ${
+                    blue ? "bg-primary" : "bg-brand-green"
+                  } opacity-90`}
+                />
+                <span
+                  aria-hidden="true"
+                  className={`absolute right-16 -bottom-16 w-24 h-40 rounded-[2rem] rotate-[30deg] ${
+                    blue ? "bg-brand-green" : "bg-primary"
+                  } opacity-25`}
+                />
+                <div className="relative flex flex-col gap-4">
+                  <span
+                    className={`w-14 h-14 rounded-full flex items-center justify-center border-2 ${
+                      blue ? "border-primary text-primary" : "border-brand-green text-brand-green"
+                    } bg-white dark:bg-gray-900`}
+                  >
+                    <Icon icon={a.icon} className="text-3xl" aria-hidden="true" />
+                  </span>
+                  <h2 className="leading-none">
+                    <span className="block text-lg font-semibold text-dark_grey dark:text-gray-300">Área de</span>
+                    <span className={`block text-4xl font-extrabold ${blue ? "text-primary" : "text-brand-green"} dark:text-white`}>
+                      {a.title}
+                    </span>
+                  </h2>
+                  <p className="text-dark_grey dark:text-gray-300 leading-relaxed max-w-[42ch]">{a.text}</p>
+                  <div>
+                    <ButtonLink href={a.cta.href} variant="blue">
+                      {a.cta.label}
+                    </ButtonLink>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
+      </section>
+
+      {/* ============================================================
+          ACCESOS RÁPIDOS
+      ============================================================ */}
+      <div className={`${CONTAINER} pb-4`}>
+        <QuickAccess
+          items={[
+            { href: "/eventos", label: "Calendario de actividades", icon: "solar:calendar-linear", color: "primary" },
+            { href: "/capacitaciones", label: "Capacitaciones", icon: "solar:diploma-linear", color: "secondary" },
+            { href: "#boletin", label: "Boletín informativo", icon: "solar:letter-linear", color: "brand-green" },
+            { href: "/contacto", label: "Contacto y consultas", icon: "solar:chat-round-line-linear", color: "primary" },
+          ]}
+        />
       </div>
 
       {/* ============================================================
-          SERVICES SECTION
+          ACTUALIDAD CIEPI — últimas noticias del blog
       ============================================================ */}
-      <section className="bg-slateGray dark:bg-gray-900">
-        <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4">
-          {/* Section header */}
-          <div className="text-center mb-14 animate-fade-up">
-            <span className="inline-block text-secondary text-xs font-bold uppercase tracking-[0.18em] mb-4">
-              Nuestros Servicios
-            </span>
-            <h2 className="text-4xl lg:text-5xl font-bold text-midnight_text dark:text-white mb-4 leading-tight">
-              Todo lo que necesitas
-              <br className="hidden sm:block" /> para emprender
-            </h2>
-            <div className="w-14 h-1 bg-secondary rounded-full mx-auto" />
+      {noticias.length > 0 && (
+        <section>
+          <div className={CONTAINER}>
+            <SectionTitle
+              title="Actualidad CIEPI"
+              link={{ href: "/blog", label: "Ver todas las noticias" }}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {noticias.map((n) => (
+                <NewsCard key={n.id} {...n} />
+              ))}
+            </div>
           </div>
+        </section>
+      )}
 
-          {/* Service cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              {
-                icon: "solar:home-wifi-bold",
-                title: "Espacios de Coworking",
-                desc: "Accede a espacios de trabajo colaborativo equipados con tecnología de punta para aprendices y emprendedores.",
-                bg: "bg-primary/5 dark:bg-primary/10",
-                border: "border-primary/12 dark:border-primary/20",
-                iconBg: "bg-primary/10",
-                iconColor: "text-primary",
-                hoverBorder: "hover:border-primary/30",
-              },
-              {
-                icon: "solar:rocket-bold",
-                title: "Incubación de Proyectos",
-                desc: "Acompañamos tu idea desde el concepto hasta la ejecución con mentoría especializada y acceso a redes de financiamiento.",
-                bg: "bg-secondary/5 dark:bg-secondary/10",
-                border: "border-secondary/12 dark:border-secondary/20",
-                iconBg: "bg-secondary/10",
-                iconColor: "text-secondary",
-                hoverBorder: "hover:border-secondary/30",
-              },
-              {
-                icon: "solar:diploma-bold",
-                title: "Capacitación Técnica",
-                desc: "Cursos certificados en tecnología, negocios y emprendimiento para aprendices, egresados y grupos vulnerables.",
-                bg: "bg-success/5 dark:bg-success/10",
-                border: "border-success/12 dark:border-success/20",
-                iconBg: "bg-success/10",
-                iconColor: "text-success",
-                hoverBorder: "hover:border-success/30",
-              },
-            ].map((s, i) => (
-              <div
-                key={i}
-                className={`${s.bg} rounded-2xl border ${s.border} ${s.hoverBorder} p-8 hover:-translate-y-1 transition-all duration-200 animate-fade-up`}
-                style={{ animationDelay: `${i * 100}ms` }}
-              >
-                <div
-                  className={`w-14 h-14 rounded-2xl ${s.iconBg} flex items-center justify-center mb-6`}
-                >
-                  <Icon icon={s.icon} className={`${s.iconColor} text-3xl`} />
-                </div>
-                <h3 className="text-xl font-bold text-midnight_text dark:text-white mb-3">
-                  {s.title}
-                </h3>
-                <p className="text-dark_grey dark:text-gray-400 text-sm leading-relaxed">
-                  {s.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          CTA STRIP
-      ============================================================ */}
-      <section
-        className="relative overflow-hidden py-0"
-        style={{
-          background:
-            "linear-gradient(135deg, #ed7625 0%, #f5943a 50%, #e86018 100%)",
-        }}
-      >
-        {/* Subtle pattern overlay */}
-        <div
-          className="absolute inset-0 opacity-[0.06]"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle, #ffffff 1.5px, transparent 1.5px)",
-            backgroundSize: "24px 24px",
-          }}
-        />
-        <div className="relative z-10 container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-16 text-center">
-          <span className="inline-block text-white/70 text-xs font-bold uppercase tracking-[0.18em] mb-4">
-            Únete a CIEPI
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4 leading-tight">
-            ¿Listo para transformar tu idea
-            <br className="hidden sm:block" /> en un proyecto real?
-          </h2>
-          <p className="text-white/80 text-lg mb-8 max-w-xl mx-auto">
-            Miles de personas ya están construyendo su futuro con el apoyo de
-            CIEPI — INADEH.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <Link
-              href="/contacto"
-              className="inline-flex items-center gap-2.5 bg-white text-secondary font-bold px-8 py-3.5 rounded-xl hover:bg-white/92 transition-all duration-200 shadow-lg hover:-translate-y-0.5"
-            >
-              <Icon icon="solar:chat-line-bold" className="text-xl" />
-              Contáctanos hoy
-            </Link>
-            <Link
-              href="/capacitaciones"
-              className="inline-flex items-center gap-2.5 bg-white/15 text-white font-semibold px-8 py-3.5 rounded-xl border border-white/30 hover:bg-white/25 transition-all duration-200"
-            >
-              <Icon icon="solar:diploma-bold" className="text-xl" />
-              Ver Capacitaciones
+      {noticias.length === 0 && (
+        <section className="py-8">
+          <div className={`${CONTAINER} text-center`}>
+            <Link href="/blog" className="text-primary font-semibold hover:underline">
+              Visita el blog de CIEPI
             </Link>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
     </div>
   );
 }

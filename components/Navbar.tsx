@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import BrandLogos from "@/components/brand/BrandLogos";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
@@ -12,6 +14,9 @@ import {
 
 export default function Navbar() {
   const { data: session, status } = useSession();
+  const pathname = usePathname() || "/";
+  const isActive = (href: string) =>
+    href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -100,21 +105,14 @@ export default function Navbar() {
   return (
     <header
       className={`sticky top-0 z-40 w-full transition-all duration-300 bg-white dark:bg-gray-800 ${
-        sticky ? "shadow-lg py-4" : "shadow-none py-6"
+        sticky ? "shadow-lg py-3" : "shadow-none py-5"
       }`}
     >
-      {/* Top accent gradient bar */}
-      <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary via-secondary to-success" />
       <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-primary to-blue-700 rounded-full flex items-center justify-center shadow-lg">
-              <span className="font-bold text-white text-xl">C</span>
-            </div>
-            <span className="font-bold text-2xl tracking-tight text-midnight_text dark:text-white hidden sm:block">
-              CIEPI
-            </span>
+          <Link href="/" aria-label="CIEPI — Inicio" className="flex items-center">
+            <BrandLogos height={sticky ? 30 : 34} />
           </Link>
 
           {/* Navigation Links */}
@@ -173,19 +171,30 @@ export default function Navbar() {
               }
 
               // Links normales (sin dropdown)
-              return section.links.map((link, linkIdx) => (
-                <Link
-                  key={`${sectionIdx}-${linkIdx}`}
-                  href={link.href}
-                  className="px-5 py-2.5 text-midnight_text dark:text-gray-300 hover:bg-slateGray dark:hover:bg-gray-800 hover:text-primary dark:hover:text-primary rounded-full transition-all duration-200 font-medium text-sm"
-                >
-                  <Icon
-                    icon={link.icon}
-                    className="w-4 h-4 inline-block mr-2 opacity-70"
-                  />
-                  {link.name}
-                </Link>
-              ));
+              return section.links.map((link, linkIdx) => {
+                const active = isActive(link.href);
+                return (
+                  <Link
+                    key={`${sectionIdx}-${linkIdx}`}
+                    href={link.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`relative px-4 py-2 text-sm font-semibold transition-colors duration-200 ${
+                      active
+                        ? "text-primary dark:text-white"
+                        : "text-midnight_text dark:text-gray-300 hover:text-primary dark:hover:text-white"
+                    }`}
+                  >
+                    {link.name}
+                    {/* Subrayado verde del elemento activo */}
+                    <span
+                      aria-hidden="true"
+                      className={`absolute left-4 right-4 -bottom-0.5 h-[3px] rounded-full bg-brand-green transition-transform duration-200 origin-left ${
+                        active ? "scale-x-100" : "scale-x-0"
+                      }`}
+                    />
+                  </Link>
+                );
+              });
             })}
           </nav>
 

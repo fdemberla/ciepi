@@ -1,27 +1,21 @@
 import Link from "next/link";
 import { Icon } from "@iconify/react";
 import NewsletterForm from "./NewsletterForm";
+import BrandLogos from "@/components/brand/BrandLogos";
 
 const Footer = () => {
   return (
-    <footer className="bg-slateGray dark:bg-gray-800 py-16 mt-auto border-t-2 border-t-primary/20 border-b-0 border-l-0 border-r-0 border border-gray-200 dark:border-gray-700">
+    <footer className="bg-slateGray dark:bg-gray-800 pt-16 mt-auto border-t border-gray-200 dark:border-gray-700">
       <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4">
-        <NewsletterForm />
+        {/* Ancla "#boletin" usada por los accesos rápidos de la portada */}
+        <div id="boletin" className="scroll-mt-28">
+          <NewsletterForm />
+        </div>
         <div className="grid grid-cols-1 gap-y-12 gap-x-8 sm:grid-cols-2 lg:grid-cols-12">
           {/* Logo y Redes Sociales */}
           <div className="col-span-1 sm:col-span-2 lg:col-span-4">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-gradient-to-br from-primary to-blue-700 rounded-full flex items-center justify-center shadow-lg">
-                <span className="font-bold text-white text-xl">C</span>
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-dark_grey dark:text-white">
-                  CIEPI
-                </h3>
-                <p className="text-dark_grey dark:text-gray-400 text-sm">
-                  Centro de Innovación y Emprendimiento
-                </p>
-              </div>
+            <div className="mb-6">
+              <BrandLogos height={30} />
             </div>
             <p className="text-dark_grey dark:text-gray-400 mb-6 text-sm leading-relaxed">
               Impulsando el desarrollo profesional a través de capacitaciones de
@@ -54,7 +48,7 @@ const Footer = () => {
 
           {/* Enlaces Rápidos */}
           <div className="col-span-1 lg:col-span-2">
-            <h3 className="mb-6 text-xl font-bold text-midnight_text dark:text-white">
+            <h3 className="mb-6 text-xl font-bold text-primary dark:text-white">
               Enlaces Rápidos
             </h3>
             <ul className="space-y-3">
@@ -111,7 +105,7 @@ const Footer = () => {
 
           {/* Administración */}
           <div className="col-span-1 sm:col-span-1 lg:col-span-3">
-            <h3 className="mb-6 text-xl font-bold text-midnight_text dark:text-white">
+            <h3 className="mb-6 text-xl font-bold text-primary dark:text-white">
               Administración
             </h3>
             <ul className="space-y-3">
@@ -132,7 +126,7 @@ const Footer = () => {
 
           {/* Información de Contacto */}
           <div className="col-span-1 sm:col-span-2 lg:col-span-3">
-            <h3 className="mb-6 text-xl font-bold text-midnight_text dark:text-white">
+            <h3 className="mb-6 text-xl font-bold text-primary dark:text-white">
               Contacto
             </h3>
             <div className="space-y-4">
@@ -182,22 +176,35 @@ const Footer = () => {
         </div>
       </div>
 
-      {/* Copyright Row */}
-      <div className="border-t border-gray-200 dark:border-gray-700 mt-12 pt-6">
-        <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-xs text-dark_grey dark:text-gray-500">
-            &copy; {new Date().getFullYear()} CIEPI &mdash; Centro de Innovación
-            y Emprendimiento Productivo
+      {/* Franja de cierre: azul oficial, patrón del isotipo y lema */}
+      <div className="relative bg-primary text-white mt-14 overflow-hidden">
+        <div className="absolute inset-0 bg-inadeh-pattern opacity-[0.07] pointer-events-none" aria-hidden="true" />
+        <span
+          aria-hidden="true"
+          className="absolute -left-12 -bottom-16 w-48 h-48 rounded-[3rem] rotate-[30deg] bg-brand-green/25"
+        />
+        <div className="relative container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-10 flex flex-col md:flex-row items-center justify-between gap-8">
+          <p className="font-[family-name:var(--font-display)] text-2xl sm:text-3xl font-semibold text-center md:text-left">
+            En CIEPI, tu talento tiene un{" "}
+            <span className="font-bold underline decoration-brand-green decoration-[5px] underline-offset-[6px]">
+              propósito
+            </span>
+            .
           </p>
-          <div className="flex items-center gap-4 text-xs text-dark_grey dark:text-gray-500">
-            <Link
-              href="/privacidad"
-              className="hover:text-primary transition-colors"
-            >
-              Política de Privacidad
-            </Link>
-            <span>&middot;</span>
-            <span>INADEH &mdash; República de Panamá</span>
+          <BrandLogos variant="dark" height={32} />
+        </div>
+        <div className="relative border-t border-white/15">
+          <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-white/75">
+            <p>
+              &copy; {new Date().getFullYear()} CIEPI &mdash; Centro de Innovación y Emprendimiento Productivo
+            </p>
+            <div className="flex items-center gap-4">
+              <Link href="/privacidad" className="hover:text-white hover:underline transition-colors">
+                Política de Privacidad
+              </Link>
+              <span aria-hidden="true">&middot;</span>
+              <span>INADEH &mdash; República de Panamá</span>
+            </div>
           </div>
         </div>
       </div>

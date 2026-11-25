@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
                WHERE child->>'text' IS NOT NULL AND child->>'text' != ''),
               ''
             ), 
-            '\s+', ' ', 'g'
+            '[[:space:]]+', ' ', 'g'
           ), 
           200
         ) AS contenido_preview,

@@ -3,9 +3,14 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --primary: #004a98;
-  --secondary: #ed7625;
-  --success: #44a147;
+  /* Paleta oficial — Manual de Identidad Corporativa INADEH (p. 31) */
+  --primary: #004a98; /* Pantone 2945C */
+  --secondary: #ed7625; /* Pantone 158C — botones de acción */
+  --success: #44a147; /* Pantone 7738C */
+  --brand-green: #44a147; /* el verde también es color de marca */
+  --neutral: #d1d3d4;
+  /* Tinte claro del azul oficial para fondos de bloque */
+  --surface-tint: #eef3f9;
   --slate-gray: #f8fafc;
   --midnight-text: #1e293b;
   --dark-grey: #3f3f3f;
@@ -33,10 +38,15 @@
   --color-primary: var(--primary);
   --color-secondary: var(--secondary);
   --color-success: var(--success);
+  --color-brand-green: var(--brand-green);
+  --color-neutral: var(--neutral);
+  --color-surface-tint: var(--surface-tint);
   --color-slateGray: var(--slate-gray);
   --color-midnight_text: var(--midnight-text);
   --color-dark_grey: var(--dark-grey);
   --font-sans: "Roboto Condensed", sans-serif;
+  /* Tipografía secundaria del manual, para títulos */
+  --font-display: "Barlow Condensed", "Roboto Condensed", sans-serif;
   --shadow-input-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
 
@@ -60,6 +70,21 @@ body {
 
 section {
   @apply py-12 md:py-16 lg:py-20;
+}
+
+/* Títulos con la tipografía secundaria del manual (Barlow Condensed) */
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0.005em;
+}
+
+/* Patrón con el isotipo INADEH (manual, "Módulos y patrones", p. 44-46) */
+.bg-inadeh-pattern {
+  background-image: url("/brand/inadeh-patron-blanco.png");
+  background-size: 150px 150px;
+  background-repeat: repeat;
 }
 
 /* =============================================

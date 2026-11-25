@@ -2,11 +2,15 @@ import type { Metadata } from "next";
 import "@fontsource/roboto-condensed/300.css";
 import "@fontsource/roboto-condensed/400.css";
 import "@fontsource/roboto-condensed/700.css";
+import "@fontsource/barlow-condensed/600.css";
+import "@fontsource/barlow-condensed/700.css";
+import "@fontsource/barlow-condensed/800.css";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { AuthProvider } from "@/components/AuthProvider";
 import { Toaster } from "react-hot-toast";
+import { BoomerangClipDefs } from "@/components/brand/BoomerangFrame";
 
 export const metadata: Metadata = {
   title: "CIEPI — Centro de Innovación y Emprendimiento Productivo",
@@ -56,6 +60,7 @@ export default function RootLayout({
               },
             }}
           />
+          <BoomerangClipDefs />
           <Navbar />
           <main id="main-content" className="flex-1">
             {children}

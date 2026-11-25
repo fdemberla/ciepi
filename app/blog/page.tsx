@@ -1,16 +1,14 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import { Icon } from "@iconify/react";
-import Link from "next/link";
-import { assetUrl } from "@/lib/basePath";
+import NewsCard from "@/components/brand/NewsCard";
 
 interface Blog {
   id: string;
   titulo: string;
   imagen_banner: string | null;
   palabras_clave: string[];
-  fecha_creacion: string;
-  fecha_actualizacion: string;
+  creado_en: string;
   contenido_preview: string;
   autor_nombre: string;
 }
@@ -101,26 +99,18 @@ export default function BlogPage() {
     setCurrentPage(1);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-ES", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
   return (
     <div className="min-h-screen bg-slateGray dark:bg-gray-900">
       {/* Hero Section */}
       <div className="bg-gradient-to-b from-primary/8 via-primary/3 to-transparent pt-32 pb-12">
         <div className="max-w-7xl mx-auto px-4 text-center animate-fade-up">
-          <h1 className="text-4xl md:text-5xl font-bold text-midnight_text dark:text-white mb-3">
-            Blog CIEPI
+          <span className="block h-1.5 w-12 bg-brand-green rounded-full mx-auto mb-3"></span>
+          <h1 className="text-4xl md:text-5xl font-bold text-primary dark:text-white mb-3">
+            Actualidad CIEPI
           </h1>
-          <span className="block h-1 w-14 bg-secondary rounded-full mx-auto mb-4"></span>
           <p className="text-lg text-dark_grey dark:text-gray-400 max-w-2xl mx-auto">
-            Descubre las últimas investigaciones, análisis y reflexiones del
-            Centro de Investigación en Economía y Políticas Internacionales
+            Noticias, actividades y artículos del Centro de Innovación y
+            Emprendimiento Productivo del INADEH.
           </p>
         </div>
       </div>
@@ -241,80 +231,15 @@ export default function BlogPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {blogs.map((blog, index) => (
-              <article
+              <div
                 key={blog.id}
-                className="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-100 dark:border-gray-700 overflow-hidden hover:-translate-y-1 hover:shadow-lg transition-all duration-300 animate-fade-up"
+                className="animate-fade-up"
                 style={{ animationDelay: `${index * 80}ms` }}
               >
-                {/* Blog Image */}
-                <div className="relative h-48 bg-gray-200 dark:bg-gray-700">
-                  {blog.imagen_banner ? (
-                    <img
-                      src={assetUrl(blog.imagen_banner)}
-                      alt={blog.titulo}
-                      className="object-cover w-full h-full"
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <Icon
-                        icon="solar:document-text-linear"
-                        className="w-12 h-12 text-dark_grey dark:text-gray-400"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Blog Content */}
-                <div className="p-6">
-                  <div className="flex items-center gap-2 text-sm text-dark_grey dark:text-gray-400 mb-3">
-                    <Icon icon="solar:calendar-linear" className="w-4 h-4" />
-                    <span>{formatDate(blog.fecha_creacion)}</span>
-                    {blog.autor_nombre && (
-                      <>
-                        <span>•</span>
-                        <span>Por {blog.autor_nombre}</span>
-                      </>
-                    )}
-                  </div>
-
-                  <h2 className="text-xl font-bold text-midnight_text dark:text-white mb-3 line-clamp-2">
-                    {blog.titulo}
-                  </h2>
-
-                  <p className="text-dark_grey dark:text-gray-400 mb-4 line-clamp-3">
-                    {blog.contenido_preview}
-                  </p>
-
-                  {/* Keywords */}
-                  {blog.palabras_clave && blog.palabras_clave.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {blog.palabras_clave.slice(0, 3).map((keyword, index) => (
-                        <span
-                          key={index}
-                          className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full"
-                        >
-                          {keyword}
-                        </span>
-                      ))}
-                      {blog.palabras_clave.length > 3 && (
-                        <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-dark_grey dark:text-gray-400 text-xs rounded-full">
-                          +{blog.palabras_clave.length - 3} más
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  <Link
-                    href={`/blog/${blog.id}`}
-                    className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-semibold transition-colors"
-                  >
-                    Leer más
-                    <Icon icon="solar:arrow-right-linear" className="w-4 h-4" />
-                  </Link>
-                </div>
-              </article>
+                <NewsCard {...blog} />
+              </div>
             ))}
           </div>
         )}
