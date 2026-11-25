@@ -222,12 +222,12 @@ def cover(c, d):
     c.setFont("Segoe", 10.5)
     c.setFillColor(MUTED)
     y = h * 0.42 - 3.1 * cm
-    for line in ["Capacitaciones e inscripciones · Eventos · Blog · Consultas · Newsletter",
+    for line in ["Capacitaciones e inscripciones · Eventos · Blog · Consultas · Newsletter · Mentorías",
                  "Usuarios y roles del portal de administración"]:
         c.drawString(2.2 * cm, y, line)
         y -= 0.6 * cm
     c.setFont("Segoe", 10)
-    c.drawString(2.2 * cm, 2.6 * cm, "Versión 1.0 de la aplicación · Noviembre de 2026")
+    c.drawString(2.2 * cm, 2.6 * cm, "Versión 1.1 de la aplicación · Noviembre de 2026")
     c.restoreState()
 
 
@@ -240,7 +240,7 @@ def page(c, d):
     c.setFont("Segoe", 8.5)
     c.setFillColor(MUTED)
     c.drawString(2.2 * cm, h - 1.25 * cm, "Manual de Administración · Portal CIEPI")
-    c.drawRightString(w - 2.2 * cm, h - 1.25 * cm, "Versión 1.0")
+    c.drawRightString(w - 2.2 * cm, h - 1.25 * cm, "Versión 1.1")
     c.line(2.2 * cm, 1.5 * cm, w - 2.2 * cm, 1.5 * cm)
     c.drawRightString(w - 2.2 * cm, 1.0 * cm, f"Página {d.page}")
     c.drawString(2.2 * cm, 1.0 * cm, "INADEH · CIEPI")
@@ -249,7 +249,7 @@ def page(c, d):
 
 doc = Doc(OUT, pagesize=letter, leftMargin=2.2 * cm, rightMargin=2.2 * cm, topMargin=2.2 * cm,
           bottomMargin=2.1 * cm, title="Manual de Administración - Portal CIEPI",
-          author="INADEH - CIEPI", subject="Manual de uso del portal de administración, versión 1.0")
+          author="INADEH - CIEPI", subject="Manual de uso del portal de administración, versión 1.1")
 frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="f")
 doc.addPageTemplates([PageTemplate(id="cover", frames=[frame], onPage=cover),
                       PageTemplate(id="normal", frames=[frame], onPage=page)])
@@ -276,6 +276,17 @@ table(["Parte", "Dirección", "Para quién"],
         "Personal autorizado: gestiona todo el contenido. Requiere cuenta institucional de Microsoft."]],
       [3.6, 6.2, 6.15])
 fig("p_inicio", "Página de inicio del sitio público.")
+H2("Novedades de la versión 1.1")
+P("Antes del lanzamiento se revisó toda la aplicación. Estos son los cambios que notará en el trabajo diario:")
+bullets([f"{b('Permisos por rol:')} cada rol solo puede modificar las áreas que le corresponden (capítulo 1).",
+         f"{b('Botones según el estado:')} al cambiar el estado de una inscripción, un artículo, una consulta o una mentoría, "
+         "el portal solo ofrece los pasos válidos. Rechazar, retirar o reabrir pide un <b>motivo</b>.",
+         f"{b('Historial:')} cada cambio de estado queda registrado con quién lo hizo, cuándo y por qué ({ui('Ver historial')}).",
+         f"{b('Cambios simultáneos:')} si otra persona cambió el mismo registro mientras usted lo tenía abierto, verá "
+         f"{ui('El estado cambió mientras lo editabas')}. Recargue la página y vuelva a intentarlo.",
+         f"{b('Blog:')} nadie puede aprobar ni publicar un artículo propio, y un artículo publicado ya no se modifica sin volver a revisión.",
+         f"{b('Sedes, aulas y profesores:')} si están en uso no se eliminan; se desactivan.",
+         f"{b('Inscripción del ciudadano:')} más segura (límite de intentos y verificación de correo obligatoria) y abierta durante todo el último día."])
 H2("Convenciones de este manual")
 bullets([f"Los textos entre comillas angulares, como {ui('Guardar Cambios')}, son botones, campos o mensajes tal como aparecen en pantalla.",
          f"Las direcciones como {url('/admin/eventos')} se escriben a continuación del dominio del portal.",
@@ -283,17 +294,25 @@ bullets([f"Los textos entre comillas angulares, como {ui('Guardar Cambios')}, so
          "En las capturas, los números en rojo indican dónde hacer clic y en qué orden. Los datos personales "
          "aparecen difuminados o sustituidos por datos de ejemplo."])
 H2("Roles del portal")
-P("Cada administrador tiene un rol. El rol define qué puede hacer, sobre todo en el blog y en la gestión de usuarios. "
-  "Los nombres son los que muestra la pantalla Roles; entre paréntesis, el número de rol:")
-table(["Rol", "Pensado para", "Puede hacer"],
-      [["Super Administrador (1)", "Responsables del sistema", "Todo, incluida la gestión de usuarios y roles. Puede mover un blog a cualquier estado."],
+P("Cada administrador tiene un rol. El rol define qué puede <b>modificar</b>; todos los administradores pueden "
+  "<b>consultar</b> cualquier módulo. Los nombres son los que muestra la pantalla Roles; entre paréntesis, el número de rol:")
+table(["Rol", "Pensado para", "Puede modificar"],
+      [["Super Administrador (1)", "Responsables del sistema", "Todo, incluidos usuarios, roles y tipos de consulta."],
        ["Administrador (2)", "Responsables del sistema", "Igual que el Super Administrador, salvo cambiar el rol de un usuario existente."],
-       ["Editor (3)", "Personal de contenidos de CIEPI", "Escribir artículos del blog y hacer la primera revisión. Gestionar capacitaciones, eventos y consultas."],
-       ["Relaciones Públicas (4)", "Equipo de comunicación", "Aprobación final y publicación de artículos del blog. Gestionar capacitaciones, eventos y consultas."]],
+       ["Editor (3)", "Personal de CIEPI", "Capacitaciones, sedes, profesores, inscripciones, mentorías, eventos y consultas. Escribe artículos y hace la primera revisión del blog."],
+       ["Relaciones Públicas (4)", "Equipo de comunicación", "Eventos, consultas y newsletter. Hace la revisión final y publica los artículos del blog."]],
       [4.2, 4.0, 7.75])
-note("info", "Capacitaciones, inscripciones, mentorías, eventos, consultas, calendario, sedes, profesores y newsletter están "
-     "disponibles para cualquier administrador, sea cual sea su rol. Solo Usuarios y Roles están reservados "
-     "a los roles 1 y 2.")
+table(["Área", "Roles que pueden modificarla"],
+      [["Capacitaciones, sedes, profesores, inscripciones, calendario", "1, 2 y 3"],
+       ["Mentorías", "1, 2 y 3"],
+       ["Eventos", "1, 2, 3 y 4"],
+       ["Blog", "1, 2, 3 y 4, según el paso de revisión (capítulo 10)"],
+       ["Consultas", "1, 2, 3 y 4 (reabrir y eliminar: solo 1 y 2)"],
+       ["Newsletter", "1, 2 y 4"],
+       ["Usuarios, roles y tipos de consulta", "1 y 2"]],
+      [9.5, 6.45])
+note("info", f"Si intenta una acción que su rol no permite, verá {ui('Tu rol no tiene permiso para realizar esta acción.')} "
+     "El rol se comprueba en cada acción: si cambian su rol o le desactivan, el cambio se aplica de inmediato.")
 
 # =============================================================== 2
 H1("Acceso al portal de administración")
@@ -380,9 +399,9 @@ bullets([f"{b('Crear un rol:')} pulse {ui('Nuevo Rol')}, escriba el {ui('Nombre 
          "Los roles 1 y 2 no se pueden editar.",
          "Los roles no se eliminan. Desactivar un rol solo lo oculta al crear o editar usuarios."])
 fig("a_roles_nuevo", "Ventana «Nuevo Rol».", max_h=8)
-note("warn", "En esta versión los permisos están definidos por el sistema para los cuatro roles predeterminados. "
-     "Un rol nuevo no recibe permisos de blog ni de gestión de usuarios: sus miembros solo podrán usar los "
-     "módulos abiertos a todos los administradores. Use los cuatro roles existentes salvo indicación del equipo técnico.")
+note("warn", "Los permisos están definidos por el sistema para los cuatro roles predeterminados. "
+     "Un rol nuevo <b>no puede modificar nada</b>: sus miembros solo podrán consultar. Use los cuatro roles "
+     "existentes salvo indicación del equipo técnico.")
 
 # =============================================================== 4
 H1("Sedes, aulas y profesores")
@@ -393,10 +412,13 @@ steps([f"Abra {ui('Sedes y Aulas')} ({url('/admin/sedes')}).",
        f"En {ui('Agregar Nueva Sede')} escriba el nombre (obligatorio), un código corto (p. ej. TOC) y la dirección. Pulse {ui('Crear Sede')}.",
        f"Dentro de la sede, escriba el nombre del edificio y pulse {ui('+ Agregar Edificio')}.",
        f"Dentro del edificio, escriba el nombre del aula, los cupos y el tipo (Aula, Laboratorio, Taller, Auditorio o Virtual). Pulse {ui('+ Aula')}."])
-fig("a_sedes", "Sedes, edificios y aulas: crear sede, agregar edificio y agregar aula.", max_h=13)
-note("warn", "En esta versión las sedes, edificios y aulas no se pueden editar desde la pantalla: si se equivoca, "
-     "elimine y vuelva a crear. <b>Eliminar una sede borra todos sus edificios y aulas</b> y deja sin ubicación a las "
-     "capacitaciones que la usaban. Esta acción no se puede deshacer.")
+fig("a_sedes", "Sedes, edificios y aulas, con los botones «Desactivar» y «Eliminar» de cada uno.", max_h=13)
+bullets([f"{b('Desactivar')} una sede, un edificio o un aula la oculta al crear capacitaciones o mentorías nuevas. "
+         f"Las que ya la usan la conservan, marcada «(inactiva)». Se revierte con {ui('Activar')}.",
+         f"{b('Eliminar')} solo es posible si nadie la usa. Si alguna capacitación, horario de mentor o reserva de "
+         "mentoría depende de ella, el portal lo indica y no la borra: desactívela en su lugar."])
+note("warn", "Las sedes, edificios y aulas no se pueden renombrar desde la pantalla. Si un nombre está mal y no se usa, "
+     "elimínela y créela de nuevo; si ya está en uso, avise al equipo técnico.")
 H2("Profesores")
 steps([f"Abra {ui('Profesores')} ({url('/admin/profesores')}) y pulse {ui('Nuevo Profesor')}.",
        f"Complete {ui('Nombre')} y {ui('Apellido')} (obligatorios) y, si los tiene, cédula (dato confidencial de uso interno), correo, teléfono, {ui('Especialidad / Área')} y {ui('Biografía breve')}.",
@@ -404,8 +426,10 @@ steps([f"Abra {ui('Profesores')} ({url('/admin/profesores')}) y pulse {ui('Nuevo
 fig("a_profesores", "Listado de profesores y botón «Nuevo Profesor».")
 fig("a_profesores_nuevo", "Ventana «Nuevo Profesor».", max_h=12)
 bullets([f"Para modificar: {ui('Editar')} en la fila del profesor. Al editar, deje la cédula vacía para conservar la registrada.",
-         f"Si un profesor deja de colaborar, desmarque {ui('Profesor activo')} en lugar de eliminarlo.",
-         f"{ui('Eliminar')} es definitivo y lo desvincula de todas sus capacitaciones."])
+         f"Si un profesor deja de colaborar, desmarque {ui('Profesor activo')}. Sus capacitaciones lo conservan, marcado «Inactivo».",
+         f"{ui('Eliminar')} solo funciona si no tiene capacitaciones ni mentorías asignadas; si las tiene, desactívelo.",
+         "Si es mentor y tiene mentorías pendientes o confirmadas, al desactivarlo el portal las enumera y pregunta si desea "
+         "cancelarlas. Si acepta, se cancelan y se avisa por correo a cada persona."])
 
 # =============================================================== 5
 H1("Capacitaciones")
@@ -415,37 +439,38 @@ steps([f"Abra {ui('Capacitaciones')} ({url('/admin/capacitaciones')}).",
        "Complete el formulario. Los campos marcados con * son obligatorios:"])
 fig("a_cap_lista", "Pantalla «Gestión de Capacitaciones» y botón «+ Nueva Capacitación».")
 table(["Sección / campo", "Obligatorio", "Indicaciones"],
-      [[ui("Banner de la capacitación"), "No", "Imagen jpg, jpeg, png o webp. Es la imagen de la tarjeta en el sitio público."],
+      [[ui("Banner de la capacitación"), "No", "Imagen jpg, jpeg, png, gif o webp de hasta 10 MB. Es la imagen de la tarjeta en el sitio público."],
        [ui("Nombre de Capacitación"), "Sí", "Nombre del curso. Admite tildes, ñ, números y signos."],
        [ui("Descripción"), "No", "Editor con formato (negrita, listas, títulos, enlaces)."],
        [ui("Cantidad de horas"), "Sí", "Duración total en horas."],
        [ui("Cantidad de participantes"), "Sí", "Cupo del curso (informativo; ver anexo)."],
-       [ui("Adjuntar archivos"), "No", "Material descargable. Use un solo archivo PDF, DOC o DOCX."],
-       [ui("Inicio / Fin de Inscripción"), "Sí", "Periodo en que los ciudadanos pueden inscribirse."],
+       [ui("Adjuntar archivos"), "No", "Material descargable: un archivo PDF, DOC o DOCX de hasta 20 MB."],
+       [ui("Inicio / Fin de Inscripción"), "Sí", "Periodo en que los ciudadanos pueden inscribirse (ambos días incluidos). Debe terminar antes de que acabe la capacitación."],
        [ui("Inicio / Fin de Capacitación"), "Sí", "Periodo en que se imparte el curso."],
        [ui("Modalidad"), "No", "Presencial, Virtual o Híbrida."],
-       ["Sede, Edificio y Aula", "No", "Se eligen en cascada. Solo aparecen los registrados y activos (capítulo 4)."],
+       ["Sede, Edificio y Aula", "No", "Se eligen en cascada; solo aparecen los activos. Si falta alguno, créelo con «Nueva sede», «Nuevo edificio» o «Nueva aula» sin salir del formulario."],
        ["Horarios de Clases", "No", f"Pulse {ui('Agregar día')} por cada día de clase e indique hora de inicio y fin. Alimenta el Calendario."],
-       ["Profesores Asignados", "No", "Marque uno o varios profesores."]],
+       ["Profesores Asignados", "No", "Marque uno o varios profesores. Si falta alguno, créelo con «Nuevo profesor»."]],
       [4.4, 2.4, 9.15])
 fig("a_cap_crear_1", "Formulario de creación: banner, nombre y descripción.")
 fig("a_cap_crear_2", "Horas, participantes, adjuntos y fechas de inscripción y de capacitación.")
 fig("a_cap_crear_3", "Modalidad, sede/edificio/aula y horarios de clase.")
 fig("a_cap_crear_4", "Profesores asignados y botón «Guardar».")
 steps(start=4, items=[f"Pulse {ui('Guardar')}. Verá {ui('Capacitación creada exitosamente')} y volverá al listado."])
-note("tip", "Revise las fechas antes de guardar: el sistema no comprueba que el fin sea posterior al inicio. "
-     "Si un horario tiene la hora de fin igual o anterior a la de inicio, se descarta sin aviso. "
-     f"Registre sedes y profesores <b>antes</b> de abrir el formulario: los enlaces {ui('Gestionar sedes y aulas →')} "
-     "y {ui('Gestionar profesores →')} salen del formulario y se pierde lo escrito.")
+note("tip", "El portal revisa las fechas y los horarios antes de guardar. Si una fecha de fin es anterior a la de "
+     "inicio, si un horario termina antes de empezar o si dos horarios del mismo día se cruzan, verá un mensaje "
+     "indicando qué corregir y no se guarda nada. Lo que haya escrito en el formulario no se pierde.")
 H2("Cuándo se ve en el sitio público")
 bullets(["La capacitación queda <b>Activa</b> al crearla y aparece de inmediato en " + url("/capacitaciones") + ".",
-         "Se muestra mientras esté activa y no haya pasado la fecha de fin de inscripción.",
-         "Los ciudadanos solo pueden inscribirse entre la fecha de inicio y la de fin de inscripción.",
+         "Se muestra mientras esté activa y no haya pasado la fecha de fin de inscripción (el último día cuenta completo, en hora de Panamá).",
+         "Los ciudadanos solo pueden inscribirse entre la fecha de inicio y la de fin de inscripción. Fuera de ese periodo, "
+         "la página del curso muestra «Inscripción próximamente» o «Inscripción cerrada» en lugar del botón.",
          "No existe modo borrador: si aún no quiere publicarla, créela y márquela como Inactiva enseguida."])
 fig("p_capacitaciones", "Catálogo público de capacitaciones (/capacitaciones).")
 H2("Modificar una capacitación")
 steps([f"En el listado, pulse {ui('Editar')} en la tarjeta de la capacitación.",
-       "Cambie los campos necesarios. Si no sube un banner o archivo nuevo, se conservan los anteriores; si sube uno, reemplaza al anterior.",
+       "Cambie los campos necesarios. Si no sube un banner o archivo nuevo, se conservan los anteriores; si sube uno, reemplaza al anterior. "
+       "Los profesores, sedes o aulas que se hayan desactivado después se conservan y aparecen marcados como inactivos.",
        f"Pulse {ui('Guardar Cambios')}. Verá {ui('Capacitación actualizada exitosamente')}."])
 fig("a_cap_tarjeta", "Botones «Editar» (1) y «Ver Detalles» (2) de cada capacitación.")
 H2("Activar, desactivar o retirar una capacitación")
@@ -472,34 +497,41 @@ table(["Estado", "Significa", "Puede pasar a"],
       [["Nueva inscripción", "Identidad validada por biometría y correo verificado.", "Pendiente de validación, Matriculado, Rechazado"],
        ["Pendiente de validación", "El ciudadano eligió validación manual/presencial. Un administrador debe comprobar su identidad.", "Matriculado, Rechazado, Nueva inscripción"],
        ["Matriculado", "Aceptado en el curso.", "Terminó curso, Retirado"],
-       ["Rechazado", "No admitido.", "Estado final (solo se reabre por un administrador)"],
-       ["Retirado", "Estaba matriculado y dejó el curso o fue dado de baja.", "Estado final (solo se reabre por un administrador)"],
-       ["Terminó curso", "Completó la capacitación.", "Estado final"]],
+       ["Rechazado", "No admitido.", "Estado final. Excepción de administrador: Pendiente de validación"],
+       ["Retirado", "Estaba matriculado y dejó el curso o fue dado de baja.", "Estado final. Excepción de administrador: Matriculado"],
+       ["Terminó curso", "Completó la capacitación.", "Estado final. Excepción de administrador: Matriculado (para corregir un error)"]],
       [3.7, 6.6, 5.65])
 H2("Cambiar el estado de una inscripción")
+P("Pueden hacerlo los roles Super Administrador, Administrador y Editor. Relaciones Públicas solo puede consultar.")
 steps([f"En {ui('Ver Detalles')}, haga clic en la etiqueta de la columna {ui('Estado')} de la persona.",
-       f"En la ventana {ui('Cambiar Estado de Inscripción')}, elija el nuevo estado.",
-       f"Pulse {ui('Confirmar Cambio')}. Verá el mensaje «Estado actualizado a ...»."])
+       f"La ventana {ui('Cambiar Estado de Inscripción')} muestra solo los pasos posibles desde el estado actual. Elija uno.",
+       f"Si el paso es {ui('Rechazar')}, {ui('Retirar')} o una excepción de administrador, escriba el {ui('Motivo')} (obligatorio).",
+       f"Pulse {ui('Confirmar Cambio')}."])
 fig("a_cap_detalles_estado", "Haga clic en la etiqueta de estado de la persona para cambiarlo.", max_h=6)
-fig("a_cap_cambiar_estado", "Ventana «Cambiar Estado de Inscripción».")
-note("warn", "La ventana muestra todos los estados, pero solo se aceptan los cambios de la tabla anterior. Si elige uno "
-     "no permitido verá «Error al actualizar el estado». Los totales de arriba se actualizan al recargar la página.")
+fig("a_cap_cambiar_estado", "Ventana «Cambiar Estado de Inscripción»: solo aparecen los pasos posibles.", max_h=11)
+fig("a_cap_historial", "Al rechazar se pide un motivo. «Ver historial» muestra quién hizo cada cambio y por qué.", max_h=12)
+note("info", f"Las excepciones de administrador (reabrir un Rechazado o un Retirado, corregir un Terminó curso) aparecen "
+     f"marcadas como {ui('Excepción de administrador')} y solo las ven los roles 1 y 2.")
+note("warn", f"Si otra persona cambió esa inscripción mientras usted tenía la página abierta, verá "
+     f"{ui('El estado cambió mientras lo editabas')}. La lista se recarga sola: revise el nuevo estado antes de volver a intentarlo.")
 note("info", "El sistema <b>no envía correo</b> al ciudadano cuando cambia su estado. Si debe avisarle "
      "(matrícula, rechazo), hágalo por correo o teléfono con los datos de la columna Contacto.")
 H2("Validar una inscripción pendiente")
 steps([f"Filtre por {ui('Pendiente de validación')}.",
        "Compruebe la identidad de la persona (presencialmente o con la documentación que establezca CIEPI).",
-       f"Cambie el estado a {ui('Matriculado')} si es correcta, o a {ui('Rechazado')} si no lo es."])
+       f"Elija {ui('Matricular')} si es correcta, {ui('Marcar identidad validada')} si quiere dejarla como Nueva inscripción "
+       f"para matricularla más adelante, o {ui('Rechazar')} (con motivo) si no lo es."])
 H2("Eliminar o dar de baja a una persona inscrita")
 P("Las inscripciones no se borran; se cierran con un estado, para conservar el historial:")
 bullets([f"Si aún no estaba matriculada (Nueva o Pendiente): cambie el estado a {ui('Rechazado')}.",
          f"Si ya estaba matriculada: cambie el estado a {ui('Retirado')}."])
 note("warn", "Una persona Rechazada o Retirada <b>no puede volver a inscribirse</b> en la misma capacitación "
-     "(verá «Ya está inscrito en esta capacitación»). Si fue un error, un Super Administrador o Super "
-     "Administrador puede reabrirla: Rechazado pasa a Pendiente de validación y Retirado pasa a Matriculado.")
+     "(verá «Ya está inscrito en esta capacitación»). Si fue un error, un Super Administrador o Administrador "
+     "puede reabrirla indicando el motivo: Rechazado pasa a Pendiente de validación y Retirado pasa a Matriculado.")
 H2("Cerrar el curso")
 P(f"Al terminar la capacitación, cambie a {ui('Terminó curso')} a cada persona matriculada que la completó, y a "
-  f"{ui('Retirado')} a quien no. Este estado ya no se puede modificar.")
+  f"{ui('Retirado')} a quien no. Si marcó «Terminó curso» por error, un Super Administrador o Administrador puede "
+  f"devolverlo a Matriculado indicando el motivo.")
 
 # =============================================================== 7
 H1("Cómo se inscribe un ciudadano")
@@ -507,22 +539,29 @@ P("Este capítulo describe lo que ve el ciudadano, para poder orientarle por tel
 steps([f"Entra en {url('/capacitaciones')}, elige un curso y pulsa {ui('Más Información')}.",
        f"En la página del curso pulsa {ui('Inscríbete Ahora')}.",
        f"<b>Paso 1 – Cédula.</b> Escribe su número de cédula (ej. 8-123-456), acepta la Política de Privacidad, completa la verificación de seguridad y pulsa {ui('Validar Cédula y Continuar')}. El sistema consulta el Tribunal Electoral.",
-       f"Confirma su <b>fecha de nacimiento</b> en formato DD/MM/AAAA y pulsa {ui('Confirmar y Continuar')}.",
+       f"Confirma su <b>fecha de nacimiento</b> en formato DD/MM/AAAA y pulsa {ui('Confirmar y Continuar')}. Tiene 5 intentos; "
+       "después debe esperar unas horas.",
        f"<b>Paso 2 – Validación.</b> Elige {ui('Realizar Validación Biométrica')} (reconocimiento facial, inmediato y recomendado) o {ui('Continuar con Validación Manual / Presencial')} (quedará pendiente de que un administrador la valide).",
        "<b>Paso 3 – Datos.</b> Sus datos personales vienen del Tribunal Electoral y no se editan. Completa correo, teléfono (6666-6666), provincia, distrito, corregimiento y dirección, acepta la política y pulsa " + ui("Completar Inscripción") + ".",
-       f"Recibe el correo {ui('Verifica tu correo electrónico - CIEPI')} y pulsa {ui('Verificar mi Correo')} <b>antes de 15 minutos</b>. Si no le llegó, puede usar {ui('Reenviar Correo de Verificación')}.",
-       "Al verificar el correo la inscripción queda registrada: como <b>Nueva inscripción</b> (biometría) o <b>Pendiente de validación</b> (manual)."])
+       f"Ve la pantalla {ui('Verifica tu Correo Electrónico')}, que se actualiza sola. Recibe el correo {ui('Verifica tu correo electrónico - CIEPI')} y pulsa {ui('Verificar mi Correo')} <b>antes de 15 minutos</b>. "
+       f"Si no le llegó, puede pulsar {ui('Reenviar Correo')} hasta 3 veces, con 1 minuto de espera entre cada envío. Solo vale el último correo recibido.",
+       "Al verificar el correo la inscripción queda registrada: como <b>Nueva inscripción</b> (biometría) o <b>Pendiente de validación</b> (manual). "
+       "Si la persona ya estaba registrada y cambió su correo o teléfono, el cambio se guarda en ese momento."])
 fig("p_capacitacion_inscribete", "Página pública de la capacitación con el botón «Inscríbete Ahora».")
 fig("p_inscripcion_paso1", "Paso 1 de la inscripción: cédula, Política de Privacidad y verificación de seguridad.", max_h=14)
 H2("Mensajes frecuentes y qué hacer")
 table(["Mensaje que ve el ciudadano", "Causa y solución"],
       [["Cédula no encontrada en el sistema nacional", "Revisar el formato de la cédula (con guiones)."],
        ["La fecha de nacimiento ingresada no coincide con nuestros registros.", "Revisar la fecha (DD/MM/AAAA)."],
+       ["Demasiados intentos. Por seguridad, espera unas horas...", "Se equivocó 5 veces con la fecha. Debe esperar o acudir a una sede del INADEH."],
+       ["Tu sesión de inscripción expiró. Vuelve a ingresar tu cédula...", "Pasó más de una hora desde que consultó la cédula. Empezar de nuevo."],
        ["Este correo electrónico ya está registrado", "El correo pertenece a otra persona registrada; usar otro correo."],
        ["Ya está inscrito en esta capacitación", "Ya tiene una inscripción en ese curso (también si fue rechazada o retirada). Ver capítulo 6."],
        ["El período de inscripción aún no ha iniciado / ha finalizado", "Fuera de las fechas de inscripción del curso."],
        ["Esta capacitación no está disponible para inscripciones", "La capacitación está Inactiva."],
-       ["El enlace de verificación ha expirado", "Pasaron más de 15 minutos; repetir la inscripción o reenviar el correo."]],
+       ["El enlace de verificación ha expirado", "Pasaron más de 15 minutos; pulsar «Reenviar Correo» en la pantalla del enlace."],
+       ["Este enlace fue reemplazado por uno más reciente", "Se reenvió el correo o volvió a inscribirse en el mismo curso: usar el último correo recibido."],
+       ["Alcanzaste el máximo de reenvíos", "Ya se reenvió 3 veces; repetir la inscripción desde el principio."]],
       [7.4, 8.55])
 note("warn", "En esta versión el sistema no limita las inscripciones al cupo indicado en «Cantidad de participantes», "
      "y la cifra «Cupos disponibles» muestra el cupo total. Vigile el número de matriculados en Ver Detalles.")
@@ -548,21 +587,21 @@ table(["Campo", "Obligatorio", "Indicaciones"],
       [[ui("Nombre del Evento"), "Sí", "Título que verá el público."],
        [ui("Ubicación"), "No", "Lugar o enlace de la reunión."],
        [ui("Fecha de Inicio"), "Sí", "Fecha y hora de inicio."],
-       [ui("Fecha de Fin"), "Sí", "Fecha y hora de fin (debe ser posterior al inicio)."],
+       [ui("Fecha de Fin"), "No", "Fecha y hora de fin; no puede ser anterior al inicio. Si se deja vacía, el evento dura hasta el final del día de inicio."],
        [ui("Descripción"), "No", "Texto sin formato; en la tarjeta se ven las 3 primeras líneas."],
-       [ui("Banner del Evento"), "No", "Imagen PNG o JPG de hasta 5 MB."]],
+       [ui("Banner del Evento"), "No", "Imagen PNG, JPG, GIF o WEBP de hasta 10 MB."]],
       [4.0, 2.4, 9.55])
 steps(start=3, items=[f"Pulse {ui('Crear Evento')}. Volverá al listado y el evento ya es público en {url('/eventos')}."])
 fig("a_eventos_crear", "Formulario «Crear Nuevo Evento» completo.", max_h=13)
 fig("p_eventos", "El evento publicado en la página pública de eventos.")
-note("info", "El estado del evento se calcula solo con las fechas: «Próximamente», «En Curso Ahora» o «Evento Pasado». "
-     "No hace falta cambiarlo a mano. No existe modo borrador: el evento se publica al crearlo.")
+note("info", "El estado del evento se calcula solo con las fechas, en hora de Panamá: «Próximamente», «En Curso Ahora» o "
+     "«Evento Pasado». No hace falta cambiarlo a mano. No existe modo borrador: el evento se publica al crearlo.")
 H2("Modificar un evento")
 steps([f"En el listado, use el buscador {ui('Buscar eventos...')} si es necesario y pulse el lápiz ({ui('Editar')}).",
        "Cambie los datos. Si no sube una imagen nueva, se conserva el banner anterior.",
        f"Pulse {ui('Guardar Cambios')}."])
 fig("a_eventos_acciones", "Iconos «Editar» (1) y «Eliminar» (2) de cada evento.", max_h=6)
-fig("a_eventos_editar", "Edición de un evento: las horas se muestran tal como se guardaron.", max_h=13)
+fig("a_eventos_editar", "Edición de un evento: las horas se muestran en hora de Panamá.", max_h=13)
 note("warn", "Si al guardar no vuelve al listado, el cambio no se guardó: revise los datos e inténtelo de nuevo.")
 H2("Eliminar un evento")
 steps(["Pulse la papelera (" + ui("Eliminar") + ") en la fila del evento.",
@@ -572,17 +611,22 @@ steps(["Pulse la papelera (" + ui("Eliminar") + ") en la fila del evento.",
 fig("a_eventos_eliminar", "Ventana de confirmación para eliminar un evento.")
 H1("Blog")
 H2("Flujo de publicación")
-P("Un artículo pasa por dos revisiones antes de publicarse:")
-table(["Estado", "Quién actúa", "Siguiente paso"],
-      [["1. Borrador", "Autor", "Enviar a «En Revisión CIEPI»."],
-       ["2. En Revisión CIEPI", "Rol Editor o administrador", "Aprobar (pasa a revisión de Relaciones Públicas) o rechazar."],
-       ["3. Rechazado por CIEPI", "Autor", "Corregir y volver a Borrador."],
-       ["4. En Revisión Relaciones Públicas", "Rol Relaciones Públicas o administrador", "Publicar o rechazar."],
-       ["5. Rechazado por Relaciones Públicas", "Autor", "Corregir y volver a Borrador."],
-       ["6. Publicado", "—", "Visible en " + url("/blog") + "."]],
-      [5.2, 4.8, 5.95])
+P("Un artículo pasa por dos revisiones antes de publicarse. En cada paso, el portal solo muestra los botones que "
+  "corresponden a su rol y al estado del artículo:")
+table(["Estado", "Quién actúa", "Acciones posibles"],
+      [["1. Borrador", "Autor o administrador", "Editar el contenido. «Enviar a revisión CIEPI»."],
+       ["2. En Revisión CIEPI", "Editor o administrador que <b>no sea el autor</b>", "«Aprobar y enviar a RR.PP.» o «Rechazar (CIEPI)» con motivo. El autor puede «Retirar de revisión»."],
+       ["3. Rechazado por CIEPI", "Autor o administrador", "Corregir el contenido y «Enviar a revisión CIEPI»."],
+       ["4. En Revisión Relaciones Públicas", "Relaciones Públicas o administrador que <b>no sea el autor</b>", "«Publicar» o «Rechazar (RR.PP.)» con motivo. El autor puede «Retirar de revisión»."],
+       ["5. Rechazado por Relaciones Públicas", "Autor o administrador", "Corregir el contenido y «Enviar a revisión CIEPI»."],
+       ["6. Publicado", "Relaciones Públicas o administrador", "Visible en " + url("/blog") + ". «Despublicar» (con motivo) lo devuelve a Borrador."]],
+      [4.6, 4.9, 6.45])
+note("warn", "<b>Nadie puede aprobar ni publicar un artículo que escribió</b>, tampoco un administrador: la revisión "
+     "debe hacerla otra persona. El contenido solo se puede editar en Borrador o Rechazado; para cambiar un artículo "
+     "en revisión, retírelo primero, y para cambiar uno publicado, despublíquelo (deberá pasar otra vez por las dos revisiones).")
 note("info", "Pueden escribir artículos los roles Editor, Super Administrador y Administrador. Solo estos dos "
-     "últimos pueden eliminar artículos. El sistema no envía correos en este flujo: avise al revisor o al autor por los canales habituales.")
+     "últimos pueden eliminar artículos. Los motivos de rechazo quedan en el <b>Historial de estados</b> del artículo, "
+     "visible para el autor. El sistema no envía correos en este flujo: avise al revisor o al autor por los canales habituales.")
 fig("a_blog_lista", "Pantalla «Gestión de Blog»: «Crear Blog» (1) y «Aprobar Blogs» (2).")
 H2("Crear un artículo")
 steps([f"Abra {ui('Gestión de Blog')} ({url('/admin/blog')}) y pulse {ui('Crear Blog')}.",
@@ -598,33 +642,29 @@ fig("a_blog_creado", "El artículo queda «En Revisión CIEPI»; el lápiz permi
 H2("Enviar a revisión un borrador")
 P("Si guardó el artículo como borrador, cuando esté listo:")
 steps([f"En {ui('Gestión de Blog')}, pulse {ui('Editar blog')} en su artículo.",
-       f"Pulse {ui('Cambiar Estado')}, elija {ui('En Revisión CIEPI')}, añada un comentario si quiere y pulse {ui('Confirmar cambio')}."])
-fig("a_blog_editar", "Edición de un artículo y botón «Cambiar Estado».")
-fig("a_blog_cambiar_estado", "Ventana «Cambiar estado del blog».")
+       f"Pulse {ui('Enviar a revisión CIEPI')}, arriba a la derecha, y confirme."])
+fig("a_blog_editar", "Edición de un borrador: el estado y el botón «Enviar a revisión CIEPI» están arriba a la derecha.")
 H2("Modificar un artículo")
-steps([f"En {ui('Gestión de Blog')}, pulse {ui('Editar blog')} (solo aparece para el autor).",
+steps([f"En {ui('Gestión de Blog')}, pulse {ui('Editar blog')}. Solo aparece para el autor o un administrador, y solo en Borrador o Rechazado.",
        "Haga los cambios. La imagen banner actual se conserva si no carga otra.",
        f"Pulse {ui('Actualizar Blog')}."])
-note("warn", "Si el autor edita un artículo ya <b>Publicado</b>, los cambios se ven en el sitio de inmediato, sin nueva "
-     "revisión. Para cambios importantes, pase antes el artículo a Borrador (lo puede hacer un administrador) y repita el flujo.")
 H2("Revisar y aprobar artículos")
 steps([f"En {ui('Gestión de Blog')}, pulse {ui('Aprobar Blogs')}.",
-       f"El filtro {ui('Pendientes de aprobación')} muestra los artículos que esperan revisión de CIEPI o de Relaciones Públicas.",
-       "Lea el artículo con " + ui("Ver/Editar blog") + " antes de decidir.",
-       f"Revisión CIEPI (estado 2): pulse {ui('Aprobar y enviar a RR.PP')} o {ui('Rechazar blog')}. Escriba un comentario y pulse {ui('Confirmar')}.",
-       f"Revisión de Relaciones Públicas (estado 4): pulse {ui('Publicar directamente')} o {ui('Rechazar blog')} y confirme."])
-fig("a_blog_aprobar", "Bandeja «Aprobar Blogs»: aprobar y enviar a RR.PP. (1) o rechazar (2).")
-fig("a_blog_aprobar_modal", "Confirmación de la aprobación, con comentario opcional.", max_h=8)
-note("warn", "En esta versión la pantalla «Revisar y aprobar detalladamente» no muestra el contenido del "
-     "artículo; lea el artículo con «Ver/Editar blog». Los comentarios de rechazo se guardan pero el autor no los ve: "
-     "comuníquele los motivos directamente.")
+       f"El filtro {ui('Pendientes de aprobación')} muestra los artículos que esperan revisión. En cada fila aparecen solo los botones que usted puede usar.",
+       f"Pulse el ojo para abrir la página {ui('Revisión del blog')}: muestra el contenido completo, las acciones disponibles y el historial.",
+       f"Revisión CIEPI (estado 2): pulse {ui('Aprobar y enviar a RR.PP.')} o {ui('Rechazar (CIEPI)')}.",
+       f"Revisión de Relaciones Públicas (estado 4): pulse {ui('Publicar')} o {ui('Rechazar (RR.PP.)')}.",
+       f"En la ventana de confirmación, escriba el {ui('Motivo')} si se pide (obligatorio al rechazar) y pulse {ui('Confirmar')}."])
+fig("a_blog_aprobar", "Bandeja «Aprobar Blogs»: cada fila muestra solo las acciones posibles para su rol.")
+fig("a_blog_revisar", "Página «Revisión del blog»: contenido, acciones disponibles e historial de estados.", max_h=14)
+fig("a_blog_accion_motivo", "Al rechazar, el motivo es obligatorio y queda en el historial.", max_h=8)
 fig("p_blog", "Los artículos publicados aparecen en el blog público.")
 H2("Corregir un artículo rechazado")
-P(f"El autor abre {ui('Editar blog')}, corrige, y con {ui('Cambiar Estado')} lo pasa a {ui('Borrador')} y luego a "
-  f"{ui('En Revisión CIEPI')}. (El botón {ui('Reenviar a revisión')} de la bandeja de aprobación solo funciona para administradores.)")
+P(f"El autor lee el motivo en el {ui('Historial de estados')}, abre {ui('Editar blog')}, corrige, pulsa {ui('Actualizar Blog')} "
+  f"y luego {ui('Enviar a revisión CIEPI')}. El artículo vuelve a empezar la revisión.")
 H2("Eliminar un artículo")
 P(f"Super Administrador o Administrador: en {ui('Gestión de Blog')}, pulse {ui('Eliminar blog')} y confirme. "
-  "Es definitivo; si solo quiere retirarlo del sitio, cambie su estado a Borrador.")
+  f"Es definitivo; si solo quiere retirarlo del sitio, use {ui('Despublicar')}.")
 
 # =============================================================== 11
 H1("Consultas del formulario de contacto")
@@ -634,15 +674,18 @@ fig("p_contacto", "Formulario público de contacto.", max_h=14)
 H2("Atender una consulta")
 steps([f"Abra {ui('Consultas')} ({url('/admin/consultas')}). Las pendientes aparecen primero.",
        f"Pulse {ui('Ver detalles y responder')} en la consulta.",
-       "Lea los datos y comentarios del ciudadano.",
+       f"Si va a tardar en contestar, pulse {ui('Tomar consulta')}: pasa a {ui('En Proceso')} y el resto del equipo sabe que usted la atiende.",
        f"<b>Responda al ciudadano por correo electrónico o teléfono</b> desde su propio buzón.",
-       f"En la ventana, escriba en {ui('Respuesta')} un resumen de lo que contestó, elija el {ui('Estado')} ({ui('En Proceso')}, {ui('Respondida')} o {ui('Cerrada')}) y pulse {ui('Enviar Respuesta')}."])
+       f"Escriba en {ui('Respuesta')} un resumen de lo que contestó y pulse {ui('Responder')}: la consulta pasa a {ui('Respondida')}.",
+       f"Cuando el caso esté terminado, pulse {ui('Cerrar')}."])
 fig("a_consultas_lista", "Listado de consultas: ver y responder (1) y «Gestionar Tipos» (2). Datos personales difuminados.")
-fig("a_consultas_detalle", "Ventana «Detalles de la Consulta» con Estado y Respuesta.")
-note("warn", "En esta versión el portal <b>no envía</b> la respuesta por correo: solo la guarda como registro, aunque el "
-     "mensaje diga «Respuesta enviada exitosamente». Recuerde también cambiar el estado: si lo deja en Pendiente, "
-     "la consulta seguirá pendiente.")
-bullets([f"{ui('Eliminar consulta')} la borra definitivamente (por ejemplo, spam)."])
+fig("a_consultas_detalle", "Ventana «Detalles de la Consulta»: los botones cambian según el estado.", max_h=14)
+note("warn", "El portal <b>no envía</b> la respuesta por correo: solo la guarda como registro. Conteste siempre "
+     "desde el correo institucional.")
+bullets(["Todas las respuestas se conservan, con quién y cuándo las escribió, junto con el historial de estados.",
+         f"{ui('Reabrir')} devuelve una consulta Respondida o Cerrada a En Proceso. Solo pueden hacerlo Super Administrador y "
+         "Administrador; reabrir una Cerrada pide un motivo.",
+         f"{ui('Eliminar consulta')} la borra definitivamente (por ejemplo, spam). Solo Super Administrador y Administrador."])
 H2("Tipos de consulta")
 P(f"Son las opciones de la lista «Tipo de consulta» del formulario público. Se gestionan con {ui('Gestionar Tipos')} dentro de Consultas.")
 steps([f"Pulse {ui('Nuevo Tipo')}, escriba el {ui('Nombre')} (p. ej. «Consulta General») y una descripción opcional.",
@@ -658,8 +701,10 @@ H1("Newsletter")
 H2("Cómo se suscriben los ciudadanos")
 bullets(["En el pie de todas las páginas hay un formulario «Suscríbete al Newsletter de CIEPI».",
          "El ciudadano escribe su correo, acepta la Política de Privacidad (Ley 81 de 2019) y pulsa «Suscribirme».",
-         "Recibe un correo para confirmar (válido 24 horas). Hasta confirmar queda como <b>Pendiente</b>; al confirmar, <b>Activo</b>.",
+         "Recibe un correo para confirmar (válido 24 horas). Al abrir el enlace debe pulsar <b>Confirmar suscripción</b>. "
+         "Hasta confirmar queda como <b>Pendiente</b>; al confirmar, <b>Activo</b>.",
          "Cada boletín incluye un enlace «Darse de baja» de un clic."])
+note("info", "Solo los roles Super Administrador, Administrador y Relaciones Públicas pueden ver los suscriptores y enviar boletines.")
 H2("Enviar un boletín")
 steps([f"Abra {ui('Newsletter')} ({url('/admin/newsletter')}), pestaña {ui('Redactar Boletín')}.",
        f"Escriba el {ui('Asunto del boletín')}.",
@@ -708,14 +753,15 @@ steps([f"En {ui('Mentorías')}, abra la pestaña {ui('Mentores')} y pulse {ui('C
 fig("a_ment_mentores", "Pestaña «Mentores»: el botón «Configurar» abre la configuración del profesor.", 7)
 fig("a_ment_config_1", "Perfil de mentor y áreas que atiende.")
 fig("a_ment_config_horario", "Horario semanal: «Agregar bloque» (1) y «Guardar configuración» (2).")
-note("tip", "Si dos bloques del mismo día se cruzan, el sistema no deja guardar e indica cuáles se solapan. "
+note("tip", "Si dos bloques del mismo día se cruzan, o si un bloque presencial usa un aula que otro mentor ya tiene "
+     "a esa hora, el sistema no deja guardar e indica el conflicto. "
      "Use la «Vigencia» de un bloque cuando un horario solo aplique por un periodo (por ejemplo, un trimestre).")
 H3("Fechas sin atención")
 P(f"Para vacaciones, licencias o feriados, use {ui('Fechas sin atención')}: indique desde, hasta (opcional) y motivo, y pulse "
   f"{ui('Bloquear fechas')}. Se guarda al instante y esos días dejan de ofrecer turnos.")
 fig("a_ment_config_bloqueos", "Fechas sin atención del mentor.")
-note("warn", "Bloquear fechas no cancela las reservas que ya existan en esos días. Cancélelas desde la pestaña «Reservas» "
-     "para que las personas reciban el aviso.")
+note("warn", "Bloquear fechas no cancela las reservas que ya existan en esos días: el portal le avisa cuáles son. "
+     "Cancélelas desde la pestaña «Reservas» para que las personas reciban el aviso.")
 
 H2("Áreas de mentoría")
 P(f"En la pestaña {ui('Áreas de mentoría')} se agregan, renombran o desactivan los temas. Un área desactivada deja de "
@@ -756,9 +802,11 @@ P(f"Antes de la sesión, en {ui('Gestionar')}, pulse {ui('Cancelar reserva')}, e
 fig("a_ment_cancelar", "Cancelación con motivo, que se envía por correo a la persona.")
 H3("Cerrar una sesión")
 P(f"Desde la hora de inicio, la reserva aparece en {ui('Por cerrar')}. En {ui('Gestionar')}, pulse {ui('Marcar como realizada')} o "
-  f"{ui('Marcar inasistencia')}. Si se equivoca, puede cambiar de una a otra.")
+  f"{ui('Marcar inasistencia')}. Si se equivoca, puede cambiar de una a otra indicando el motivo.")
 fig("a_ment_cerrar", "Cerrar una sesión: «Marcar como realizada» (1) o «Marcar inasistencia» (2).")
-note("info", f"Las {ui('Notas internas')} solo las ve el equipo de CIEPI. Al cancelar, el motivo se agrega a las notas automáticamente.")
+note("info", f"Las {ui('Notas internas')} solo las ve el equipo de CIEPI. Los motivos de cancelación y de corrección quedan "
+     "en el historial de la reserva, visible en la ventana de gestión. Una reserva pendiente que ya venció aparece como "
+     "Expirada y no admite acciones.")
 
 H2("Agenda")
 P(f"La pestaña {ui('Agenda')} muestra un calendario mensual con todas las mentorías, de colores según su estado. "
@@ -794,27 +842,33 @@ faq = [
     ("El ciudadano no recibió el correo de verificación.",
      "Que revise spam y use «Reenviar Correo de Verificación» en la pantalla de espera. El enlace vale 15 minutos."),
     ("Mi artículo del blog no aparece para revisión.",
-     "Probablemente se guardó como Borrador: use Editar blog > Cambiar Estado > En Revisión CIEPI."),
+     "Probablemente se guardó como Borrador: abra Editar blog y pulse «Enviar a revisión CIEPI»."),
+    ("No me aparece el botón para aprobar un artículo.",
+     "Si usted es el autor, la revisión debe hacerla otra persona. Si no, revise que su rol corresponda al paso (Editor en la revisión CIEPI, Relaciones Públicas en la final)."),
+    ("Veo «El estado cambió mientras lo editabas».",
+     "Otra persona cambió el mismo registro. Recargue la página, revise el estado actual y repita la acción si sigue siendo necesaria."),
+    ("No puedo eliminar una sede, un aula o un profesor.",
+     "Está en uso por alguna capacitación o mentoría. Desactívelo: dejará de ofrecerse para lo nuevo y lo existente no se rompe."),
 ]
 for q, a in faq:
     story.append(KeepTogether([Paragraph(q, ss["h3"]), Paragraph(a, ss["body"])]))
 
 # =============================================================== Anexo
-H1("Anexo: limitaciones conocidas de la versión 1.0")
+H1("Anexo: limitaciones conocidas de la versión 1.1")
 P("Estas situaciones están identificadas para próximas versiones. Mientras tanto, siga las indicaciones de este manual.")
 table(["Área", "Limitación", "Cómo proceder"],
       [["Acceso", "Si la cuenta no está autorizada no se muestra ningún mensaje.", "Verificar el usuario en Usuarios."],
        ["Usuarios", "«Último Acceso» siempre dice «Nunca».", "Dato informativo; no afecta al acceso."],
-       ["Usuarios", "Desactivar no cierra la sesión abierta.", "Solicitar invalidación al equipo técnico."],
-       ["Capacitaciones", "Solo se guarda el primer archivo adjunto; los Excel se rechazan.", "Adjuntar un único PDF, DOC o DOCX."],
+       ["Usuarios", "Desactivar no cierra la sesión abierta, aunque ya no permite modificar nada.", "Solicitar invalidación al equipo técnico si es urgente."],
+       ["Capacitaciones", "Solo se guarda un archivo adjunto.", "Adjuntar un único PDF, DOC o DOCX."],
        ["Capacitaciones", "No se controla el cupo.", "Vigilar el número de matriculados."],
        ["Inscripciones", "No se envían correos al cambiar de estado.", "Avisar al ciudadano manualmente."],
        ["Inscripciones", "No hay exportación de inscritos.", "Solicitar el reporte al equipo técnico."],
-       ["Blog", "La revisión detallada no muestra el contenido; los comentarios no son visibles para el autor.", "Ver capítulo 10."],
+       ["Blog", "No se envían avisos al autor ni al revisor.", "Avisar por los canales habituales; los motivos están en el historial."],
        ["Consultas", "La respuesta no se envía por correo.", "Responder desde el correo institucional."],
        ["Newsletter", "Envío sin confirmación.", "Revisar el boletín antes de enviarlo."],
-       ["Sedes", "No se pueden editar; eliminar borra en cascada.", "Eliminar y volver a crear con cuidado."],
-       ["Mentorías", "El enlace de Teams no se crea solo; bloquear fechas no cancela reservas existentes.", "Pegar el enlace en «Gestionar»; cancelar a mano las reservas afectadas."]],
+       ["Sedes", "No se pueden renombrar.", "Si no está en uso, eliminar y volver a crear; si lo está, avisar al equipo técnico."],
+       ["Mentorías", "El enlace de Teams no se crea solo; bloquear fechas no cancela reservas existentes.", "Pegar el enlace en «Gestionar»; cancelar a mano las reservas que el portal señala."]],
       [2.9, 7.2, 5.85])
 
 doc.multiBuild(story)

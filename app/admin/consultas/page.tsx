@@ -374,12 +374,17 @@ export default function ConsultasAdminPage() {
       {/* Modal de Detalles/Respuesta */}
       {showModal && selectedConsulta && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 dark:border-gray-700 animate-fade-up">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="consulta-modal-titulo"
+            className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 dark:border-gray-700 animate-fade-up"
+          >
             <div className="p-6">
               {/* Header */}
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold text-midnight_text dark:text-white">
+                  <h2 id="consulta-modal-titulo" className="text-2xl font-bold text-midnight_text dark:text-white">
                     Detalles de la Consulta
                   </h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
