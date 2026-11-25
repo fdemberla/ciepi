@@ -7,7 +7,12 @@ import { Descendant } from "slate";
 import { useSession } from "next-auth/react";
 import SlateEditorField from "@/components/SlateEditorField";
 import type { FormFieldConfig } from "@/components/Form.types";
-import { canEditBlog, getAllowedStatesForRole } from "@/lib/permissions";
+import { canEditBlog } from "@/lib/permissions";
+import BlogAccionesEstado, {
+  BlogHistorial,
+  type EntradaHistorialBlog,
+  type TransicionBlog,
+} from "@/components/BlogAccionesEstado";
 
 // Componente de palabras clave
 interface KeywordsInputProps {
@@ -330,6 +335,11 @@ interface Blog {
   contenido: unknown;
   estado?: number;
   estado_nombre?: string;
+  /** Calculados por la API para el usuario actual (lib/estados/blog.ts). */
+  puede_editar?: boolean;
+  motivo_no_editable?: string | null;
+  transiciones?: TransicionBlog[];
+  historial?: EntradaHistorialBlog[];
 }
 
 interface BlogEditorProps {
@@ -345,14 +355,25 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
   const [selectedAction, setSelectedAction] = useState<"borrador" | "revision">(
     "borrador",
   );
-  const [isChangingState, setIsChangingState] = useState(false);
-  const [showStateModal, setShowStateModal] = useState(false);
   const [localBlog, setLocalBlog] = useState<Blog | undefined>(blog);
-  const [selectedEstadoId, setSelectedEstadoId] = useState<number | null>(
-    localBlog?.estado ?? null,
-  );
-  const [comentarioEstado, setComentarioEstado] = useState("");
   const userRole = session?.user?.rolId || 0;
+  // Crear: según el rol. Editar: lo decide el servidor (autor o admin, y solo en
+  // Borrador o Rechazado).
+  const puedeEditar =
+    mode === "create" ? canEditBlog(userRole) : Boolean(localBlog?.puede_editar);
+
+  // Recarga el blog tras un cambio de estado (nuevas transiciones, permisos e historial).
+  const recargarBlog = async () => {
+    if (!localBlog?.id) return;
+    try {
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+      const res = await fetch(`${basePath}/api/admin/blog/${localBlog.id}`);
+      const result = await res.json();
+      if (res.ok && result.success) setLocalBlog(result.data);
+    } catch (error) {
+      console.error("Error recargando blog:", error);
+    }
+  };
 
   // Definir los campos del formulario con layout completo
   const formFields: FormFieldConfig[] = [
@@ -445,11 +466,14 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
         method = "POST";
       } else {
         // Para edición
+        // estado_actual: si otra persona cambió el estado entretanto, el servidor
+        // responde 409 en lugar de guardar sobre un estado distinto.
         requestData = {
           titulo: data.titulo,
           imagen_banner: imagenBannerUrl,
           palabras_clave: palabrasClaveArray,
           contenido: data.contenido,
+          estado_actual: localBlog?.estado,
         };
 
         url = `/api/admin/blog/${blog?.id}`;
@@ -563,17 +587,14 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
             {mode === "edit" && localBlog && (
               <div className="flex items-center gap-3">
                 {getEstadoBadge(localBlog.estado!, localBlog.estado_nombre!)}
-                <button
-                  onClick={() => {
-                    setSelectedEstadoId(localBlog.estado ?? null);
-                    setComentarioEstado("");
-                    setShowStateModal(true);
-                  }}
-                  className="flex items-center gap-2 px-3 py-2 bg-secondary text-white rounded-xl hover:bg-secondary/90 transition-colors text-sm font-medium"
-                >
-                  <Icon icon="solar:check-circle-linear" className="w-4 h-4" />
-                  Cambiar Estado
-                </button>
+                <BlogAccionesEstado
+                  blogId={localBlog.id!}
+                  titulo={localBlog.titulo}
+                  estadoActual={localBlog.estado!}
+                  transiciones={localBlog.transiciones}
+                  onCambio={() => recargarBlog()}
+                  compacto
+                />
               </div>
             )}
           </div>
@@ -581,195 +602,6 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
       </div>
 
       <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-8">
-        {/* Modal para cambiar estado */}
-        {showStateModal && localBlog && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg mx-auto">
-              <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-midnight_text dark:text-white">
-                    Cambiar estado del blog
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setShowStateModal(false)}
-                    aria-label="Cerrar modal"
-                    className="text-dark_grey dark:text-gray-400 hover:text-midnight_text dark:hover:text-white transition-colors"
-                  >
-                    <Icon
-                      icon="solar:close-circle-linear"
-                      className="w-6 h-6"
-                      aria-hidden="true"
-                    />
-                  </button>
-                </div>
-                <p className="text-sm text-dark_grey dark:text-gray-400 mt-2">
-                  Estado actual:{" "}
-                  <span className="font-medium">{localBlog.estado_nombre}</span>
-                </p>
-              </div>
-
-              <div className="p-6">
-                <div className="space-y-3">
-                  {/* Lista de estados disponibles */}
-                  {[
-                    {
-                      id: 1,
-                      nombre: "Borrador",
-                      descripcion: "Borrador - editable por el autor",
-                    },
-                    {
-                      id: 2,
-                      nombre: "En Revisión CIEPI",
-                      descripcion: "En revisión por CIEPI",
-                    },
-                    {
-                      id: 3,
-                      nombre: "Rechazado por CIEPI",
-                      descripcion: "Rechazado por CIEPI",
-                    },
-                    {
-                      id: 4,
-                      nombre: "En Revisión Relaciones Públicas",
-                      descripcion: "En revisión por Relaciones Públicas",
-                    },
-                    {
-                      id: 5,
-                      nombre: "Rechazado por Relaciones Públicas",
-                      descripcion: "Rechazado por Relaciones Públicas",
-                    },
-                    {
-                      id: 6,
-                      nombre: "Publicado",
-                      descripcion: "Publicado públicamente",
-                    },
-                  ]
-                    .filter((estado) =>
-                      getAllowedStatesForRole(userRole).includes(estado.id),
-                    )
-                    .map((estado) => (
-                      <label
-                        key={estado.id}
-                        className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                          selectedEstadoId === estado.id
-                            ? "border-primary bg-primary/5 dark:bg-primary/10"
-                            : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="estado"
-                          value={estado.id}
-                          checked={selectedEstadoId === estado.id}
-                          onChange={() => setSelectedEstadoId(estado.id)}
-                          className="mt-1 text-primary focus:ring-primary"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-midnight_text dark:text-white">
-                              {estado.nombre}
-                            </span>
-                          </div>
-                          <p className="text-sm text-dark_grey dark:text-gray-400 mt-1">
-                            {estado.descripcion}
-                          </p>
-                        </div>
-                      </label>
-                    ))}
-
-                  <div>
-                    <label className="block text-sm font-medium text-midnight_text dark:text-white mb-2">
-                      Comentario (opcional)
-                    </label>
-                    <textarea
-                      value={comentarioEstado}
-                      onChange={(e) => setComentarioEstado(e.target.value)}
-                      placeholder="Agregar comentario sobre este cambio..."
-                      className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-midnight_text dark:text-white resize-none"
-                      rows={3}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex gap-3 justify-end">
-                  <button
-                    onClick={() => setShowStateModal(false)}
-                    disabled={isChangingState}
-                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-midnight_text dark:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={async () => {
-                      if (!localBlog || selectedEstadoId === null) return;
-                      if (selectedEstadoId === localBlog.estado) {
-                        setShowStateModal(false);
-                        return;
-                      }
-
-                      try {
-                        setIsChangingState(true);
-                        const basePath =
-                          process.env.NEXT_PUBLIC_BASE_PATH || "";
-                        const res = await fetch(
-                          `${basePath}/api/admin/blog/${localBlog.id}`,
-                          {
-                            method: "PUT",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              estado: selectedEstadoId,
-                              comentario_temp: comentarioEstado,
-                            }),
-                          },
-                        );
-
-                        if (!res.ok) {
-                          const err = await res.json();
-                          throw new Error(
-                            err.error || "Error al cambiar estado",
-                          );
-                        }
-
-                        const result = await res.json();
-                        // Actualizar estado localmente
-                        setLocalBlog((prev) =>
-                          prev
-                            ? {
-                                ...prev,
-                                estado: selectedEstadoId!,
-                                estado_nombre:
-                                  result.data?.estado_nombre ??
-                                  prev.estado_nombre,
-                              }
-                            : prev,
-                        );
-                        toast.success("Estado actualizado correctamente");
-                        setShowStateModal(false);
-                      } catch (error) {
-                        console.error("Error cambiando estado:", error);
-                        toast.error(
-                          error instanceof Error
-                            ? error.message
-                            : "Error al cambiar estado",
-                        );
-                      } finally {
-                        setIsChangingState(false);
-                      }
-                    }}
-                    disabled={
-                      isChangingState || selectedEstadoId === localBlog?.estado
-                    }
-                    className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors"
-                  >
-                    {isChangingState ? "Procesando..." : "Confirmar cambio"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
         {/* Selector de Acción para creación */}
         {mode === "create" && (
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm p-6 mb-6">
@@ -822,29 +654,8 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
             </div>
           </div>
         )}
-        {/* Información de estado para edición */}
-        {mode === "edit" && blog && blog.estado! > 1 && (
-          <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 dark:border-primary/30 rounded-xl p-4 mb-6">
-            <div className="flex items-start gap-3">
-              <Icon
-                icon="solar:info-circle-linear"
-                className="w-5 h-5 text-primary dark:text-primary/80 mt-0.5"
-              />
-              <div>
-                <h3 className="text-sm font-semibold text-primary dark:text-primary/80 mb-1">
-                  Blog en proceso de revisión
-                </h3>
-                <p className="text-sm text-primary/80 dark:text-primary/70">
-                  Este blog está actualmente en estado &ldquo;
-                  {blog.estado_nombre}&rdquo;. Los cambios que hagas se
-                  guardarán, pero no afectarán el proceso de revisión actual.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-        {/* Validación de permisos de edición */}
-        {mode === "edit" && !canEditBlog(userRole) && (
+        {/* Edición bloqueada por estado o permisos (regla de lib/estados/blog.ts) */}
+        {mode === "edit" && localBlog && !puedeEditar && (
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-6">
             <div className="flex items-start gap-3">
               <Icon
@@ -853,19 +664,37 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
               />
               <div>
                 <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1">
-                  Permisos limitados
+                  Edición no disponible
                 </h3>
                 <p className="text-sm text-amber-700 dark:text-amber-300">
-                  Tu rol solo permite cambiar el estado del blog, no editarlo.
-                  Para realizar cambios en el contenido, contacta al
-                  administrador.
+                  {localBlog.motivo_no_editable ||
+                    "No puedes editar el contenido de este blog."}
                 </p>
               </div>
             </div>
           </div>
         )}
+        {/* Blog rechazado: recordar que hay que corregir y reenviar */}
+        {mode === "edit" &&
+          localBlog &&
+          puedeEditar &&
+          (localBlog.estado === 3 || localBlog.estado === 5) && (
+            <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 dark:border-primary/30 rounded-xl p-4 mb-6">
+              <div className="flex items-start gap-3">
+                <Icon
+                  icon="solar:info-circle-linear"
+                  className="w-5 h-5 text-primary dark:text-primary/80 mt-0.5"
+                />
+                <p className="text-sm text-primary/80 dark:text-primary/70">
+                  Este blog fue rechazado (&ldquo;{localBlog.estado_nombre}&rdquo;).
+                  Revisa el motivo en el historial, guarda tus correcciones y
+                  luego usa &ldquo;Reenviar a revisión CIEPI&rdquo;.
+                </p>
+              </div>
+            </div>
+          )}
         {/* Formulario personalizado con ancho completo */}
-        {canEditBlog(userRole) ? (
+        {puedeEditar ? (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
             <h2 className="mb-8 text-2xl font-bold text-midnight_text dark:text-white">
               Información del Blog
@@ -931,11 +760,19 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
                 </label>
                 <div className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-midnight_text dark:text-white max-h-64 overflow-y-auto">
                   <p className="text-sm opacity-75">
-                    [Contenido del blog - no editable para tu rol]
+                    [Contenido del blog - no editable]
                   </p>
                 </div>
               </div>
             </div>
+          </div>
+        )}
+        {mode === "edit" && localBlog && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 mt-6">
+            <h2 className="mb-6 text-xl font-bold text-midnight_text dark:text-white">
+              Historial de estados
+            </h2>
+            <BlogHistorial historial={localBlog.historial} />
           </div>
         )}
       </div>

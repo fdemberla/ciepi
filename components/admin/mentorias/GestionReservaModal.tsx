@@ -5,6 +5,7 @@ import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
 import { withBasePath } from "@/lib/basePath";
 import { ETIQUETA_ESTADO_RESERVA, type EstadoReserva } from "@/lib/mentorias";
+import type { TransicionDisponible } from "@/lib/estados/comun";
 
 export interface ReservaAdmin {
   id: number;
@@ -23,8 +24,27 @@ export interface ReservaAdmin {
   area: string | null;
   sede: string | null;
   aula: string | null;
-  transiciones: EstadoReserva[];
+  /** Transiciones que el servidor permite ahora (la UI no calcula ninguna). */
+  transiciones: TransicionDisponible<EstadoReserva>[];
 }
+
+interface EntradaHistorial {
+  id: number;
+  estado_de: string | null;
+  estado_a: string;
+  accion: string;
+  actor_tipo: "admin" | "ciudadano" | "sistema";
+  actor_nombre: string | null;
+  motivo: string | null;
+  es_override: boolean;
+  creado_en: string;
+}
+
+const ACTOR: Record<EntradaHistorial["actor_tipo"], string> = {
+  admin: "CIEPI",
+  ciudadano: "La persona",
+  sistema: "Sistema",
+};
 
 export const COLOR_ESTADO: Record<EstadoReserva, string> = {
   pendiente_verificacion: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200",
@@ -58,10 +78,17 @@ export function EstadoBadge({ estado }: { estado: EstadoReserva }) {
   );
 }
 
-const BOTON_ESTADO: Partial<Record<EstadoReserva, { texto: string; icono: string; clase: string }>> = {
-  completada: { texto: "Marcar como realizada", icono: "solar:check-circle-linear", clase: "bg-brand-green text-white" },
-  no_asistio: { texto: "Marcar inasistencia", icono: "solar:user-cross-linear", clase: "bg-amber-500 text-white" },
+/** Estilo del botón según el destino; el texto viene del servidor (etiqueta). */
+const ESTILO_DESTINO: Partial<Record<EstadoReserva, { icono: string; clase: string }>> = {
+  completada: { icono: "solar:check-circle-linear", clase: "bg-brand-green text-white" },
+  no_asistio: { icono: "solar:user-cross-linear", clase: "bg-amber-500 text-white" },
+  cancelada_ciepi: {
+    icono: "solar:close-circle-linear",
+    clase:
+      "border border-red-300 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20",
+  },
 };
+const ESTILO_POR_DEFECTO = { icono: "solar:arrow-right-linear", clase: "bg-surface-tint dark:bg-gray-700 text-primary dark:text-white" };
 
 const INPUT =
   "w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-midnight_text dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary";
@@ -77,14 +104,33 @@ export default function GestionReservaModal({ reserva: r, onClose, onChanged }: 
   const [notas, setNotas] = useState(r.notas_admin ?? "");
   const [enlace, setEnlace] = useState(r.enlace_reunion ?? "");
   const [motivo, setMotivo] = useState("");
-  const [cancelando, setCancelando] = useState(false);
+  /** Transición que espera un motivo antes de enviarse. */
+  const [pidiendoMotivo, setPidiendoMotivo] = useState<TransicionDisponible<EstadoReserva> | null>(null);
   const [trabajando, setTrabajando] = useState(false);
+  const [historial, setHistorial] = useState<EntradaHistorial[] | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  useEffect(() => {
+    let vigente = true;
+    fetch(withBasePath(`/api/admin/mentorias/reservas/${r.id}`))
+      .then((x) => x.json())
+      .then((d) => vigente && setHistorial(d.success ? d.data.historial : []))
+      .catch(() => vigente && setHistorial([]));
+    return () => {
+      vigente = false;
+    };
+  }, [r.id]);
+
+  const ejecutar = async (t: TransicionDisponible<EstadoReserva>, conMotivo?: string) => {
+    const body: Record<string, unknown> = { estado: t.a };
+    if (conMotivo) body.motivo = conMotivo;
+    if (await enviar(body, `Reserva: ${ETIQUETA_ESTADO_RESERVA[t.a] ?? t.a}`)) onClose();
+  };
 
   const enviar = async (body: Record<string, unknown>, exito: string) => {
     setTrabajando(true);
@@ -220,56 +266,66 @@ export default function GestionReservaModal({ reserva: r, onClose, onChanged }: 
             <div className="border-t border-gray-100 dark:border-gray-700 pt-5">
               <p className="text-sm font-semibold text-midnight_text dark:text-white mb-3">Cambiar estado</p>
               <div className="flex flex-wrap gap-2">
-                {r.transiciones
-                  .filter((t) => t !== "cancelada_ciepi")
-                  .map((t) => {
-                    const b = BOTON_ESTADO[t];
-                    if (!b) return null;
-                    return (
-                      <button
-                        key={t}
-                        disabled={trabajando}
-                        onClick={async () => (await enviar({ estado: t }, `Reserva marcada: ${ETIQUETA_ESTADO_RESERVA[t]}`)) && onClose()}
-                        className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold disabled:opacity-50 ${b.clase}`}
-                      >
-                        <Icon icon={b.icono} aria-hidden="true" />
-                        {b.texto}
-                      </button>
-                    );
-                  })}
-                {r.transiciones.includes("cancelada_ciepi") && !cancelando && (
-                  <button
-                    onClick={() => setCancelando(true)}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold border border-red-300 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
-                  >
-                    <Icon icon="solar:close-circle-linear" aria-hidden="true" />
-                    Cancelar reserva
-                  </button>
-                )}
+                {r.transiciones.map((t) => {
+                  const estilo = ESTILO_DESTINO[t.a] ?? ESTILO_POR_DEFECTO;
+                  if (pidiendoMotivo?.a === t.a) return null;
+                  return (
+                    <button
+                      key={`${t.accion}-${t.a}`}
+                      disabled={trabajando}
+                      onClick={() => {
+                        if (t.requiereMotivo) {
+                          setMotivo("");
+                          setPidiendoMotivo(t);
+                        } else {
+                          ejecutar(t);
+                        }
+                      }}
+                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold disabled:opacity-50 ${estilo.clase}`}
+                    >
+                      <Icon icon={estilo.icono} aria-hidden="true" />
+                      {t.etiqueta}
+                    </button>
+                  );
+                })}
               </div>
-              {cancelando && (
-                <div className="mt-3 rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-900/20 p-4">
-                  <label htmlFor="motivo-cancelacion" className="text-sm font-semibold text-red-800 dark:text-red-200">
-                    Motivo (se enviará a la persona por correo)
+              {pidiendoMotivo && (
+                <div
+                  className={`mt-3 rounded-xl border p-4 ${
+                    pidiendoMotivo.a === "cancelada_ciepi"
+                      ? "border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-900/20"
+                      : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30"
+                  }`}
+                >
+                  <label htmlFor="motivo-transicion" className="text-sm font-semibold text-midnight_text dark:text-white">
+                    {pidiendoMotivo.a === "cancelada_ciepi"
+                      ? "Motivo (se enviará a la persona por correo)"
+                      : "Motivo de la corrección (queda en el historial)"}
                   </label>
                   <textarea
-                    id="motivo-cancelacion"
+                    id="motivo-transicion"
                     rows={2}
                     maxLength={500}
                     value={motivo}
                     onChange={(e) => setMotivo(e.target.value)}
-                    placeholder="Ej.: El mentor tuvo un imprevisto. Puedes reservar otro horario."
+                    placeholder={
+                      pidiendoMotivo.a === "cancelada_ciepi"
+                        ? "Ej.: El mentor tuvo un imprevisto. Puedes reservar otro horario."
+                        : "Ej.: Se marcó por error."
+                    }
                     className={`${INPUT} mt-1`}
                   />
                   <div className="flex gap-2 mt-2">
                     <button
                       disabled={trabajando || !motivo.trim()}
-                      onClick={async () => (await enviar({ estado: "cancelada_ciepi", motivo }, "Reserva cancelada")) && onClose()}
-                      className="px-4 py-2 rounded-full text-sm font-semibold bg-red-600 text-white disabled:opacity-50"
+                      onClick={() => ejecutar(pidiendoMotivo, motivo.trim())}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold text-white disabled:opacity-50 ${
+                        pidiendoMotivo.a === "cancelada_ciepi" ? "bg-red-600" : "bg-primary"
+                      }`}
                     >
-                      Confirmar cancelación
+                      Confirmar: {pidiendoMotivo.etiqueta.toLowerCase()}
                     </button>
-                    <button onClick={() => setCancelando(false)} className="px-4 py-2 rounded-full text-sm font-semibold text-dark_grey">
+                    <button onClick={() => setPidiendoMotivo(null)} className="px-4 py-2 rounded-full text-sm font-semibold text-dark_grey">
                       Volver
                     </button>
                   </div>
@@ -277,6 +333,36 @@ export default function GestionReservaModal({ reserva: r, onClose, onChanged }: 
               )}
             </div>
           )}
+
+          <div className="border-t border-gray-100 dark:border-gray-700 pt-5">
+            <p className="text-sm font-semibold text-midnight_text dark:text-white mb-3">Historial</p>
+            {historial === null ? (
+              <p className="text-sm text-dark_grey dark:text-gray-400">Cargando...</p>
+            ) : historial.length === 0 ? (
+              <p className="text-sm text-dark_grey dark:text-gray-400">Sin cambios registrados.</p>
+            ) : (
+              <ol className="flex flex-col gap-2 text-sm">
+                {historial.map((h) => (
+                  <li key={h.id} className="flex flex-col">
+                    <span className="text-midnight_text dark:text-white">
+                      <span className="font-semibold">
+                        {h.estado_de
+                          ? `${ETIQUETA_ESTADO_RESERVA[h.estado_de as EstadoReserva] ?? h.estado_de} → `
+                          : "Creada: "}
+                        {ETIQUETA_ESTADO_RESERVA[h.estado_a as EstadoReserva] ?? h.estado_a}
+                      </span>
+                      {h.es_override && " (corrección)"}
+                    </span>
+                    <span className="text-xs text-dark_grey dark:text-gray-400">
+                      {fechaHoraPanama(h.creado_en)} · {ACTOR[h.actor_tipo] ?? h.actor_tipo}
+                      {h.actor_nombre ? ` (${h.actor_nombre})` : ""}
+                    </span>
+                    {h.motivo && <span className="text-xs text-dark_grey dark:text-gray-300">Motivo: {h.motivo}</span>}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
         </div>
       </div>
     </div>

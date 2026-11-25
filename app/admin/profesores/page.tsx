@@ -91,13 +91,32 @@ export default function AdminProfesoresPage() {
       const url = editing
         ? withBasePath(`/api/admin/profesores/${editing.id}`)
         : withBasePath("/api/admin/profesores");
-      const res = await fetch(url, {
-        method: editing ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
+      const enviar = (extra: Record<string, unknown> = {}) =>
+        fetch(url, {
+          method: editing ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...form, ...extra }),
+        });
+      let res = await enviar();
+      let data = await res.json();
+      // Desactivar a un mentor con mentorías pendientes o confirmadas: el servidor
+      // las lista y solo las cancela si se confirma explícitamente.
+      if (res.status === 409 && data.code === "RESERVAS_ACTIVAS") {
+        const n = Array.isArray(data.reservas) ? data.reservas.length : 0;
+        if (
+          !confirm(
+            `${data.error || "Este profesor tiene mentorías activas."}
+
+¿Cancelar ${n} mentoría(s) y avisar por correo a las personas?`,
+          )
+        ) {
+          return;
+        }
+        res = await enviar({ cancelar_reservas: true });
+        data = await res.json();
+      }
       if (!res.ok) throw new Error(data.error || "Error al guardar profesor");
+      if (Array.isArray(data.avisos)) data.avisos.forEach((a: string) => toast(a));
 
       toast.success(data.message);
       setModalOpen(false);

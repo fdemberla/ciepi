@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Icon } from "@iconify/react";
 import Table from "@/components/Table";
+import BlogAccionesEstado, { type TransicionBlog } from "@/components/BlogAccionesEstado";
 import type { ColumnDef } from "@tanstack/react-table";
 
 interface Blog {
@@ -19,6 +20,7 @@ interface Blog {
   aprobado_por: string | null;
   aprobado_por_nombre: string | null;
   aprobado_en: string | null;
+  transiciones: TransicionBlog[];
 }
 
 export default function AprobarBlogsPage() {
@@ -95,39 +97,6 @@ export default function AprobarBlogsPage() {
     }
   };
 
-  const handleEstadoChange = async (
-    blogId: string,
-    nuevoEstado: number,
-    comentario?: string,
-  ) => {
-    try {
-      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-      const response = await fetch(`${basePath}/api/admin/blog/${blogId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          estado: nuevoEstado,
-          comentario_temp: comentario,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Error al cambiar estado");
-      }
-
-      toast.success("Estado del blog actualizado exitosamente");
-      fetchBlogs();
-    } catch (error) {
-      console.error("Error cambiando estado:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Error al cambiar estado",
-      );
-    }
-  };
-
   const getEstadoBadge = (estado: number, estadoNombre: string) => {
     const badges = {
       1: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300", // Borrador
@@ -149,180 +118,28 @@ export default function AprobarBlogsPage() {
     );
   };
 
-  const AccionesCell = ({ blog }: { blog: Blog }) => {
-    const [showModal, setShowModal] = useState(false);
-    const [comentario, setComentario] = useState("");
-    const [accionSeleccionada, setAccionSeleccionada] = useState<{
-      tipo: string;
-      estado: number;
-    } | null>(null);
-
-    const abrirModal = (tipo: string, estado: number) => {
-      setAccionSeleccionada({ tipo, estado });
-      setComentario("");
-      setShowModal(true);
-    };
-
-    const confirmarAccion = () => {
-      if (accionSeleccionada) {
-        handleEstadoChange(blog.id, accionSeleccionada.estado, comentario);
-        setShowModal(false);
-        setAccionSeleccionada(null);
-        setComentario("");
-      }
-    };
-
-    const getAccionesDisponibles = () => {
-      const acciones = [];
-
-      if (blog.estado === 2) {
-        // En Revisión CIEPI
-        acciones.push(
-          <button
-            key="aprobar-ciepi"
-            onClick={() => abrirModal("Aprobar para RR.PP", 4)}
-            className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-            title="Aprobar y enviar a RR.PP"
-          >
-            <Icon icon="solar:check-circle-linear" className="w-5 h-5" />
-          </button>,
-        );
-        acciones.push(
-          <button
-            key="rechazar-ciepi"
-            type="button"
-            onClick={() => abrirModal("Rechazar", 3)}
-            className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-            title="Rechazar blog"
-            aria-label="Rechazar blog"
-          >
-            <Icon icon="solar:close-circle-linear" className="w-5 h-5" aria-hidden="true" />
-          </button>,
-        );
-      }
-
-      if (blog.estado === 4) {
-        // En Revisión RR.PP
-        acciones.push(
-          <button
-            key="aprobar-detallado"
-            type="button"
-            onClick={() => router.push(`/admin/blog/aprobar/${blog.id}`)}
-            className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-            title="Revisar y aprobar detalladamente"
-            aria-label="Revisar y aprobar detalladamente"
-          >
-            <Icon icon="solar:document-check-linear" className="w-5 h-5" aria-hidden="true" />
-          </button>,
-        );
-        acciones.push(
-          <button
-            key="publicar"
-            type="button"
-            onClick={() => abrirModal("Publicar", 6)}
-            className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-            title="Publicar directamente"
-            aria-label="Publicar directamente"
-          >
-            <Icon icon="solar:verified-check-linear" className="w-5 h-5" aria-hidden="true" />
-          </button>,
-        );
-        acciones.push(
-          <button
-            key="rechazar-rrpp"
-            type="button"
-            onClick={() => abrirModal("Rechazar", 5)}
-            className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-            title="Rechazar blog"
-            aria-label="Rechazar blog"
-          >
-            <Icon icon="solar:close-circle-linear" className="w-5 h-5" aria-hidden="true" />
-          </button>,
-        );
-      }
-
-      // Acción de reenviar para blogs rechazados
-      if (blog.estado === 3 || blog.estado === 5) {
-        acciones.push(
-          <button
-            key="reenviar"
-            type="button"
-            onClick={() =>
-              abrirModal("Reenviar a revisión", blog.estado === 3 ? 2 : 4)
-            }
-            className="p-2 text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded-lg transition-colors"
-            title="Reenviar a revisión"
-            aria-label="Reenviar a revisión"
-          >
-            <Icon icon="solar:refresh-linear" className="w-5 h-5" aria-hidden="true" />
-          </button>,
-        );
-      }
-
-      return acciones;
-    };
-
-    return (
-      <>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => router.push(`/admin/blog/editar/${blog.id}`)}
-            className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-            title="Ver/Editar blog"
-            aria-label="Ver/Editar blog"
-          >
-            <Icon icon="solar:eye-linear" className="w-5 h-5" aria-hidden="true" />
-          </button>
-          {getAccionesDisponibles()}
-        </div>
-
-        {/* Modal de confirmación */}
-        {showModal && accionSeleccionada && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
-              <h3 className="text-lg font-semibold text-midnight_text dark:text-white mb-4">
-                {accionSeleccionada.tipo}
-              </h3>
-              <p className="text-dark_grey dark:text-gray-400 mb-4">
-                ¿Estás seguro de que deseas{" "}
-                {accionSeleccionada.tipo.toLowerCase()} el blog &ldquo;
-                {blog.titulo}&rdquo;?
-              </p>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-midnight_text dark:text-white mb-2">
-                  Comentario (opcional)
-                </label>
-                <textarea
-                  value={comentario}
-                  onChange={(e) => setComentario(e.target.value)}
-                  placeholder="Agregar comentario sobre esta acción..."
-                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-midnight_text dark:text-white resize-none"
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex gap-3 justify-end">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-midnight_text dark:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={confirmarAccion}
-                  className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors"
-                >
-                  Confirmar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </>
-    );
-  };
+  // Solo se dibujan las transiciones que la API calculó para el usuario actual.
+  const AccionesCell = ({ blog }: { blog: Blog }) => (
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={() => router.push(`/admin/blog/aprobar/${blog.id}`)}
+        className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+        title="Ver contenido e historial"
+        aria-label="Ver contenido e historial"
+      >
+        <Icon icon="solar:eye-linear" className="w-5 h-5" aria-hidden="true" />
+      </button>
+      <BlogAccionesEstado
+        blogId={blog.id}
+        titulo={blog.titulo}
+        estadoActual={blog.estado}
+        transiciones={blog.transiciones}
+        onCambio={() => fetchBlogs()}
+        compacto
+      />
+    </div>
+  );
 
   const columns: ColumnDef<Blog>[] = [
     {

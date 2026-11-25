@@ -43,7 +43,11 @@ FROM (VALUES
      to_regclass('ciepi.inscripcion_sesiones') IS NOT NULL
      AND to_regclass('ciepi.uq_inscripciones_usuario_capacitacion') IS NOT NULL
      AND EXISTS (SELECT 1 FROM information_schema.columns
-                 WHERE table_schema = 'ciepi' AND table_name = 'verificacion_correo' AND column_name = 'consulta_hash'))
+                 WHERE table_schema = 'ciepi' AND table_name = 'verificacion_correo' AND column_name = 'consulta_hash')),
+  ('10. fase2_maquinas_estado.sql',
+     to_regclass('ciepi.estado_historial') IS NOT NULL
+     AND to_regclass('ciepi.consultas_respuestas') IS NOT NULL
+     AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_inscripciones_estado_rango'))
 ) AS t(script, ok)
 ORDER BY script;
 

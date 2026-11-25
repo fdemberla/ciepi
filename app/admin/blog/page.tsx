@@ -5,11 +5,8 @@ import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import { Icon } from "@iconify/react";
 import Table from "@/components/Table";
-import {
-  canEditBlog,
-  canDeleteBlog,
-  canChangeToState,
-} from "@/lib/permissions";
+import { canDeleteBlog } from "@/lib/permissions";
+import type { TransicionBlog } from "@/components/BlogAccionesEstado";
 import type { ColumnDef } from "@tanstack/react-table";
 
 interface Blog {
@@ -25,6 +22,9 @@ interface Blog {
   aprobado_por: string | null;
   aprobado_por_nombre: string | null;
   aprobado_en: string | null;
+  /** Calculados por la API para el usuario actual (lib/estados/blog.ts). */
+  puede_editar: boolean;
+  transiciones: TransicionBlog[];
 }
 
 export default function BlogAdminPage() {
@@ -33,7 +33,6 @@ export default function BlogAdminPage() {
   const [blogs, setBlogs] = useState<Blog[]>([]);
   const [loading, setLoading] = useState(true);
   const userRole = session?.user?.rolId || 0;
-  const userId = session?.user?.adminId || "";
 
   useEffect(() => {
     fetchBlogs();
@@ -164,12 +163,11 @@ export default function BlogAdminPage() {
       id: "acciones",
       header: "Acciones",
       cell: ({ row }) => {
-        const isCreator = row.original.creado_por === userId;
-        const canEdit = isCreator && canEditBlog(userRole);
+        // Editar: autor o admin y solo en Borrador/Rechazado. Gestionar: hay alguna
+        // transición disponible para este usuario. Ambos los decide el servidor.
+        const canEdit = row.original.puede_editar;
         const canDelete = canDeleteBlog(userRole);
-        const canApprove =
-          row.original.estado > 1 &&
-          canChangeToState(userRole, row.original.estado);
+        const canApprove = (row.original.transiciones ?? []).length > 0;
 
         return (
           <div className="flex gap-2">
@@ -190,7 +188,7 @@ export default function BlogAdminPage() {
                   router.push(`/admin/blog/aprobar/${row.original.id}`)
                 }
                 className="p-2 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
-                title="Gestionar aprobación"
+                title="Revisar y cambiar estado"
               >
                 <Icon icon="solar:check-circle-linear" className="w-5 h-5" />
               </button>

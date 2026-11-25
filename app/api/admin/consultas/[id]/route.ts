@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-import { query } from "@/lib/db";
+import { query, withTransaction } from "@/lib/db";
+import { parseId } from "@/lib/adminAuth";
+import { safeErrorDetail } from "@/lib/apiError";
+import { getClientIp } from "@/lib/verificationUtils";
+import { cambiarEstado, leerHistorial, respuestaErrorTransicion, type Q } from "@/lib/estadosServer";
+import {
+  puedeEliminarConsulta,
+  transicionesConsulta,
+  validarAccionConsulta,
+} from "@/lib/estados/consulta";
 
 interface Params {
   params: Promise<{
@@ -9,22 +18,78 @@ interface Params {
   }>;
 }
 
+/**
+ * Sesión de administrador con el rol leído de la BD (el del JWT puede estar
+ * desactualizado). Devuelve la respuesta de error lista para retornar.
+ */
+async function sesionAdmin(): Promise<
+  | { ok: true; adminId: number; rol: number; correo: string | null }
+  | { ok: false; respuesta: NextResponse }
+> {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user?.isAdmin || !session.user.adminId) {
+    return {
+      ok: false,
+      respuesta: NextResponse.json(
+        { success: false, error: "No autorizado. Se requieren permisos de administrador." },
+        { status: 401 }
+      ),
+    };
+  }
+  const r = await query(
+    `SELECT rol_id FROM ciepi.usuarios_administradores WHERE id = $1 AND activo = true`,
+    [session.user.adminId]
+  );
+  if (r.rows.length === 0) {
+    return {
+      ok: false,
+      respuesta: NextResponse.json({ success: false, error: "Usuario administrador no activo." }, { status: 403 }),
+    };
+  }
+  return { ok: true, adminId: session.user.adminId, rol: Number(r.rows[0].rol_id), correo: session.user.email ?? null };
+}
+
+/** Respuestas anteriores (más reciente primero). Tolera que la tabla aún no exista. */
+async function leerRespuestas(q: Q, consultaId: number) {
+  try {
+    const r = await q(
+      `SELECT cr.id, cr.respuesta, cr.admin_id, cr.creado_en,
+              NULLIF(TRIM(CONCAT(u.nombre, ' ', u.apellido)), '') AS admin_nombre
+         FROM ciepi.consultas_respuestas cr
+         LEFT JOIN ciepi.usuarios_administradores u ON u.id = cr.admin_id
+        WHERE cr.consulta_id = $1
+        ORDER BY cr.creado_en DESC, cr.id DESC`,
+      [consultaId]
+    );
+    return r.rows;
+  } catch (error) {
+    // 42P01 = tabla inexistente (falta ejecutar database/fase2/30_consultas.sql)
+    if ((error as { code?: string })?.code === "42P01") return [];
+    throw error;
+  }
+}
+
+async function leerHistorialSeguro(q: Q, consultaId: number) {
+  try {
+    return await leerHistorial(q, "consulta", consultaId);
+  } catch (error) {
+    if ((error as { code?: string })?.code === "42P01") return [];
+    throw error;
+  }
+}
+
 export async function GET(request: NextRequest, { params }: Params) {
   try {
-    // Verificar autenticación y permisos de admin
-    const session = await getServerSession(authOptions);
+    const sesion = await sesionAdmin();
+    if (!sesion.ok) return sesion.respuesta;
 
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 }
-      );
+    const id = parseId((await params).id);
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Consulta no válida." }, { status: 400 });
     }
 
-    const { id } = await params;
-
     const consultaQuery = `
-      SELECT 
+      SELECT
         c.id,
         c.nombre,
         c.email,
@@ -56,15 +121,21 @@ export async function GET(request: NextRequest, { params }: Params) {
     const result = await query(consultaQuery, [id]);
 
     if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Consulta no encontrada" },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: false, error: "Consulta no encontrada" }, { status: 404 });
     }
+
+    const consulta = result.rows[0];
+    const [historial, respuestas] = await Promise.all([leerHistorialSeguro(query, id), leerRespuestas(query, id)]);
 
     return NextResponse.json({
       success: true,
-      data: result.rows[0],
+      data: {
+        ...consulta,
+        transiciones: transicionesConsulta(consulta.estado, sesion.rol),
+        historial,
+        respuestas_previas: respuestas,
+      },
+      permisos: { eliminar: puedeEliminarConsulta(sesion.rol) },
     });
   } catch (error) {
     console.error("Error obteniendo consulta:", error);
@@ -72,117 +143,122 @@ export async function GET(request: NextRequest, { params }: Params) {
       {
         success: false,
         error: "Error al obtener consulta",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );
   }
 }
 
+/**
+ * Cambio de estado de una consulta. Cuerpo:
+ *   { accion: "tomar" | "responder" | "cerrar" | "reabrir",
+ *     estado_actual: <estado que se veía en pantalla>,
+ *     respuesta?: string   (obligatoria para "responder"),
+ *     motivo?: string      (obligatorio para reabrir una consulta cerrada) }
+ * En lugar de `accion` se acepta `estado` con el estado destino.
+ * El UPDATE se condiciona a `estado_actual`: si otra persona la cambió, 409.
+ */
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
-    // Verificar autenticación y permisos de admin
-    const session = await getServerSession(authOptions);
+    const sesion = await sesionAdmin();
+    if (!sesion.ok) return sesion.respuesta;
 
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 }
-      );
+    const id = parseId((await params).id);
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Consulta no válida." }, { status: 400 });
     }
 
-    const { id } = await params;
-    const body = await request.json();
-
-    const { respuesta, estado } = body;
-
-    // Validar que al menos uno de los campos esté presente
-    if (respuesta === undefined && estado === undefined) {
-      return NextResponse.json(
-        { error: "Se debe proporcionar respuesta o estado" },
-        { status: 400 }
-      );
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "Cuerpo de la petición no válido." }, { status: 400 });
     }
 
-    // Validar estado si se proporciona
-    const estadosValidos = ["pendiente", "en_proceso", "respondida", "cerrada"];
-    if (estado && !estadosValidos.includes(estado)) {
-      return NextResponse.json(
-        {
-          error:
-            "Estado inválido. Debe ser: pendiente, en_proceso, respondida o cerrada",
-        },
-        { status: 400 }
-      );
+    const v = validarAccionConsulta({
+      estadoActual: body.estado_actual,
+      accion: body.accion,
+      estadoDestino: body.estado,
+      respuesta: body.respuesta,
+      motivo: body.motivo,
+      rol: sesion.rol,
+    });
+    if (!v.ok) {
+      return NextResponse.json({ success: false, error: v.motivo }, { status: v.status });
     }
 
-    // Construir query de actualización dinámicamente
-    const updates: string[] = [];
-    const values: (string | number | null)[] = [];
-    let paramIndex = 1;
+    const t = v.transicion;
+    const actor = { tipo: "admin" as const, id: sesion.adminId, descripcion: sesion.correo };
+    const ip = getClientIp(request);
 
-    if (respuesta !== undefined) {
-      updates.push(`respuesta = $${paramIndex}`);
-      values.push(respuesta);
-      paramIndex++;
-
-      updates.push(`respondido_por = $${paramIndex}`);
-      values.push(session.user.adminId || null);
-      paramIndex++;
-
-      updates.push(`fecha_respuesta = CURRENT_TIMESTAMP`);
-
-      // Si se responde y no se especifica estado, cambiar a 'respondida'
-      if (estado === undefined) {
-        updates.push(`estado = 'respondida'`);
+    const fila = await withTransaction(async (q) => {
+      if (t.accion === "responder") {
+        // Hora de la BD (misma convención que fecha_creacion, timestamp sin zona).
+        const ahora = (await q(`SELECT LOCALTIMESTAMP AS ahora`)).rows[0].ahora;
+        const actualizada = await cambiarEstado(q, {
+          entidad: "consulta",
+          tabla: "ciepi.consultas",
+          columnaEstado: "estado",
+          id,
+          de: v.de,
+          a: t.a,
+          accion: t.accion,
+          actor,
+          motivo: v.motivo,
+          override: t.override,
+          ip,
+          extra: {
+            respuesta: v.respuesta,
+            respondido_por: sesion.adminId,
+            fecha_respuesta: ahora,
+          },
+        });
+        // Se conservan todas las respuestas (la columna respuesta guarda solo la última).
+        await q(
+          `INSERT INTO ciepi.consultas_respuestas (consulta_id, respuesta, admin_id) VALUES ($1, $2, $3)`,
+          [id, v.respuesta, sesion.adminId]
+        );
+        return actualizada;
       }
-    }
-
-    if (estado !== undefined) {
-      updates.push(`estado = $${paramIndex}`);
-      values.push(estado);
-      paramIndex++;
-    }
-
-    values.push(id);
-
-    const updateQuery = `
-      UPDATE ciepi.consultas
-      SET ${updates.join(", ")}
-      WHERE id = $${paramIndex}
-      RETURNING 
+      return cambiarEstado(q, {
+        entidad: "consulta",
+        tabla: "ciepi.consultas",
+        columnaEstado: "estado",
         id,
-        nombre,
-        email,
-        respuesta,
-        estado,
-        fecha_respuesta,
-        fecha_actualizacion
-    `;
+        de: v.de,
+        a: t.a,
+        accion: t.accion,
+        actor,
+        motivo: v.motivo,
+        override: t.override,
+        ip,
+      });
+    });
 
-    const result = await query(updateQuery, values);
-
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Consulta no encontrada" },
-        { status: 404 }
-      );
-    }
-
-    // TODO: Enviar email al usuario notificando la respuesta
+    // Efectos posteriores al commit.
+    // TODO: enviar al ciudadano un correo con la respuesta cuando t.accion === "responder"
+    // (hoy no se envía ningún correo; la respuesta solo queda registrada en el sistema).
 
     return NextResponse.json({
       success: true,
-      message: "Consulta actualizada exitosamente",
-      data: result.rows[0],
+      message: t.accion === "responder" ? "Respuesta guardada" : "Consulta actualizada",
+      data: {
+        id: fila.id,
+        estado: fila.estado,
+        respuesta: fila.respuesta,
+        fecha_respuesta: fila.fecha_respuesta,
+        fecha_actualizacion: fila.fecha_actualizacion,
+        transiciones: transicionesConsulta(String(fila.estado), sesion.rol),
+      },
     });
   } catch (error) {
+    const r = respuestaErrorTransicion(error);
+    if (r) return r;
     console.error("Error actualizando consulta:", error);
     return NextResponse.json(
       {
         success: false,
         error: "Error al actualizar consulta",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );
@@ -191,31 +267,24 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
-    // Verificar autenticación y permisos de admin
-    const session = await getServerSession(authOptions);
-
-    if (!session || !session.user?.isAdmin) {
+    const sesion = await sesionAdmin();
+    if (!sesion.ok) return sesion.respuesta;
+    if (!puedeEliminarConsulta(sesion.rol)) {
       return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 }
+        { success: false, error: "Solo un administrador puede eliminar consultas." },
+        { status: 403 }
       );
     }
 
-    const { id } = await params;
+    const id = parseId((await params).id);
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Consulta no válida." }, { status: 400 });
+    }
 
-    const deleteQuery = `
-      DELETE FROM ciepi.consultas
-      WHERE id = $1
-      RETURNING id
-    `;
-
-    const result = await query(deleteQuery, [id]);
+    const result = await query(`DELETE FROM ciepi.consultas WHERE id = $1 RETURNING id`, [id]);
 
     if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Consulta no encontrada" },
-        { status: 404 }
-      );
+      return NextResponse.json({ success: false, error: "Consulta no encontrada" }, { status: 404 });
     }
 
     return NextResponse.json({
@@ -228,7 +297,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       {
         success: false,
         error: "Error al eliminar consulta",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );

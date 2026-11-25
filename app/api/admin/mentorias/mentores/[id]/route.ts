@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, withTransaction } from "@/lib/db";
 import { requireAdmin, parseId } from "@/lib/adminAuth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
 import { DURACIONES_MENTORIA, validarDisponibilidad, claveFecha } from "@/lib/mentorias";
+import { MOTIVO_MENTOR_NO_DISPONIBLE } from "@/lib/estados/mentoriaReserva";
+import { respuestaErrorTransicion } from "@/lib/estadosServer";
+import {
+  aplicarDesactivacionMentor,
+  ErrorReservasActivas,
+  type ReservaCanceladaPorMentor,
+} from "@/lib/mentoriasServer";
+import { enviarCancelacionesPorMentor } from "@/lib/mentoriasEmails";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -57,10 +67,19 @@ export async function GET(_request: NextRequest, { params }: Params) {
   }
 }
 
-/** Guarda la configuración de mentor. Áreas y horario se reemplazan completos, en una transacción. */
+/**
+ * Guarda la configuración de mentor. Áreas y horario se reemplazan completos, en una transacción.
+ *
+ * Si con es_mentor = false el profesor deja de atender y tiene mentorías confirmadas o
+ * pendientes futuras, responde 409 { code: "RESERVAS_ACTIVAS", reservas } sin guardar nada,
+ * salvo que llegue `cancelar_reservas: true`: entonces las cancela como cancelada_ciepi
+ * (con `motivo_cancelacion` o un motivo por defecto) en la misma transacción y avisa
+ * por correo después del commit.
+ */
 export async function PUT(request: NextRequest, { params }: Params) {
   const denied = await requireAdmin();
   if (denied) return denied;
+  const session = await getServerSession(authOptions);
   const id = parseId((await params).id);
   if (!id) return NextResponse.json({ success: false, error: "Profesor no válido." }, { status: 400 });
 
@@ -86,15 +105,33 @@ export async function PUT(request: NextRequest, { params }: Params) {
   const disp = validarDisponibilidad(body.disponibilidad ?? []);
   if (!disp.ok) return NextResponse.json({ success: false, error: disp.error }, { status: 400 });
 
+  const cancelarReservas = body.cancelar_reservas === true;
+  const motivoCancelacion =
+    typeof body.motivo_cancelacion === "string" && body.motivo_cancelacion.trim()
+      ? body.motivo_cancelacion.trim().slice(0, 500)
+      : MOTIVO_MENTOR_NO_DISPONIBLE;
+
   try {
-    await withTransaction(async (q) => {
+    const canceladas: ReservaCanceladaPorMentor[] = await withTransaction(async (q) => {
       const upd = await q(
         `UPDATE ciepi.profesores
          SET es_mentor = $1, duracion_mentoria_min = $2, foto = $3, fecha_actualizacion = NOW()
-         WHERE id = $4`,
+         WHERE id = $4
+         RETURNING activo`,
         [es_mentor, duracion, foto, id]
       );
       if (upd.rowCount === 0) throw Object.assign(new Error("Profesor no encontrado."), { status: 404 });
+
+      // Con la fila del profesor ya bloqueada: reservas activas si deja de atender.
+      const canceladasTx = await aplicarDesactivacionMentor(q, {
+        profesorId: id,
+        esMentor: es_mentor,
+        activo: Boolean(upd.rows[0].activo),
+        cancelarReservas,
+        motivo: motivoCancelacion,
+        actor: { tipo: "admin", id: session?.user?.adminId ?? null, descripcion: session?.user?.email ?? null },
+        rol: session?.user?.rolId,
+      });
 
       if (areaIds.length > 0) {
         const ok = await q(`SELECT COUNT(*)::int AS n FROM ciepi.mentoria_areas WHERE id = ANY($1::int[])`, [areaIds]);
@@ -141,9 +178,16 @@ export async function PUT(request: NextRequest, { params }: Params) {
           ]
         );
       }
+      return canceladasTx;
     });
-    return NextResponse.json({ success: true });
+    const avisos = canceladas.length ? await enviarCancelacionesPorMentor(canceladas, motivoCancelacion) : [];
+    return NextResponse.json({ success: true, canceladas: canceladas.length, avisos });
   } catch (error) {
+    if (error instanceof ErrorReservasActivas) {
+      return NextResponse.json(error.cuerpo(), { status: 409 });
+    }
+    const transicion = respuestaErrorTransicion(error);
+    if (transicion) return transicion;
     const status = (error as { status?: number }).status;
     if (status) {
       return NextResponse.json({ success: false, error: (error as Error).message }, { status });

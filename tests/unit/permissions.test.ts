@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 import {
   Role,
   BlogState,
-  getAllowedStatesForRole,
-  canChangeToState,
   canCreateBlog,
   canEditBlog,
   canDeleteBlog,
-  validateBlogStateTransition,
 } from "@/lib/permissions";
+
+// Las transiciones de estado del blog (por rol, autoría y estado) se prueban en
+// tests/unit/estadosBlog.test.ts contra lib/estados/blog.ts.
 
 // ─── Role Enum Sanity Check ──────────────────────────────────────────────────
 // NOTE: The enum labels are historically reversed from DB semantics.
@@ -45,82 +45,6 @@ describe("BlogState enum values", () => {
   });
 });
 
-// ─── RELACIONES_PUBLICAS Fix ─────────────────────────────────────────────────
-describe("getAllowedStatesForRole — RELACIONES_PUBLICAS (role 4)", () => {
-  const states = getAllowedStatesForRole(Role.RELACIONES_PUBLICAS);
-
-  it("returns exactly [5, 6] (RECHAZADO_RP + PUBLICADO)", () => {
-    expect(states).toHaveLength(2);
-    expect(states).toContain(BlogState.RECHAZADO_RP);
-    expect(states).toContain(BlogState.PUBLICADO);
-  });
-
-  it("does NOT allow BORRADOR (state 1)", () => {
-    expect(states).not.toContain(BlogState.BORRADOR);
-  });
-
-  it("does NOT allow EN_REVISION_CIEPI (state 2)", () => {
-    expect(states).not.toContain(BlogState.EN_REVISION_CIEPI);
-  });
-
-  it("does NOT allow RECHAZADO_CIEPI (state 3)", () => {
-    expect(states).not.toContain(BlogState.RECHAZADO_CIEPI);
-  });
-
-  it("does NOT allow EN_REVISION_RP (state 4)", () => {
-    expect(states).not.toContain(BlogState.EN_REVISION_RP);
-  });
-
-  it("canChangeToState(4, BORRADOR) returns false", () => {
-    expect(canChangeToState(Role.RELACIONES_PUBLICAS, BlogState.BORRADOR)).toBe(false);
-  });
-
-  it("canChangeToState(4, RECHAZADO_CIEPI) returns false", () => {
-    expect(canChangeToState(Role.RELACIONES_PUBLICAS, BlogState.RECHAZADO_CIEPI)).toBe(false);
-  });
-
-  it("canChangeToState(4, RECHAZADO_RP) returns true", () => {
-    expect(canChangeToState(Role.RELACIONES_PUBLICAS, BlogState.RECHAZADO_RP)).toBe(true);
-  });
-
-  it("canChangeToState(4, PUBLICADO) returns true", () => {
-    expect(canChangeToState(Role.RELACIONES_PUBLICAS, BlogState.PUBLICADO)).toBe(true);
-  });
-});
-
-// ─── CIEPI ──────────────────────────────────────────────────────────────────
-describe("getAllowedStatesForRole — CIEPI (role 3)", () => {
-  const states = getAllowedStatesForRole(Role.CIEPI);
-
-  it("returns exactly [1, 2, 3, 4]", () => {
-    expect(states).toHaveLength(4);
-    expect(states).toContain(BlogState.BORRADOR);
-    expect(states).toContain(BlogState.EN_REVISION_CIEPI);
-    expect(states).toContain(BlogState.RECHAZADO_CIEPI);
-    expect(states).toContain(BlogState.EN_REVISION_RP);
-  });
-
-  it("cannot publish directly (PUBLICADO)", () => {
-    expect(states).not.toContain(BlogState.PUBLICADO);
-  });
-});
-
-// ─── ADMIN (most privileged) ─────────────────────────────────────────────────
-describe("getAllowedStatesForRole — ADMIN (role 1, most privileged)", () => {
-  const states = getAllowedStatesForRole(Role.ADMIN);
-
-  it("returns all 6 states", () => {
-    expect(states).toHaveLength(6);
-  });
-});
-
-// ─── Unknown Role ────────────────────────────────────────────────────────────
-describe("getAllowedStatesForRole — unknown role", () => {
-  it("returns empty array for role 99", () => {
-    expect(getAllowedStatesForRole(99)).toHaveLength(0);
-  });
-});
-
 // ─── Create / Edit / Delete Guards ───────────────────────────────────────────
 describe("canCreateBlog", () => {
   it("CIEPI can create", () => expect(canCreateBlog(Role.CIEPI)).toBe(true));
@@ -140,58 +64,4 @@ describe("canDeleteBlog", () => {
   it("CIEPI cannot delete", () => expect(canDeleteBlog(Role.CIEPI)).toBe(false));
   it("RELACIONES_PUBLICAS cannot delete", () =>
     expect(canDeleteBlog(Role.RELACIONES_PUBLICAS)).toBe(false));
-});
-
-describe("validateBlogStateTransition", () => {
-  it("allows strict step transitions for CIEPI and RELACIONES_PUBLICAS", () => {
-    expect(
-      validateBlogStateTransition(
-        BlogState.BORRADOR,
-        BlogState.EN_REVISION_CIEPI,
-        Role.CIEPI,
-      ),
-    ).toEqual({ allowed: true, isOverride: false });
-
-    expect(
-      validateBlogStateTransition(
-        BlogState.EN_REVISION_RP,
-        BlogState.PUBLICADO,
-        Role.RELACIONES_PUBLICAS,
-      ),
-    ).toEqual({ allowed: true, isOverride: false });
-  });
-
-  it("blocks stage skips for non-admin roles", () => {
-    const skip = validateBlogStateTransition(
-      BlogState.BORRADOR,
-      BlogState.EN_REVISION_RP,
-      Role.CIEPI,
-    );
-    expect(skip.allowed).toBe(false);
-
-    const exitPublished = validateBlogStateTransition(
-      BlogState.PUBLICADO,
-      BlogState.RECHAZADO_RP,
-      Role.RELACIONES_PUBLICAS,
-    );
-    expect(exitPublished.allowed).toBe(false);
-  });
-
-  it("allows ADMIN override with isOverride flag and rejects same/invalid states", () => {
-    const override = validateBlogStateTransition(
-      BlogState.BORRADOR,
-      BlogState.PUBLICADO,
-      Role.ADMIN,
-    );
-    expect(override).toEqual({ allowed: true, isOverride: true });
-
-    expect(
-      validateBlogStateTransition(BlogState.BORRADOR, BlogState.BORRADOR, Role.ADMIN)
-        .allowed,
-    ).toBe(false);
-
-    expect(
-      validateBlogStateTransition(BlogState.BORRADOR, 99, Role.ADMIN).allowed,
-    ).toBe(false);
-  });
 });

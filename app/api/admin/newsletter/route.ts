@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
 import { safeErrorDetail } from "@/lib/apiError";
+import { autorizarGestionNewsletter } from "./_auth";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 },
-      );
-    }
+    // Solo ADMIN, SUPER_ADMIN y RELACIONES_PUBLICAS (rol leído de la BD).
+    const auth = await autorizarGestionNewsletter();
+    if (!auth.ok) return auth.respuesta;
 
     const estado = request.nextUrl.searchParams.get("estado") || "";
     const VALID_ESTADOS = ["pendiente", "activo", "baja"];

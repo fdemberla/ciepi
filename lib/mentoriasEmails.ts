@@ -9,7 +9,12 @@ import {
   formatoFechaHoraPanama,
   generarIcs,
 } from "@/lib/mentoriaSolicitud";
-import { lugarReserva, type ReservaCompleta } from "@/lib/mentoriasServer";
+import {
+  lugarReserva,
+  cargarReservaCompleta,
+  type ReservaCompleta,
+  type ReservaCanceladaPorMentor,
+} from "@/lib/mentoriasServer";
 
 export function urlGestionReserva(token: string): string {
   return `${getBaseUrl()}/mentorias/reserva/${token}`;
@@ -182,8 +187,15 @@ export async function enviarCorreosCancelacion(r: ReservaCompleta) {
   resultados.forEach((res) => res.status === "rejected" && console.error("Error enviando correo de cancelación:", res.reason));
 }
 
-/** 4) Cancelación por CIEPI: avisa a la persona (con el motivo) y al mentor. */
-export async function enviarCorreosCancelacionCiepi(r: ReservaCompleta, motivo: string | null) {
+/**
+ * 4) Cancelación por CIEPI: avisa a la persona (con el motivo) y al mentor.
+ * Si la reserva estaba solo pendiente, el mentor nunca supo de ella: `avisarMentor: false`.
+ */
+export async function enviarCorreosCancelacionCiepi(
+  r: ReservaCompleta,
+  motivo: string | null,
+  opciones: { avisarMentor?: boolean } = {}
+) {
   const motivoHtml = motivo ? `<p><strong>Motivo:</strong> ${escapeHtml(motivo)}</p>` : "";
   const envios: Promise<unknown>[] = [
     sendEmail({
@@ -198,7 +210,7 @@ export async function enviarCorreosCancelacionCiepi(r: ReservaCompleta, motivo: 
       attachments: [icsAdjunto(r, true)],
     }),
   ];
-  if (r.mentor_correo) {
+  if (r.mentor_correo && opciones.avisarMentor !== false) {
     envios.push(
       sendEmail({
         to: r.mentor_correo,
@@ -215,6 +227,30 @@ export async function enviarCorreosCancelacionCiepi(r: ReservaCompleta, motivo: 
   const resultados = await Promise.allSettled(envios);
   resultados.forEach((res) => res.status === "rejected" && console.error("Error enviando cancelación de CIEPI:", res.reason));
   if (resultados[0].status === "rejected") throw resultados[0].reason;
+}
+
+/**
+ * Correos de las reservas canceladas al desactivar un mentor (después del commit).
+ * Nunca lanza: devuelve avisos para el admin con las personas a las que no se pudo avisar.
+ */
+export async function enviarCancelacionesPorMentor(
+  canceladas: ReservaCanceladaPorMentor[],
+  motivo: string
+): Promise<string[]> {
+  const fallidas: string[] = [];
+  for (const c of canceladas) {
+    try {
+      const r = await cargarReservaCompleta({ id: c.id });
+      if (!r) continue;
+      await enviarCorreosCancelacionCiepi(r, motivo, { avisarMentor: c.estadoPrevio === "confirmada" });
+    } catch (error) {
+      console.error(`No se pudo avisar la cancelación de la reserva de mentoría ${c.id}:`, error);
+      fallidas.push(`#${c.id}`);
+    }
+  }
+  return fallidas.length
+    ? [`Se cancelaron las reservas, pero no se pudo enviar el correo de ${fallidas.join(", ")}. Avisa a esas personas por teléfono.`]
+    : [];
 }
 
 /** 5) Enlace de la reunión virtual: a la persona, con el .ics actualizado (mismo UID). */

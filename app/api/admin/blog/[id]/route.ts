@@ -1,13 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-import { query } from "@/lib/db";
-import {
-  canEditBlog,
-  canDeleteBlog,
-  validateBlogStateTransition,
-} from "@/lib/permissions";
+import { query, withTransaction } from "@/lib/db";
+import { canDeleteBlog } from "@/lib/permissions";
+import { parseId } from "@/lib/adminAuth";
 import { safeErrorDetail } from "@/lib/apiError";
+import {
+  ETIQUETA_ESTADO_BLOG,
+  esEstadoBlog,
+  motivoNoEditable,
+  puedeEditarBlog,
+  transicionesBlog,
+  validarTransicionBlog,
+  type ContextoBlog,
+  type EstadoBlog,
+} from "@/lib/estados/blog";
+import {
+  cambiarEstado,
+  ErrorTransicion,
+  leerHistorial,
+  respuestaErrorTransicion,
+} from "@/lib/estadosServer";
 
 interface Params {
   params: Promise<{
@@ -15,23 +28,58 @@ interface Params {
   }>;
 }
 
-// GET: Obtener un blog específico
+/**
+ * Sesión de administrador con el rol leído de la BD (no del JWT, que puede estar
+ * desactualizado). Devuelve la respuesta de error lista para retornar o el actor.
+ */
+async function obtenerActor(): Promise<
+  { error: NextResponse } | { adminId: number; rol: number }
+> {
+  const session = await getServerSession(authOptions);
+  if (!session || !session.user?.isAdmin || !session.user.adminId) {
+    return {
+      error: NextResponse.json(
+        { success: false, error: "No autorizado. Se requieren permisos de administrador." },
+        { status: 401 }
+      ),
+    };
+  }
+  const res = await query(
+    `SELECT rol_id FROM ciepi.usuarios_administradores WHERE id = $1`,
+    [session.user.adminId]
+  );
+  if (res.rows.length === 0) {
+    return {
+      error: NextResponse.json(
+        { success: false, error: "Usuario no encontrado" },
+        { status: 404 }
+      ),
+    };
+  }
+  return { adminId: Number(session.user.adminId), rol: Number(res.rows[0].rol_id) };
+}
+
+function ipDe(request: NextRequest): string | null {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    null
+  );
+}
+
+// GET: Obtener un blog específico (con transiciones disponibles e historial)
 export async function GET(request: NextRequest, { params }: Params) {
   try {
-    // Verificar autenticación y permisos de admin
-    const session = await getServerSession(authOptions);
+    const actor = await obtenerActor();
+    if ("error" in actor) return actor.error;
 
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 }
-      );
+    const id = parseId((await params).id);
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Blog no válido." }, { status: 400 });
     }
 
-    const { id } = await params;
-
     const blogQuery = `
-      SELECT 
+      SELECT
         b.id,
         b.titulo,
         b.contenido,
@@ -43,16 +91,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         b.estado,
         b.aprobado_por,
         ua.nombre as aprobado_por_nombre,
-        b.aprobado_en,
-        b.historial_estados,
-        CASE b.estado
-          WHEN 1 THEN 'Borrador'
-          WHEN 2 THEN 'En Revisión CIEPI'
-          WHEN 3 THEN 'Rechazado por CIEPI'
-          WHEN 4 THEN 'En Revisión Relaciones Públicas'
-          WHEN 5 THEN 'Rechazado por Relaciones Públicas'
-          WHEN 6 THEN 'Publicado'
-        END as estado_nombre
+        b.aprobado_en
       FROM ciepi.blogs b
       LEFT JOIN ciepi.usuarios_administradores u ON b.creado_por = u.id
       LEFT JOIN ciepi.usuarios_administradores ua ON b.aprobado_por = ua.id
@@ -63,20 +102,29 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     if (result.rows.length === 0) {
       return NextResponse.json(
-        { error: "Blog no encontrado" },
+        { success: false, error: "Blog no encontrado" },
         { status: 404 }
       );
     }
 
-    // Parsear contenido JSON
     const blog = result.rows[0];
-    blog.contenido = blog.contenido;
-    blog.palabras_clave = blog.palabras_clave;
-    blog.historial_estados = blog.historial_estados;
+    const ctx: ContextoBlog = {
+      rol: actor.rol,
+      esAutor: Number(blog.creado_por) === actor.adminId,
+    };
+    const historial = await leerHistorial(query, "blog", id);
 
     return NextResponse.json({
       success: true,
-      data: blog,
+      data: {
+        ...blog,
+        estado_nombre: ETIQUETA_ESTADO_BLOG[blog.estado as EstadoBlog] ?? null,
+        es_autor: ctx.esAutor,
+        puede_editar: puedeEditarBlog(blog.estado, ctx),
+        motivo_no_editable: motivoNoEditable(blog.estado, ctx),
+        transiciones: transicionesBlog(blog.estado, ctx),
+        historial,
+      },
     });
   } catch (error) {
     console.error("Error obteniendo blog:", error);
@@ -91,196 +139,188 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 }
 
-// PUT: Actualizar blog
+/** Valida y normaliza los campos de contenido presentes en el cuerpo (undefined = no se toca). */
+function camposDeContenido(body: Record<string, unknown>):
+  | { error: string }
+  | { campos: Record<string, unknown> } {
+  const campos: Record<string, unknown> = {};
+
+  if (body.titulo !== undefined) {
+    if (typeof body.titulo !== "string" || !body.titulo.trim()) {
+      return { error: "El título no puede estar vacío." };
+    }
+    if (body.titulo.trim().length > 255) {
+      return { error: "El título no puede superar los 255 caracteres." };
+    }
+    campos.titulo = body.titulo.trim();
+  }
+
+  if (body.contenido !== undefined) {
+    if (!Array.isArray(body.contenido) || body.contenido.length === 0) {
+      return { error: "El contenido debe ser un array válido de Slate y no puede estar vacío." };
+    }
+    campos.contenido = JSON.stringify(body.contenido);
+  }
+
+  if (body.imagen_banner !== undefined) {
+    if (body.imagen_banner !== null && typeof body.imagen_banner !== "string") {
+      return { error: "La imagen del banner no es válida." };
+    }
+    campos.imagen_banner = body.imagen_banner || null;
+  }
+
+  if (body.palabras_clave !== undefined) {
+    if (
+      !Array.isArray(body.palabras_clave) ||
+      !body.palabras_clave.every((p) => typeof p === "string")
+    ) {
+      return { error: "Las palabras clave deben ser una lista de textos." };
+    }
+    campos.palabras_clave = JSON.stringify(body.palabras_clave);
+  }
+
+  return { campos };
+}
+
+/**
+ * PUT: Actualizar blog. Acepta, por separado o juntos:
+ * - Contenido (titulo, contenido, imagen_banner, palabras_clave): solo el autor o un
+ *   administrador, y solo en Borrador o Rechazado (ver lib/estados/blog.ts).
+ * - Cambio de estado: { estado, estado_actual, motivo }. Pasa por validarTransicionBlog
+ *   y cambiarEstado (UPDATE condicionado + ciepi.estado_historial). Si estado_actual no
+ *   coincide con el de la BD responde 409.
+ * Todo va en una transacción; si viene contenido y estado, primero se guarda el
+ * contenido (en el estado de origen) y luego se cambia el estado.
+ */
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
-    // Verificar autenticación
-    const session = await getServerSession(authOptions);
+    const actor = await obtenerActor();
+    if ("error" in actor) return actor.error;
 
-    if (!session || !session.user) {
+    const id = parseId((await params).id);
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Blog no válido." }, { status: 400 });
+    }
+
+    const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ success: false, error: "Cuerpo de la petición inválido." }, { status: 400 });
+    }
+
+    const contenido = camposDeContenido(body);
+    if ("error" in contenido) {
+      return NextResponse.json({ success: false, error: contenido.error }, { status: 400 });
+    }
+    const hayContenido = Object.keys(contenido.campos).length > 0;
+    const hayEstado = body.estado !== undefined && body.estado !== null;
+
+    if (!hayContenido && !hayEstado) {
       return NextResponse.json(
-        { error: "No autorizado. Debe iniciar sesión." },
-        { status: 401 }
-      );
-    }
-
-    // Obtener el rol del usuario
-    const roleQuery = `
-      SELECT rol_id FROM ciepi.usuarios_administradores 
-      WHERE id = $1
-    `;
-    const roleResult = await query(roleQuery, [session.user.adminId]);
-
-    if (roleResult.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Usuario no encontrado" },
-        { status: 404 }
-      );
-    }
-
-    const userRole = roleResult.rows[0].rol_id;
-    const { id } = await params;
-    const body = await request.json();
-    const {
-      titulo,
-      contenido,
-      imagen_banner,
-      palabras_clave,
-      estado,
-      comentario_temp,
-    } = body;
-
-    // Obtener el blog actual para validaciones
-    const currentBlogQuery = `
-      SELECT estado, creado_por FROM ciepi.blogs WHERE id = $1
-    `;
-    const currentBlogResult = await query(currentBlogQuery, [id]);
-
-    if (currentBlogResult.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Blog no encontrado" },
-        { status: 404 }
-      );
-    }
-
-    const currentBlog = currentBlogResult.rows[0];
-    const isCreator = currentBlog.creado_por === session.user.adminId;
-
-    // Validación de permisos para EDITAR (no cambiar estado)
-    // Solo el creador o el SUPER_ADMIN (role 1) pueden modificar el contenido del blog.
-    // ADMIN (role 2) NO puede editar contenido de blogs que no creó.
-    if (titulo || contenido || imagen_banner || palabras_clave) {
-      if (!canEditBlog(userRole) || (!isCreator && userRole !== 1)) {
-        return NextResponse.json(
-          {
-            error:
-              "No tiene permisos para editar este blog. Solo el creador o el Super Administrador pueden editar el contenido.",
-          },
-          { status: 403 }
-        );
-      }
-    }
-
-    // Validación de permisos y grafo de transiciones para CAMBIAR ESTADO
-    if (estado !== undefined) {
-      const targetEstado = Number(estado);
-      if (targetEstado !== currentBlog.estado) {
-        const transition = validateBlogStateTransition(
-          currentBlog.estado,
-          targetEstado,
-          userRole,
-        );
-        if (!transition.allowed) {
-          return NextResponse.json(
-            {
-              error:
-                transition.reason ||
-                "No tiene permisos para cambiar el blog a ese estado.",
-            },
-            { status: transition.status || 403 }
-          );
-        }
-        if (transition.isOverride) {
-          console.warn(
-            `[Blog State Override] Admin ${session.user.adminId} (rol ${userRole}) saltó etapa en blog ${id}: ${currentBlog.estado} -> ${targetEstado}`,
-          );
-        }
-      }
-    }
-
-    // Si se cambia el estado y hay comentario, guardarlo temporalmente
-    if (estado && comentario_temp) {
-      await query("SELECT ciepi.set_comentario_estado($1, $2)", [
-        id,
-        comentario_temp,
-      ]);
-    }
-
-    // Construir query de actualización dinámicamente
-    const updates: string[] = [];
-    const values: (string | number | null | boolean)[] = [];
-    let paramIndex = 1;
-
-    if (titulo !== undefined) {
-      updates.push(`titulo = $${paramIndex}`);
-      values.push(titulo);
-      paramIndex++;
-    }
-
-    if (contenido !== undefined) {
-      updates.push(`contenido = $${paramIndex}`);
-      values.push(JSON.stringify(contenido));
-      paramIndex++;
-    }
-
-    if (imagen_banner !== undefined) {
-      updates.push(`imagen_banner = $${paramIndex}`);
-      values.push(imagen_banner);
-      paramIndex++;
-    }
-
-    if (palabras_clave !== undefined) {
-      updates.push(`palabras_clave = $${paramIndex}`);
-      values.push(JSON.stringify(palabras_clave));
-      paramIndex++;
-    }
-
-    if (estado !== undefined && estado !== currentBlog.estado) {
-      updates.push(`estado = $${paramIndex}`);
-      values.push(estado);
-      paramIndex++;
-
-      // Si se está aprobando/rechazando, registrar quién lo hizo
-      updates.push(`aprobado_por = $${paramIndex}`);
-      values.push(session.user.adminId || null);
-      paramIndex++;
-
-      updates.push(`aprobado_en = CURRENT_TIMESTAMP`);
-    }
-
-    // Si no hay actualizaciones, retornar error
-    if (updates.length === 0) {
-      return NextResponse.json(
-        { error: "Se debe proporcionar al menos un campo para actualizar" },
+        { success: false, error: "Se debe proporcionar al menos un campo para actualizar" },
         { status: 400 }
       );
     }
 
-    values.push(id);
+    const motivo =
+      typeof body.motivo === "string" && body.motivo.trim()
+        ? body.motivo.trim().slice(0, 2000)
+        : null;
 
-    const updateQuery = `
-      UPDATE ciepi.blogs
-      SET ${updates.join(", ")}
-      WHERE id = $${paramIndex}
-      RETURNING 
-        id,
-        titulo,
-        estado,
-        CASE estado
-          WHEN 1 THEN 'Borrador'
-          WHEN 2 THEN 'En Revisión CIEPI'
-          WHEN 3 THEN 'Rechazado por CIEPI'
-          WHEN 4 THEN 'En Revisión Relaciones Públicas'
-          WHEN 5 THEN 'Rechazado por Relaciones Públicas'
-          WHEN 6 THEN 'Publicado'
-        END as estado_nombre
-    `;
-
-    const result = await query(updateQuery, values);
-
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Blog no encontrado" },
-        { status: 404 }
+    const resultado = await withTransaction(async (q) => {
+      const actual = await q(
+        `SELECT estado, creado_por FROM ciepi.blogs WHERE id = $1 FOR UPDATE`,
+        [id]
       );
-    }
+      if (actual.rows.length === 0) {
+        throw new ErrorTransicion(404, "Blog no encontrado", "NO_ENCONTRADO");
+      }
+      const estadoDb = Number(actual.rows[0].estado);
+      const ctx: ContextoBlog = {
+        rol: actor.rol,
+        esAutor: Number(actual.rows[0].creado_por) === actor.adminId,
+      };
+
+      // El cliente dice desde qué estado actúa: si ya no es ese, otra persona lo cambió.
+      if (body.estado_actual !== undefined && Number(body.estado_actual) !== estadoDb) {
+        throw new ErrorTransicion(
+          409,
+          "El estado del blog cambió mientras lo editabas. Recarga la página para ver el estado actual.",
+          "CONFLICTO_ESTADO"
+        );
+      }
+
+      // 1. Contenido
+      if (hayContenido) {
+        const bloqueo = motivoNoEditable(estadoDb, ctx);
+        if (bloqueo) throw new ErrorTransicion(403, bloqueo, "NO_EDITABLE");
+
+        const cols = Object.keys(contenido.campos);
+        const valores = Object.values(contenido.campos);
+        await q(
+          `UPDATE ciepi.blogs SET ${cols.map((c, i) => `${c} = $${i + 1}`).join(", ")}
+            WHERE id = $${cols.length + 1} AND estado = $${cols.length + 2}`,
+          [...valores, id, estadoDb]
+        );
+      }
+
+      // 2. Estado
+      let estadoFinal = estadoDb;
+      if (hayEstado) {
+        const destino = Number(body.estado);
+        if (!esEstadoBlog(destino)) {
+          throw new ErrorTransicion(400, "Estado de blog inválido.");
+        }
+        // Reenviar el mismo estado con solo contenido no es un cambio de estado.
+        if (destino !== estadoDb || !hayContenido) {
+          const v = validarTransicionBlog(estadoDb, destino, { ...ctx, motivo });
+          if (!v.ok) throw new ErrorTransicion(v.status, v.motivo);
+
+          const accion = v.transicion.accion;
+          const extra: Record<string, unknown> = {};
+          if (accion === "aprobar_ciepi" || accion === "publicar") {
+            extra.aprobado_por = actor.adminId;
+            extra.aprobado_en = new Date();
+          } else if (destino === 1) {
+            // Vuelve a Borrador: la aprobación anterior ya no vale.
+            extra.aprobado_por = null;
+            extra.aprobado_en = null;
+          }
+
+          await cambiarEstado<EstadoBlog>(q, {
+            entidad: "blog",
+            tabla: "ciepi.blogs",
+            columnaEstado: "estado",
+            id,
+            de: estadoDb as EstadoBlog,
+            a: destino,
+            accion,
+            actor: { tipo: "admin", id: actor.adminId },
+            motivo,
+            override: v.transicion.override,
+            extra,
+            ip: ipDe(request),
+          });
+          estadoFinal = destino;
+        }
+      }
+
+      const fila = await q(`SELECT id, titulo, estado FROM ciepi.blogs WHERE id = $1`, [id]);
+      return {
+        ...fila.rows[0],
+        estado_nombre: ETIQUETA_ESTADO_BLOG[estadoFinal as EstadoBlog] ?? null,
+        transiciones: transicionesBlog(estadoFinal, ctx),
+        puede_editar: puedeEditarBlog(estadoFinal, ctx),
+      };
+    });
 
     return NextResponse.json({
       success: true,
       message: "Blog actualizado exitosamente",
-      data: result.rows[0],
+      data: resultado,
     });
   } catch (error) {
+    const respuesta = respuestaErrorTransicion(error);
+    if (respuesta) return respuesta;
     console.error("Error actualizando blog:", error);
     return NextResponse.json(
       {
@@ -296,36 +336,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
 // DELETE: Eliminar blog
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
-    // Verificar autenticación
-    const session = await getServerSession(authOptions);
-
-    if (!session || !session.user) {
-      return NextResponse.json(
-        { error: "No autorizado. Debe iniciar sesión." },
-        { status: 401 }
-      );
-    }
-
-    // Obtener el rol del usuario
-    const roleQuery = `
-      SELECT rol_id FROM ciepi.usuarios_administradores 
-      WHERE id = $1
-    `;
-    const roleResult = await query(roleQuery, [session.user.adminId]);
-
-    if (roleResult.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Usuario no encontrado" },
-        { status: 404 }
-      );
-    }
-
-    const userRole = roleResult.rows[0].rol_id;
+    const actor = await obtenerActor();
+    if ("error" in actor) return actor.error;
 
     // Validación de permisos para ELIMINAR
-    if (!canDeleteBlog(userRole)) {
+    if (!canDeleteBlog(actor.rol)) {
       return NextResponse.json(
         {
+          success: false,
           error:
             "No tienes permisos para eliminar blogs. Solo administradores pueden hacerlo.",
         },
@@ -333,7 +351,10 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       );
     }
 
-    const { id } = await params;
+    const id = parseId((await params).id);
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Blog no válido." }, { status: 400 });
+    }
 
     const deleteQuery = `
       DELETE FROM ciepi.blogs
@@ -345,7 +366,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
     if (result.rows.length === 0) {
       return NextResponse.json(
-        { error: "Blog no encontrado" },
+        { success: false, error: "Blog no encontrado" },
         { status: 404 }
       );
     }

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-import { query } from "@/lib/db";
+import { query, withTransaction } from "@/lib/db";
 import { BlogState, canCreateBlog } from "@/lib/permissions";
 import { safeErrorDetail } from "@/lib/apiError";
+import { puedeEditarBlog, transicionesBlog, type ContextoBlog } from "@/lib/estados/blog";
+import { registrarHistorial } from "@/lib/estadosServer";
 
 // GET: Listar todos los blogs con filtros
 export async function GET(request: NextRequest) {
@@ -11,12 +13,20 @@ export async function GET(request: NextRequest) {
     // Verificar autenticación y permisos de admin
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user?.isAdmin) {
+    if (!session || !session.user?.isAdmin || !session.user.adminId) {
       return NextResponse.json(
         { error: "No autorizado. Se requieren permisos de administrador." },
         { status: 401 }
       );
     }
+
+    // Rol desde la BD (no del JWT) para calcular las transiciones de cada fila.
+    const rolRes = await query(
+      `SELECT rol_id FROM ciepi.usuarios_administradores WHERE id = $1`,
+      [session.user.adminId]
+    );
+    const adminId = Number(session.user.adminId);
+    const rol = rolRes.rows.length ? Number(rolRes.rows[0].rol_id) : undefined;
 
     // Obtener parámetros de búsqueda
     const searchParams = request.nextUrl.searchParams;
@@ -112,9 +122,21 @@ export async function GET(request: NextRequest) {
     const total = parseInt(countResult.rows[0].total);
     const totalPages = Math.ceil(total / limit);
 
+    // Cada fila lleva las transiciones que el usuario actual puede ejecutar y si puede
+    // editar el contenido: la interfaz solo dibuja esos botones.
+    const data = blogsResult.rows.map((b) => {
+      const ctx: ContextoBlog = { rol, esAutor: Number(b.creado_por) === adminId };
+      return {
+        ...b,
+        es_autor: ctx.esAutor,
+        puede_editar: puedeEditarBlog(b.estado, ctx),
+        transiciones: transicionesBlog(b.estado, ctx),
+      };
+    });
+
     return NextResponse.json({
       success: true,
-      data: blogsResult.rows,
+      data,
       pagination: {
         page,
         limit,
@@ -201,33 +223,60 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insertar nuevo blog
-    const insertQuery = `
-      INSERT INTO ciepi.blogs (
-        titulo,
-        contenido,
-        imagen_banner,
-        palabras_clave,
-        creado_por,
-        estado
-      ) VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING id, titulo, creado_en, estado
-    `;
+    if (typeof titulo !== "string" || !titulo.trim() || titulo.trim().length > 255) {
+      return NextResponse.json(
+        { error: "El título es obligatorio y no puede superar los 255 caracteres" },
+        { status: 400 }
+      );
+    }
+    if (
+      palabras_clave !== undefined &&
+      (!Array.isArray(palabras_clave) || !palabras_clave.every((p: unknown) => typeof p === "string"))
+    ) {
+      return NextResponse.json(
+        { error: "Las palabras clave deben ser una lista de textos" },
+        { status: 400 }
+      );
+    }
 
-    const result = await query(insertQuery, [
-      titulo,
-      JSON.stringify(contenido),
-      imagen_banner || null,
-      JSON.stringify(palabras_clave || []),
-      session.user.adminId,
-      estadoInicial,
-    ]);
+    // Insertar nuevo blog y registrar la creación en el historial común.
+    const creado = await withTransaction(async (q) => {
+      const result = await q(
+        `INSERT INTO ciepi.blogs (
+          titulo,
+          contenido,
+          imagen_banner,
+          palabras_clave,
+          creado_por,
+          estado
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, titulo, creado_en, estado`,
+        [
+          titulo.trim(),
+          JSON.stringify(contenido),
+          typeof imagen_banner === "string" && imagen_banner ? imagen_banner : null,
+          JSON.stringify(palabras_clave || []),
+          session.user.adminId,
+          estadoInicial,
+        ]
+      );
+      const fila = result.rows[0];
+      await registrarHistorial(q, {
+        entidad: "blog",
+        entidadId: fila.id,
+        de: null,
+        a: estadoInicial,
+        accion: estadoInicial === BlogState.EN_REVISION_CIEPI ? "crear_y_enviar" : "crear",
+        actor: { tipo: "admin", id: Number(session.user.adminId) },
+      });
+      return fila;
+    });
 
     return NextResponse.json(
       {
         success: true,
         message: "Blog creado exitosamente",
-        data: result.rows[0],
+        data: creado,
       },
       { status: 201 }
     );

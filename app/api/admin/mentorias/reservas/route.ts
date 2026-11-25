@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireAdmin } from "@/lib/adminAuth";
-import { transicionesAdminReserva } from "@/lib/mentorias";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
+import { estadoEfectivoReserva, transicionesReserva } from "@/lib/estados/mentoriaReserva";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +33,8 @@ export async function GET(request: NextRequest) {
   const denied = await requireAdmin();
   if (denied) return denied;
 
+  const rol = (await getServerSession(authOptions))?.user?.rolId;
+
   const sp = request.nextUrl.searchParams;
   const vista = VISTAS[sp.get("vista") ?? "proximas"] ? (sp.get("vista") ?? "proximas") : "proximas";
   const params: unknown[] = [];
@@ -56,7 +60,7 @@ export async function GET(request: NextRequest) {
     const result = await query(
       `SELECT r.id, r.profesor_id, r.inicio, r.fin, r.modalidad, r.estado, r.pendiente_expira,
               r.nombre, r.correo, r.telefono, r.tema, r.enlace_reunion, r.notas_admin,
-              r.fecha_creacion, r.confirmada_en, r.cancelada_en,
+              r.fecha_creacion, r.confirmada_en, r.cancelada_en, NOW() AS ahora,
               p.nombre || ' ' || p.apellido AS mentor,
               a.nombre AS area, s.nombre AS sede, au.nombre AS aula
        FROM ciepi.mentoria_reservas r
@@ -69,7 +73,7 @@ export async function GET(request: NextRequest) {
        LIMIT 500`,
       params
     );
-    const ahora = new Date();
+    const ahora = new Date(result.rows[0]?.ahora ?? Date.now());
     const conteos = await query(
       `SELECT
          COUNT(*) FILTER (WHERE ${VISTAS.proximas.where})::int AS proximas,
@@ -82,10 +86,10 @@ export async function GET(request: NextRequest) {
       success: true,
       data: result.rows.map((r) => ({
         ...r,
-        // Una pendiente vencida se muestra como expirada.
-        estado:
-          r.estado === "pendiente_verificacion" && new Date(r.pendiente_expira) <= ahora ? "expirada" : r.estado,
-        transiciones: transicionesAdminReserva(r.estado, new Date(r.inicio), ahora),
+        // Una pendiente vencida se muestra como expirada y no tiene transiciones:
+        // ambas cosas se calculan con el mismo estado efectivo y la hora de la BD.
+        estado: estadoEfectivoReserva(r.estado, r.pendiente_expira, ahora),
+        transiciones: transicionesReserva(r, { actor: "admin", ahora, rol }),
       })),
       conteos: conteos.rows[0],
     });

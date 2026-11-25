@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
+import {
+  puedeGestionarInscripciones,
+  transicionesInscripcion,
+} from "@/lib/inscripcionStates";
 
 interface Params {
   params: Promise<{
@@ -89,6 +93,9 @@ export async function GET(request: NextRequest, { params }: Params) {
       [capacitacionId]
     );
 
+    // Transiciones que el rol de la sesión puede ejecutar (la UI solo dibuja estas)
+    const rol = session.user.rolId;
+
     // Formatear los datos para una mejor estructura
     const estudiantes = estudiantesResult.rows.map((row) => ({
       inscripcion: {
@@ -98,6 +105,7 @@ export async function GET(request: NextRequest, { params }: Params) {
           nombre: row.estado_nombre,
           descripcion: row.estado_descripcion,
         },
+        transiciones: transicionesInscripcion(Number(row.estado_inscripcion), rol),
         fecha_inscripcion: row.fecha_inscripcion,
         fecha_ultima_actualizacion: row.fecha_ultima_actualizacion,
         biometria: {
@@ -190,6 +198,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         },
         estudiantes,
         estadisticas,
+        puede_gestionar: puedeGestionarInscripciones(rol),
         totales: {
           total_inscritos: estudiantes.length,
           con_correo_verificado: estudiantes.filter(

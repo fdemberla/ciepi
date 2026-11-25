@@ -3,18 +3,30 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
 import { safeErrorDetail } from "@/lib/apiError";
+import { parseId } from "@/lib/adminAuth";
+import { esEstadoConsulta, puedeEliminarConsulta, transicionesConsulta } from "@/lib/estados/consulta";
 
 export async function GET(request: NextRequest) {
   try {
     // Verificar autenticación y permisos de admin
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user?.isAdmin) {
+    if (!session || !session.user?.isAdmin || !session.user.adminId) {
       return NextResponse.json(
         { error: "No autorizado. Se requieren permisos de administrador." },
         { status: 401 }
       );
     }
+
+    // Rol leído de la BD (el del JWT puede estar desactualizado); define las acciones por fila.
+    const rolResult = await query(
+      `SELECT rol_id FROM ciepi.usuarios_administradores WHERE id = $1 AND activo = true`,
+      [session.user.adminId]
+    );
+    if (rolResult.rows.length === 0) {
+      return NextResponse.json({ success: false, error: "Usuario administrador no activo." }, { status: 403 });
+    }
+    const rol = Number(rolResult.rows[0].rol_id);
 
     // Obtener parámetros de búsqueda
     const searchParams = request.nextUrl.searchParams;
@@ -23,6 +35,13 @@ export async function GET(request: NextRequest) {
     const search = (searchParams.get("search") || "").slice(0, 100);
     const estado = searchParams.get("estado") || "";
     const tipoConsulta = searchParams.get("tipo_consulta_id") || "";
+
+    if (estado && !esEstadoConsulta(estado)) {
+      return NextResponse.json({ success: false, error: "Filtro de estado no válido." }, { status: 400 });
+    }
+    if (tipoConsulta && !parseId(tipoConsulta)) {
+      return NextResponse.json({ success: false, error: "Filtro de tipo no válido." }, { status: 400 });
+    }
 
     const offset = (page - 1) * limit;
 
@@ -47,7 +66,7 @@ export async function GET(request: NextRequest) {
 
     if (tipoConsulta) {
       whereConditions.push(`c.tipo_consulta_id = $${paramIndex}`);
-      queryParams.push(parseInt(tipoConsulta));
+      queryParams.push(Number(tipoConsulta));
       paramIndex++;
     }
 
@@ -114,7 +133,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: consultasResult.rows,
+      data: consultasResult.rows.map((c) => ({
+        ...c,
+        transiciones: transicionesConsulta(c.estado, rol),
+      })),
+      permisos: { eliminar: puedeEliminarConsulta(rol) },
       pagination: {
         page,
         limit,

@@ -97,3 +97,42 @@ S1–S6 y F1–F3 corregidos. Script para producción: `database/fase1_seguridad
 - **Asistente:** se restaura desde la sesión del servidor, así que la vuelta de la biometría funciona, y «Atrás» ya no salta la fecha de nacimiento.
 
 El detalle completo de los 79 hallazgos, con escenario y corrección propuesta para cada uno, está en `revision-prelanzamiento-detalle.json`.
+
+## Fase 2: implementada
+
+Script para producción: `database/fase2_maquinas_estado.sql`. Es idempotente y requiere la Fase 1.
+
+**Patrón común**
+- `lib/estados/comun.ts` define el mapa de transiciones, con acción, roles, motivo obligatorio, overrides y guardas.
+- `lib/estadosServer.ts` contiene `cambiarEstado`. Hace un UPDATE condicionado al estado leído, de modo que si otra persona cambió el registro antes devuelve 409, e inserta el cambio en `ciepi.estado_historial`.
+- La API devuelve las `transiciones` permitidas y la interfaz solo muestra esos botones.
+
+**Inscripciones** (`lib/inscripcionStates.ts`)
+- Pueden cambiar estados Admin, Super Admin y CIEPI; RR.PP. solo puede consultar.
+- Rechazar, retirar y reabrir exigen motivo.
+- Overrides de administrador: 2→6, 4→3 y 5→3.
+- La creación por correo verificado también queda en el historial.
+
+**Blog** (`lib/estados/blog.ts`)
+- Nadie aprueba ni publica un texto propio, tampoco los administradores.
+- Solo se edita en Borrador o Rechazado.
+- Nuevas transiciones «Retirar de revisión» y «Despublicar», esta última con motivo.
+- Se eliminó la tabla temporal de comentarios.
+
+**Consultas** (`lib/estados/consulta.ts`)
+- Acciones: tomar, responder (pasa a «respondida»), cerrar y reabrir. Reabrir solo lo pueden hacer los administradores.
+- Se guardan todas las respuestas en `consultas_respuestas`.
+- Solo los administradores pueden eliminar.
+
+**Reservas de mentoría** (`lib/estados/mentoriaReserva.ts`)
+- Las reglas del ciudadano, del administrador y del cron están en un solo mapa.
+- Una reserva pendiente vencida no admite acciones.
+- Desactivar un mentor con reservas activas devuelve 409 con la lista; con confirmación, las cancela y envía los correos.
+- El cron marca el recordatorio después de enviarlo.
+- El límite de 2 reservas por correo es seguro ante envíos simultáneos.
+
+**Newsletter** (`lib/estados/newsletter.ts`)
+- El alta es atómica y nunca devuelve un suscriptor activo a pendiente.
+- La confirmación se hace con POST tras pulsar un botón, no al abrir el enlace, y es idempotente.
+- Consentimientos y bajas quedan en el historial.
+- Solo Admin, Super Admin y RR.PP. gestionan el newsletter.

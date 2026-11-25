@@ -1,7 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { query, withTransaction } from "@/lib/db";
 import { safeErrorDetail } from "@/lib/apiError";
+import { cambiarEstado, respuestaErrorTransicion } from "@/lib/estadosServer";
+import { validarTransicion } from "@/lib/estados/comun";
+import {
+  TRANSICIONES_NEWSLETTER,
+  esEstadoSuscriptor,
+  type EstadoSuscriptor,
+} from "@/lib/estados/newsletter";
 import { maskEmail, verifyUnsubscribeToken } from "@/lib/newsletter";
+import { getClientIp } from "@/lib/verificationUtils";
+
+/*
+ * Baja del boletín con el enlace firmado (HMAC) del pie de cada envío.
+ *
+ * GET  → solo lectura: valida el enlace y devuelve el estado (la página muestra un botón).
+ * POST → pendiente|activo → baja. Idempotente: si ya estaba de baja responde éxito.
+ */
 
 export async function GET(
   _request: NextRequest,
@@ -43,7 +58,7 @@ export async function GET(
 }
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ token: string }> },
 ) {
   try {
@@ -55,24 +70,66 @@ export async function POST(
         { status: 400 },
       );
     }
+    const ip = getClientIp(request);
 
-    const result = await query(
-      `UPDATE ciepi.newsletter_suscriptores
-       SET estado = 'baja',
-           fecha_baja = NOW(),
-           confirm_token_hash = NULL,
-           confirm_token_expiracion = NULL,
-           actualizado_en = NOW()
-       WHERE id = $1 AND email = $2
-       RETURNING id`,
-      [verified.id, verified.email],
-    );
+    const resultado = await withTransaction(async (q) => {
+      const res = await q(
+        `SELECT id, estado FROM ciepi.newsletter_suscriptores
+         WHERE id = $1 AND email = $2
+         FOR UPDATE`,
+        [verified.id, verified.email],
+      );
+      if (res.rows.length === 0) return "no_encontrada" as const;
 
-    if (result.rows.length === 0) {
+      const estado = res.rows[0].estado as unknown;
+      if (estado === "baja") return "ya_de_baja" as const;
+      if (!esEstadoSuscriptor(estado)) return "no_encontrada" as const;
+
+      const v = validarTransicion(TRANSICIONES_NEWSLETTER, estado, "baja" as EstadoSuscriptor, {
+        actor: "ciudadano",
+      });
+      if (!v.ok) return v;
+
+      const ahora = new Date();
+      await cambiarEstado<EstadoSuscriptor>(q, {
+        entidad: "newsletter_suscriptor",
+        tabla: "ciepi.newsletter_suscriptores",
+        columnaEstado: "estado",
+        id: verified.id,
+        de: estado,
+        a: "baja",
+        accion: v.transicion.accion,
+        actor: { tipo: "ciudadano" },
+        motivo: "Enlace de baja del boletín",
+        extra: {
+          fecha_baja: ahora,
+          confirm_token_hash: null,
+          confirm_token_expiracion: null,
+          actualizado_en: ahora,
+        },
+        ip,
+      });
+      return "dado_de_baja" as const;
+    });
+
+    if (resultado === "no_encontrada") {
       return NextResponse.json(
         { success: false, error: "Suscripción no encontrada." },
         { status: 404 },
       );
+    }
+    if (typeof resultado === "object") {
+      return NextResponse.json(
+        { success: false, error: resultado.motivo },
+        { status: resultado.status },
+      );
+    }
+    if (resultado === "ya_de_baja") {
+      return NextResponse.json({
+        success: true,
+        yaDadoDeBaja: true,
+        message: "Tu correo ya había sido dado de baja anteriormente.",
+      });
     }
 
     return NextResponse.json({
@@ -81,6 +138,8 @@ export async function POST(
         "Te has dado de baja correctamente. No recibirás más correos del boletín.",
     });
   } catch (error) {
+    const errTransicion = respuestaErrorTransicion(error);
+    if (errTransicion) return errTransicion;
     console.error("[Newsletter] Error al dar de baja:", error);
     return NextResponse.json(
       {

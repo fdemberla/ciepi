@@ -1,120 +1,173 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/authOptions";
+import { query, withTransaction } from "@/lib/db";
 import { requireAdmin, parseId } from "@/lib/adminAuth";
-import { transicionesAdminReserva, ETIQUETA_ESTADO_RESERVA, type EstadoReserva } from "@/lib/mentorias";
-import { cargarReservaCompleta } from "@/lib/mentoriasServer";
+import {
+  estadoEfectivoReserva,
+  validarTransicionReserva,
+  mensajeTransicionNoPermitida,
+  type EstadoReserva,
+} from "@/lib/estados/mentoriaReserva";
+import { ErrorTransicion, leerHistorial, respuestaErrorTransicion } from "@/lib/estadosServer";
+import { bloquearReserva, cargarReservaCompleta, transicionarReserva } from "@/lib/mentoriasServer";
 import { enviarCorreosCancelacionCiepi, enviarEnlaceReunion } from "@/lib/mentoriasEmails";
+import { getClientIp } from "@/lib/verificationUtils";
 
-/**
- * Gestión de una reserva desde el admin. Acepta, por separado o juntos:
- * - estado (+ motivo si es cancelación): solo transiciones permitidas.
- * - enlace_reunion (+ enviar_enlace): solo reservas virtuales, URL https.
- * - notas_admin: notas internas, no se envían a nadie.
- */
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+type Params = { params: Promise<{ id: string }> };
+
+const ENLACE = /^https:\/\/[^\s<>"']+$/i;
+
+/** Historial de cambios de estado de la reserva (para el detalle en el admin). */
+export async function GET(_request: NextRequest, { params }: Params) {
   const denied = await requireAdmin();
   if (denied) return denied;
   const id = parseId((await params).id);
   if (!id) return NextResponse.json({ success: false, error: "Reserva no válida." }, { status: 400 });
+  try {
+    const historial = await leerHistorial(query, "mentoria_reserva", id);
+    return NextResponse.json({ success: true, data: { historial } });
+  } catch (error) {
+    console.error("Error al leer el historial de la reserva de mentoría:", error);
+    return NextResponse.json({ success: false, error: "No se pudo cargar el historial." }, { status: 500 });
+  }
+}
+
+/**
+ * Gestión de una reserva desde el admin. Acepta, por separado o juntos:
+ * - estado (+ motivo si la transición lo exige): solo transiciones de la máquina de estados.
+ * - enlace_reunion (+ enviar_enlace): solo reservas virtuales pendientes o confirmadas, URL https.
+ * - notas_admin: notas internas, no se envían a nadie.
+ *
+ * Todo se valida antes de guardar y se aplica en UNA transacción: si el cambio de
+ * estado falla (p. ej. 409 porque la persona canceló), no queda nada guardado a medias.
+ * Los correos se envían después del commit; si fallan se devuelven como `avisos`.
+ */
+export async function PATCH(request: NextRequest, { params }: Params) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const session = await getServerSession(authOptions);
+  const id = parseId((await params).id);
+  if (!id) return NextResponse.json({ success: false, error: "Reserva no válida." }, { status: 400 });
 
   const body = await request.json().catch(() => ({}));
-  const actual = await cargarReservaCompleta({ id });
-  if (!actual) return NextResponse.json({ success: false, error: "Reserva no encontrada." }, { status: 404 });
 
-  const avisos: string[] = [];
+  // 1. Validación de forma (sin tocar la BD)
+  const cambiaNotas = body.notas_admin !== undefined;
+  const notas = typeof body.notas_admin === "string" ? body.notas_admin.trim().slice(0, 2000) : "";
+  const cambiaEnlace = body.enlace_reunion !== undefined;
+  const enlace = typeof body.enlace_reunion === "string" ? body.enlace_reunion.trim() : "";
+  if (cambiaEnlace && enlace && (!ENLACE.test(enlace) || enlace.length > 500)) {
+    return NextResponse.json(
+      { success: false, error: "El enlace debe ser una dirección https:// válida (p. ej. de Microsoft Teams)." },
+      { status: 400 }
+    );
+  }
+  const nuevoEstado = body.estado !== undefined ? String(body.estado) : null;
+  const motivo = typeof body.motivo === "string" && body.motivo.trim() ? body.motivo.trim().slice(0, 500) : null;
+
+  const actor = {
+    tipo: "admin" as const,
+    id: session?.user?.adminId ?? null,
+    descripcion: session?.user?.email ?? null,
+  };
+  const rol = session?.user?.rolId;
+
   try {
-    // 1. Notas internas
-    if (body.notas_admin !== undefined) {
-      const notas = typeof body.notas_admin === "string" ? body.notas_admin.trim().slice(0, 2000) : "";
-      await query(`UPDATE ciepi.mentoria_reservas SET notas_admin = $1, fecha_actualizacion = NOW() WHERE id = $2`, [
-        notas || null,
-        id,
-      ]);
-    }
+    const { estadoPrevio } = await withTransaction(async (q) => {
+      const r = await bloquearReserva(q, id);
+      if (!r) throw new ErrorTransicion(404, "Reserva no encontrada.", "NO_ENCONTRADO");
+      const ahora = new Date(r.ahora);
+      const efectivo = estadoEfectivoReserva(r.estado, r.pendiente_expira, ahora);
 
-    // 2. Enlace de la reunión
-    if (body.enlace_reunion !== undefined) {
-      const enlace = typeof body.enlace_reunion === "string" ? body.enlace_reunion.trim() : "";
-      if (enlace && actual.modalidad !== "virtual") {
-        return NextResponse.json({ success: false, error: "Solo las mentorías virtuales llevan enlace." }, { status: 400 });
+      // 2. Validación de reglas con la fila bloqueada, antes de escribir nada
+      if (cambiaEnlace && enlace) {
+        if (r.modalidad !== "virtual") {
+          throw new ErrorTransicion(400, "Solo las mentorías virtuales llevan enlace.", "DATOS_INVALIDOS");
+        }
+        if (efectivo !== "confirmada" && efectivo !== "pendiente_verificacion") {
+          throw new ErrorTransicion(
+            409,
+            "Solo se puede guardar el enlace en reservas pendientes o confirmadas.",
+            "ESTADO_NO_EDITABLE"
+          );
+        }
       }
-      if (enlace && (!/^https:\/\/[^\s<>"']+$/i.test(enlace) || enlace.length > 500)) {
-        return NextResponse.json(
-          { success: false, error: "El enlace debe ser una dirección https:// válida (p. ej. de Microsoft Teams)." },
-          { status: 400 }
-        );
+      if (nuevoEstado !== null) {
+        const v = validarTransicionReserva(r, nuevoEstado, { actor: "admin", ahora, rol, motivo });
+        if (!v.ok) {
+          const mensaje =
+            v.status === 410
+              ? "Esta reserva expiró (la persona no la confirmó a tiempo); ya no se puede cambiar."
+              : v.status === 400 && v.motivo.startsWith("Cambio de estado no permitido")
+                ? mensajeTransicionNoPermitida(efectivo, nuevoEstado)
+                : v.motivo;
+          throw new ErrorTransicion(v.status === 410 ? 409 : v.status, mensaje);
+        }
       }
-      await query(`UPDATE ciepi.mentoria_reservas SET enlace_reunion = $1, fecha_actualizacion = NOW() WHERE id = $2`, [
-        enlace || null,
-        id,
-      ]);
-    }
 
-    // 3. Cambio de estado
-    if (body.estado !== undefined) {
-      const nuevo = String(body.estado) as EstadoReserva;
-      const permitidas = transicionesAdminReserva(actual.estado, new Date(actual.inicio), new Date());
-      if (!permitidas.includes(nuevo)) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: `No se puede pasar de «${ETIQUETA_ESTADO_RESERVA[actual.estado as EstadoReserva] ?? actual.estado}» a «${
-              ETIQUETA_ESTADO_RESERVA[nuevo] ?? nuevo
-            }».`,
-          },
-          { status: 409 }
+      // 3. Escrituras (todas o ninguna)
+      if (cambiaNotas || cambiaEnlace) {
+        const sets: string[] = [];
+        const valores: unknown[] = [];
+        if (cambiaNotas) {
+          valores.push(notas || null);
+          sets.push(`notas_admin = $${valores.length}`);
+        }
+        if (cambiaEnlace) {
+          valores.push(enlace || null);
+          sets.push(`enlace_reunion = $${valores.length}`);
+        }
+        valores.push(id);
+        await q(
+          `UPDATE ciepi.mentoria_reservas SET ${sets.join(", ")}, fecha_actualizacion = NOW() WHERE id = $${valores.length}`,
+          valores
         );
       }
-      const motivo = typeof body.motivo === "string" && body.motivo.trim() ? body.motivo.trim().slice(0, 500) : null;
-      if (nuevo === "cancelada_ciepi" && !motivo) {
-        return NextResponse.json(
-          { success: false, error: "Escribe el motivo de la cancelación: se enviará a la persona." },
-          { status: 400 }
-        );
+      if (nuevoEstado !== null) {
+        await transicionarReserva(q, {
+          reserva: r,
+          a: nuevoEstado,
+          actor,
+          rol,
+          motivo,
+          ip: getClientIp(request),
+        });
       }
-      // Condicionado al estado leído: si otra persona lo cambió antes, no se pisa.
-      const upd = await query(
-        `UPDATE ciepi.mentoria_reservas
-         SET estado = $1::varchar, fecha_actualizacion = NOW(),
-             cancelada_en = CASE WHEN $1::varchar = 'cancelada_ciepi' THEN NOW() ELSE cancelada_en END,
-             notas_admin = CASE WHEN $1::varchar = 'cancelada_ciepi'
-                                THEN concat_ws(E'\n', notas_admin, 'Cancelada por CIEPI: ' || $3::text)
-                                ELSE notas_admin END
-         WHERE id = $2 AND estado = $4::varchar
-         RETURNING id`,
-        [nuevo, id, motivo, actual.estado]
-      );
-      if (upd.rowCount === 0) {
-        return NextResponse.json(
-          { success: false, error: "La reserva cambió mientras la editabas. Recarga e inténtalo de nuevo." },
-          { status: 409 }
-        );
-      }
-      if (nuevo === "cancelada_ciepi" && actual.estado === "confirmada") {
+      return { estadoPrevio: r.estado as EstadoReserva };
+    });
+
+    // 4. Correos, después del commit: un fallo no deshace lo guardado.
+    const avisos: string[] = [];
+    if (nuevoEstado === "cancelada_ciepi" || body.enviar_enlace === true) {
+      const r = await cargarReservaCompleta({ id });
+      if (r && nuevoEstado === "cancelada_ciepi") {
         try {
-          await enviarCorreosCancelacionCiepi(actual, motivo);
-        } catch {
+          // Una pendiente nunca se avisó al mentor: solo se le escribe si estaba confirmada.
+          await enviarCorreosCancelacionCiepi(r, motivo, { avisarMentor: estadoPrevio === "confirmada" });
+        } catch (error) {
+          console.error("Reserva cancelada, pero falló el correo de cancelación:", error);
           avisos.push("La reserva se canceló, pero no se pudo enviar el correo a la persona. Avísale por teléfono.");
         }
       }
-    }
-
-    // 4. Envío del enlace (después de guardarlo)
-    if (body.enviar_enlace === true) {
-      const r = (await cargarReservaCompleta({ id }))!;
-      if (r.estado !== "confirmada" || !r.enlace_reunion) {
-        avisos.push("No se envió el enlace: la reserva debe estar confirmada y tener un enlace guardado.");
-      } else {
-        try {
-          await enviarEnlaceReunion(r);
-        } catch {
-          avisos.push("El enlace se guardó, pero no se pudo enviar el correo.");
+      if (r && body.enviar_enlace === true) {
+        if (r.estado !== "confirmada" || !r.enlace_reunion) {
+          avisos.push("No se envió el enlace: la reserva debe estar confirmada y tener un enlace guardado.");
+        } else {
+          try {
+            await enviarEnlaceReunion(r);
+          } catch (error) {
+            console.error("Enlace guardado, pero falló el correo:", error);
+            avisos.push("El enlace se guardó, pero no se pudo enviar el correo.");
+          }
         }
       }
     }
 
     return NextResponse.json({ success: true, avisos });
   } catch (error) {
+    const respuesta = respuestaErrorTransicion(error);
+    if (respuesta) return respuesta;
     console.error("Error al gestionar reserva de mentoría:", error);
     return NextResponse.json({ success: false, error: "No se pudo actualizar la reserva." }, { status: 500 });
   }

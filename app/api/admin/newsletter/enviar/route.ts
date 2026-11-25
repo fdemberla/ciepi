@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
 import { safeErrorDetail } from "@/lib/apiError";
+import { autorizarGestionNewsletter } from "../_auth";
 import { sendEmail } from "@/lib/smtp";
 import {
   createUnsubscribeToken,
@@ -13,13 +12,9 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 },
-      );
-    }
+    // Solo ADMIN, SUPER_ADMIN y RELACIONES_PUBLICAS (rol leído de la BD).
+    const auth = await autorizarGestionNewsletter();
+    if (!auth.ok) return auth.respuesta;
 
     const body = await request.json();
     const asunto = typeof body.asunto === "string" ? body.asunto.trim() : "";
@@ -79,7 +74,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const enviadoPor = session.user.email || session.user.name || "admin";
+    const enviadoPor = auth.email || auth.nombre || "admin";
     await query(
       `INSERT INTO ciepi.newsletter_envios (
         asunto, contenido_html, total_destinatarios, total_enviados, total_fallidos, enviado_por

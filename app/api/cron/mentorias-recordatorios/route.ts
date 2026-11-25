@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { withTransaction } from "@/lib/db";
 import { verificarSecretoCron } from "@/lib/cronAuth";
-import { cargarReservaCompleta } from "@/lib/mentoriasServer";
+import { cargarReservaCompleta, expirarPendientesVencidas } from "@/lib/mentoriasServer";
 import { enviarRecordatorio } from "@/lib/mentoriasEmails";
 
 export const dynamic = "force-dynamic";
+
+/** Tope de recordatorios por ejecución (la tarea corre cada hora). */
+const MAX_POR_EJECUCION = 200;
 
 /**
  * Tarea programada (cada hora, desde el Programador de tareas de Windows con
@@ -25,36 +28,50 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const exp = await query(
-      `UPDATE ciepi.mentoria_reservas SET estado = 'expirada', fecha_actualizacion = NOW()
-       WHERE estado = 'pendiente_verificacion' AND pendiente_expira <= NOW()`
-    );
+    const expiradas = await withTransaction((q) => expirarPendientesVencidas(q, { actorDescripcion: "cron" }));
 
-    // Se "reservan" las filas antes de enviar: si la tarea corre dos veces a la
-    // vez, cada recordatorio sale una sola vez.
-    const pendientes = await query(
-      `UPDATE ciepi.mentoria_reservas SET recordatorio_enviado_en = NOW()
-       WHERE estado = 'confirmada' AND recordatorio_enviado_en IS NULL
-         AND inicio > NOW() AND inicio <= NOW() + interval '24 hours'
-       RETURNING id`
-    );
-
+    // Recordatorios, de a uno: cada reserva se toma con FOR UPDATE SKIP LOCKED dentro de
+    // una transacción que se mantiene abierta mientras se envía el correo, y solo se
+    // marca recordatorio_enviado_en si el envío salió bien.
+    // - Dos ejecuciones simultáneas no toman la misma fila (SKIP LOCKED).
+    // - Si el proceso se cae a mitad, la transacción se revierte y la fila se reintenta
+    //   en la próxima hora: ningún recordatorio se pierde.
+    // - Se vuelve a comprobar estado = 'confirmada' y que el mentor siga activo en el
+    //   mismo SELECT que bloquea la fila.
     let enviados = 0;
-    let fallidos = 0;
-    for (const { id } of pendientes.rows as { id: number }[]) {
-      const r = await cargarReservaCompleta({ id });
-      if (!r) continue;
-      try {
-        await enviarRecordatorio(r);
-        enviados++;
-      } catch (error) {
-        fallidos++;
-        console.error(`Recordatorio de mentoría ${id} no enviado; se reintentará:`, error);
-        await query(`UPDATE ciepi.mentoria_reservas SET recordatorio_enviado_en = NULL WHERE id = $1`, [id]);
-      }
+    const fallidos: number[] = [];
+    for (let i = 0; i < MAX_POR_EJECUCION; i++) {
+      const resultado = await withTransaction(async (q) => {
+        const fila = await q(
+          `SELECT r.id FROM ciepi.mentoria_reservas r
+             JOIN ciepi.profesores p ON p.id = r.profesor_id AND p.activo = true AND p.es_mentor = true
+            WHERE r.estado = 'confirmada' AND r.recordatorio_enviado_en IS NULL
+              AND r.inicio > NOW() AND r.inicio <= NOW() + interval '24 hours'
+              AND NOT (r.id = ANY($1::int[]))
+            ORDER BY r.inicio
+            LIMIT 1
+            FOR UPDATE OF r SKIP LOCKED`,
+          [fallidos]
+        );
+        if (fila.rowCount === 0) return "fin" as const;
+        const id = fila.rows[0].id as number;
+        const r = await cargarReservaCompleta({ id }, q);
+        if (!r) return "fin" as const;
+        try {
+          await enviarRecordatorio(r);
+        } catch (error) {
+          console.error(`Recordatorio de mentoría ${id} no enviado; se reintentará:`, error);
+          fallidos.push(id);
+          return "fallido" as const;
+        }
+        await q(`UPDATE ciepi.mentoria_reservas SET recordatorio_enviado_en = NOW() WHERE id = $1`, [id]);
+        return "enviado" as const;
+      });
+      if (resultado === "fin") break;
+      if (resultado === "enviado") enviados++;
     }
 
-    return NextResponse.json({ success: true, expiradas: exp.rowCount ?? 0, recordatorios: enviados, fallidos });
+    return NextResponse.json({ success: true, expiradas, recordatorios: enviados, fallidos: fallidos.length });
   } catch (error) {
     console.error("Error en la tarea de recordatorios de mentorías:", error);
     return NextResponse.json({ success: false, error: "Error en la tarea." }, { status: 500 });

@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-import { query } from "@/lib/db";
+import { query, withTransaction } from "@/lib/db";
 import { safeErrorDetail } from "@/lib/apiError";
+import { parseId } from "@/lib/adminAuth";
+import { MOTIVO_MENTOR_NO_DISPONIBLE } from "@/lib/estados/mentoriaReserva";
+import { respuestaErrorTransicion } from "@/lib/estadosServer";
+import {
+  aplicarDesactivacionMentor,
+  ErrorReservasActivas,
+  type ReservaCanceladaPorMentor,
+} from "@/lib/mentoriasServer";
+import { enviarCancelacionesPorMentor } from "@/lib/mentoriasEmails";
 
 export async function PUT(
   request: NextRequest,
@@ -37,7 +46,9 @@ export async function PUT(
     const biografia = typeof body.biografia === "string" && body.biografia.trim()
       ? body.biografia.trim()
       : null;
-    const activo = typeof body.activo === "boolean" ? body.activo : true;
+    // Si no llega como booleano se conserva el valor actual (antes se reactivaba por defecto).
+    const activo = typeof body.activo === "boolean" ? body.activo : null;
+    const cancelarReservas = body.cancelar_reservas === true;
 
     if (!nombre || !apellido) {
       return NextResponse.json(
@@ -46,36 +57,69 @@ export async function PUT(
       );
     }
 
-    const result = await query(
-      `UPDATE ciepi.profesores
-       SET nombre = $1,
-           apellido = $2,
-           cedula = COALESCE($3, cedula),
-           correo = $4,
-           telefono = $5,
-           especialidad = $6,
-           biografia = $7,
-           activo = $8,
-           fecha_actualizacion = NOW()
-       WHERE id = $9
-       RETURNING id, nombre, apellido, correo, telefono, especialidad, biografia, activo,
-                 (cedula IS NOT NULL) AS tiene_cedula, fecha_creacion, fecha_actualizacion`,
-      [nombre, apellido, cedula, correo, telefono, especialidad, biografia, activo, id],
-    );
+    const profesorId = parseId(String(id));
+    if (!profesorId) {
+      return NextResponse.json({ success: false, error: "Profesor no válido." }, { status: 400 });
+    }
 
-    if (result.rows.length === 0) {
+    // Una sola transacción: si al desactivarlo tiene mentorías activas futuras, se
+    // responde 409 sin guardar nada, salvo que el admin pida cancelarlas (cancelar_reservas).
+    const { fila, canceladas } = await withTransaction(async (q) => {
+      const result = await q(
+        `UPDATE ciepi.profesores
+         SET nombre = $1,
+             apellido = $2,
+             cedula = COALESCE($3, cedula),
+             correo = $4,
+             telefono = $5,
+             especialidad = $6,
+             biografia = $7,
+             activo = COALESCE($8, activo),
+             fecha_actualizacion = NOW()
+         WHERE id = $9
+         RETURNING id, nombre, apellido, correo, telefono, especialidad, biografia, activo, es_mentor,
+                   (cedula IS NOT NULL) AS tiene_cedula, fecha_creacion, fecha_actualizacion`,
+        [nombre, apellido, cedula, correo, telefono, especialidad, biografia, activo, profesorId],
+      );
+      if (result.rows.length === 0) return { fila: null, canceladas: [] as ReservaCanceladaPorMentor[] };
+      const { es_mentor, ...datos } = result.rows[0];
+      const canceladasTx = await aplicarDesactivacionMentor(q, {
+        profesorId,
+        esMentor: Boolean(es_mentor),
+        activo: Boolean(datos.activo),
+        cancelarReservas,
+        motivo: MOTIVO_MENTOR_NO_DISPONIBLE,
+        actor: { tipo: "admin", id: session.user?.adminId ?? null, descripcion: session.user?.email ?? null },
+        rol: session.user?.rolId,
+      });
+      return { fila: datos, canceladas: canceladasTx };
+    });
+
+    if (!fila) {
       return NextResponse.json(
         { success: false, error: "Profesor no encontrado" },
         { status: 404 },
       );
     }
 
+    // Correos de las mentorías canceladas, después del commit (nunca lanza).
+    const avisos = canceladas.length
+      ? await enviarCancelacionesPorMentor(canceladas, MOTIVO_MENTOR_NO_DISPONIBLE)
+      : [];
+
     return NextResponse.json({
       success: true,
       message: "Profesor actualizado exitosamente",
-      data: result.rows[0],
+      data: fila,
+      canceladas: canceladas.length,
+      avisos,
     });
   } catch (error) {
+    if (error instanceof ErrorReservasActivas) {
+      return NextResponse.json(error.cuerpo(), { status: 409 });
+    }
+    const transicion = respuestaErrorTransicion(error);
+    if (transicion) return transicion;
     const pgCode = (error as { code?: string })?.code;
     if (pgCode === "23505") {
       return NextResponse.json(

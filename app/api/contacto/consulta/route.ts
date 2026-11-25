@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { safeErrorDetail } from "@/lib/apiError";
+import { registrarHistorial } from "@/lib/estadosServer";
+import { getClientIp } from "@/lib/verificationUtils";
 
 // Función para verificar reCAPTCHA
 async function verifyRecaptcha(
@@ -161,6 +163,22 @@ export async function POST(request: NextRequest) {
     ]);
 
     const consultaId = result.rows[0].id;
+
+    // Historial de estados: creación (de = null → pendiente). Si falla no se pierde
+    // la consulta del ciudadano; solo queda sin la entrada inicial del historial.
+    try {
+      await registrarHistorial(query, {
+        entidad: "consulta",
+        entidadId: consultaId,
+        de: null,
+        a: "pendiente",
+        accion: "crear",
+        actor: { tipo: "ciudadano", descripcion: String(email).slice(0, 200) },
+        ip: getClientIp(request),
+      });
+    } catch (error) {
+      console.error("[Consultas] No se pudo registrar el historial de creación:", error);
+    }
 
     console.log(`[Consultas] Consulta creada exitosamente - ID: ${consultaId}`);
     console.log(

@@ -16,7 +16,9 @@ interface Reserva {
   lugar: string;
   area: string | null;
   pendiente_expira: string | null;
+  puede_confirmar: boolean;
   puede_cancelar: boolean;
+  mentor_no_disponible: boolean;
 }
 
 const ESTADOS: Record<string, { titulo: string; icono: string; color: string }> = {
@@ -56,6 +58,18 @@ export default function GestionReservaPage() {
       .finally(() => setLoading(false));
   }, [token]);
 
+  /** Vuelve a pedir el estado real (p. ej. tras un error del servidor), sin borrar el mensaje. */
+  const recargar = async () => {
+    try {
+      const d = await fetch(withBasePath(`/api/mentorias/reservas/gestion?token=${encodeURIComponent(token)}`)).then((r) =>
+        r.json()
+      );
+      if (d.success) setReserva(d.data);
+    } catch {
+      // Sin conexión: se deja la vista como estaba para poder reintentar.
+    }
+  };
+
   const accion = async (tipo: "confirmar" | "cancelar") => {
     if (tipo === "cancelar" && !window.confirm("¿Seguro que quieres cancelar esta mentoría? El horario quedará libre.")) return;
     setTrabajando(true);
@@ -68,8 +82,10 @@ export default function GestionReservaPage() {
       }).then((r) => r.json());
       if (d.success) setReserva(d.data);
       else {
+        // Se muestra el error real; el estado viene del servidor (no se supone "vencida").
         setError(d.error || "No se pudo completar la acción.");
-        if (tipo === "confirmar") setReserva((r) => r && { ...r, estado: "expirada" });
+        if (d.data) setReserva(d.data);
+        else await recargar();
       }
     } catch {
       setError("No se pudo conectar. Intenta de nuevo.");
@@ -128,7 +144,12 @@ export default function GestionReservaPage() {
             )}
 
             <div className="mt-6 flex flex-col items-center gap-3">
-              {reserva.estado === "pendiente_verificacion" && (
+              {reserva.mentor_no_disponible && (
+                <p className="text-sm text-center text-dark_grey dark:text-gray-300">
+                  El mentor ya no está disponible en ese horario, así que la reserva no se puede confirmar. Puedes elegir otro horario u otro mentor.
+                </p>
+              )}
+              {reserva.estado === "pendiente_verificacion" && reserva.puede_confirmar && (
                 <button
                   onClick={() => accion("confirmar")}
                   disabled={trabajando}
@@ -148,7 +169,7 @@ export default function GestionReservaPage() {
                   Cancelar mentoría
                 </button>
               )}
-              {["expirada", "cancelada_usuario", "cancelada_ciepi"].includes(reserva.estado) && (
+              {(["expirada", "cancelada_usuario", "cancelada_ciepi"].includes(reserva.estado) || reserva.mentor_no_disponible) && (
                 <Link href="/mentorias" className="inline-flex items-center gap-2 rounded-full bg-primary text-white font-semibold px-7 py-3">
                   Reservar otro horario
                   <Icon icon="solar:arrow-right-linear" aria-hidden="true" />

@@ -186,7 +186,7 @@ export function getNewsletterConfirmationTemplate(
 
 Gracias por solicitar tu suscripción al boletín informativo del Centro de Innovación y Emprendimiento Productivo (CIEPI - INADEH).
 
-Para confirmar tu correo y activar tu suscripción, haz clic en el siguiente enlace (válido por 24 horas):
+Para confirmar tu correo y activar tu suscripción, abre el siguiente enlace y pulsa "Confirmar suscripción" (válido por 24 horas):
 ${safeUrl}
 
 Si no solicitaste esta suscripción, puedes ignorar este mensaje.`,

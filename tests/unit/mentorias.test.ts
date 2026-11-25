@@ -4,7 +4,6 @@ import {
   validarDisponibilidad,
   instantePanama,
   fechaPanama,
-  transicionesAdminReserva,
   type DisponibilidadInput,
 } from "@/lib/mentorias";
 
@@ -159,27 +158,4 @@ describe("validarDisponibilidad", () => {
   });
 });
 
-describe("transicionesAdminReserva", () => {
-  const ahora = new Date("2026-12-07T15:00:00Z");
-  const antes = new Date("2026-12-07T16:00:00Z");
-  const despues = new Date("2026-12-07T14:00:00Z");
-
-  it("antes de la sesión solo se puede cancelar", () => {
-    expect(transicionesAdminReserva("confirmada", antes, ahora)).toEqual(["cancelada_ciepi"]);
-    expect(transicionesAdminReserva("pendiente_verificacion", antes, ahora)).toEqual(["cancelada_ciepi"]);
-  });
-
-  it("desde que empieza se marca como realizada o inasistencia", () => {
-    expect(transicionesAdminReserva("confirmada", despues, ahora)).toEqual(["completada", "no_asistio"]);
-    expect(transicionesAdminReserva("confirmada", ahora, ahora)).toEqual(["completada", "no_asistio"]);
-  });
-
-  it("realizada e inasistencia se corrigen entre sí; canceladas y expiradas son finales", () => {
-    expect(transicionesAdminReserva("completada", despues, ahora)).toEqual(["no_asistio"]);
-    expect(transicionesAdminReserva("no_asistio", despues, ahora)).toEqual(["completada"]);
-    for (const e of ["expirada", "cancelada_usuario", "cancelada_ciepi"]) {
-      expect(transicionesAdminReserva(e, antes, ahora)).toEqual([]);
-    }
-    expect(transicionesAdminReserva("pendiente_verificacion", despues, ahora)).toEqual([]);
-  });
-});
+// La máquina de estados de las reservas se prueba en tests/unit/estadosMentoriaReserva.test.ts.

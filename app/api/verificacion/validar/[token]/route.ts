@@ -6,6 +6,7 @@ import { getClientIp } from "@/lib/verificationUtils";
 import { validarCanje } from "@/lib/estados/verificacionCorreo";
 import { InscripcionState } from "@/lib/inscripcionStates";
 import type { BiometriaServidor, DatosPersona } from "@/lib/inscripcionSesion";
+import { registrarHistorial } from "@/lib/estadosServer";
 
 interface Params {
   params: Promise<{ token: string }>;
@@ -149,6 +150,18 @@ async function aplicarInscripcion(q: Q, fila: FilaVerificacionCompleta, ip: stri
   );
   let inscripcion = nueva.rows[0] as { id: number; estado_inscripcion: number } | undefined;
   let yaExistia = false;
+  if (inscripcion) {
+    await registrarHistorial(q, {
+      entidad: "inscripcion",
+      entidadId: inscripcion.id,
+      de: null,
+      a: estadoInicial,
+      accion: "crear",
+      actor: { tipo: "ciudadano", descripcion: fila.correo },
+      motivo: bio ? "Inscripción con validación biométrica" : "Inscripción con validación manual pendiente",
+      ip,
+    });
+  }
   if (!inscripcion) {
     yaExistia = true;
     const ex = await q(

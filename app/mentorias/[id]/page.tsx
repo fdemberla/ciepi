@@ -55,6 +55,8 @@ export default function MentorPage() {
   const [form, setForm] = useState({ nombre: "", correo: "", telefono: "", area_id: "", tema: "" });
   const [consentimiento, setConsentimiento] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
+  // Cambia tras cada envío para volver a montar el widget: un token de Turnstile solo sirve una vez.
+  const [intentoTurnstile, setIntentoTurnstile] = useState(0);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enviado, setEnviado] = useState<{ minutos: number; correo: string } | null>(null);
@@ -87,8 +89,12 @@ export default function MentorPage() {
     if (!consentimiento) return setError("Debes aceptar la Política de Privacidad para reservar.");
     if (isTurnstileClientEnabled() && !turnstileToken) return setError("Completa la verificación de seguridad.");
     setEnviando(true);
+    const tokenUsado = turnstileToken;
+    // El token ya se consumió en el servidor, salga bien o mal: se pide uno nuevo.
+    setTurnstileToken("");
+    setIntentoTurnstile((n) => n + 1);
     try {
-      const res = await fetch(withBasePath("/api/mentorias/reservas"), {
+      const resp = await fetch(withBasePath("/api/mentorias/reservas"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -100,14 +106,18 @@ export default function MentorPage() {
           telefono: form.telefono,
           tema: form.tema,
           consentimiento,
-          turnstileToken,
+          turnstileToken: tokenUsado,
         }),
-      }).then((r) => r.json());
+      });
+      const res = await resp.json().catch(() => ({ success: false }));
       if (!res.success) {
         setError(res.error || "No se pudo registrar la reserva.");
-        // Si el turno se ocupó, recarga los horarios.
-        await cargar();
-        setTurno(null);
+        // Solo si el horario se ocupó se recargan los turnos y se cierra el formulario;
+        // con otros errores (datos, verificación) la persona corrige y reintenta.
+        if (res.code === "TURNO_OCUPADO") {
+          await cargar();
+          setTurno(null);
+        }
         return;
       }
       setEnviado({ minutos: res.minutosParaConfirmar, correo: form.correo.trim() });
@@ -321,7 +331,11 @@ export default function MentorPage() {
                     />
                     {isTurnstileClientEnabled() && (
                       <div className="mb-4">
-                        <TurnstileWidget onVerify={setTurnstileToken} onExpire={() => setTurnstileToken("")} />
+                        <TurnstileWidget
+                          key={intentoTurnstile}
+                          onVerify={setTurnstileToken}
+                          onExpire={() => setTurnstileToken("")}
+                        />
                       </div>
                     )}
                     {error && (

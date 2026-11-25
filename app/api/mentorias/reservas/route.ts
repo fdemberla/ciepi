@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withTransaction, query } from "@/lib/db";
+import { withTransaction } from "@/lib/db";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { getClientIp } from "@/lib/verificationUtils";
 import { generateConfirmToken, hashConfirmToken } from "@/lib/newsletter";
@@ -10,12 +10,39 @@ import {
   DIAS_RESERVABLES,
   MENTORIA_POLICY_VERSION,
 } from "@/lib/mentoriaSolicitud";
-import { cargarTurnosMentor, cargarReservaCompleta, SQL_RESERVA_OCUPA } from "@/lib/mentoriasServer";
+import {
+  cargarTurnosMentor,
+  cargarReservaCompleta,
+  expirarPendientesVencidas,
+  bloquearReserva,
+  transicionarReserva,
+  SQL_RESERVA_OCUPA,
+} from "@/lib/mentoriasServer";
+import { registrarHistorial } from "@/lib/estadosServer";
 import { enviarCorreoVerificacion } from "@/lib/mentoriasEmails";
 
 class ErrorReserva extends Error {
-  constructor(message: string, public status = 400) {
+  constructor(message: string, public status = 400, public code?: string) {
     super(message);
+  }
+}
+
+/** Sin correo de verificación no hay forma de confirmar: el sistema expira la reserva. */
+async function liberarTurno(reservaId: number) {
+  try {
+    await withTransaction(async (q) => {
+      const r = await bloquearReserva(q, reservaId);
+      if (!r || r.estado !== "pendiente_verificacion") return;
+      await transicionarReserva(q, {
+        reserva: r,
+        a: "expirada",
+        actor: { tipo: "sistema", descripcion: "correo de verificación no enviado" },
+        motivo: "No se pudo enviar el correo de verificación.",
+      });
+    });
+  } catch (error) {
+    // Si falla, la retención vence sola en MINUTOS_PARA_CONFIRMAR minutos.
+    console.error("No se pudo liberar el turno de la reserva de mentoría:", error);
   }
 }
 
@@ -36,19 +63,19 @@ export async function POST(request: NextRequest) {
   const s = v.data;
 
   const token = generateConfirmToken();
+  const ip = getClientIp(request);
+  const actor = { tipo: "ciudadano" as const, descripcion: s.correo };
   try {
     const reservaId = await withTransaction(async (q) => {
-      // Libera los turnos cuyas retenciones vencieron (así el índice único no los bloquea).
-      await q(
-        `UPDATE ciepi.mentoria_reservas SET estado = 'expirada', fecha_actualizacion = NOW()
-         WHERE estado = 'pendiente_verificacion' AND pendiente_expira <= NOW()`
-      );
-
+      // FOR SHARE: si a la vez se desactiva al mentor, una de las dos operaciones espera a la otra.
       const mentor = await q(
-        `SELECT id FROM ciepi.profesores WHERE id = $1 AND es_mentor = true AND activo = true`,
+        `SELECT id FROM ciepi.profesores WHERE id = $1 AND es_mentor = true AND activo = true FOR SHARE`,
         [s.profesor_id]
       );
       if (mentor.rowCount === 0) throw new ErrorReserva("Este mentor no está disponible.", 404);
+
+      // Libera los turnos de este mentor cuyas retenciones vencieron (así el índice único no los bloquea).
+      await expirarPendientesVencidas(q, { profesorId: s.profesor_id, actorDescripcion: "reserva pública" });
 
       if (s.area_id !== null) {
         const area = await q(
@@ -59,6 +86,9 @@ export async function POST(request: NextRequest) {
         if (area.rowCount === 0) throw new ErrorReserva("El mentor no atiende esa área.");
       }
 
+      // Serializa las solicitudes del mismo correo hasta el COMMIT: dos envíos simultáneos
+      // no pueden ver ambos "menos de 2 activas" y pasar el tope.
+      await q(`SELECT pg_advisory_xact_lock(hashtext('mentoria_correo:' || $1::text))`, [s.correo]);
       const activas = await q(
         `SELECT COUNT(*)::int AS n FROM ciepi.mentoria_reservas r
          WHERE lower(r.correo) = $1 AND r.fin > NOW() AND ${SQL_RESERVA_OCUPA}`,
@@ -74,7 +104,7 @@ export async function POST(request: NextRequest) {
       // El horario pedido tiene que ser uno de los turnos libres calculados por el servidor.
       const t = await cargarTurnosMentor(s.profesor_id, DIAS_RESERVABLES, q);
       const turno = t?.turnos.find((x) => x.inicio === s.inicio);
-      if (!turno) throw new ErrorReserva("Ese horario ya no está disponible. Elige otro.", 409);
+      if (!turno) throw new ErrorReserva("Ese horario ya no está disponible. Elige otro.", 409, "TURNO_OCUPADO");
 
       const ins = await q(
         `INSERT INTO ciepi.mentoria_reservas
@@ -91,7 +121,17 @@ export async function POST(request: NextRequest) {
           MENTORIA_POLICY_VERSION,
         ]
       );
-      return ins.rows[0].id as number;
+      const id = ins.rows[0].id as number;
+      await registrarHistorial(q, {
+        entidad: "mentoria_reserva",
+        entidadId: id,
+        de: null,
+        a: "pendiente_verificacion",
+        accion: "solicitar",
+        actor,
+        ip,
+      });
+      return id;
     });
 
     const reserva = await cargarReservaCompleta({ id: reservaId });
@@ -100,7 +140,7 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       // Sin correo no hay forma de confirmar: se libera el turno.
       console.error("No se pudo enviar el correo de verificación de mentoría:", error);
-      await query(`UPDATE ciepi.mentoria_reservas SET estado = 'expirada', fecha_actualizacion = NOW() WHERE id = $1`, [reservaId]);
+      await liberarTurno(reservaId);
       return NextResponse.json(
         { success: false, error: "No pudimos enviar el correo de confirmación. Revisa tu correo e inténtalo de nuevo." },
         { status: 502 }
@@ -110,11 +150,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, minutosParaConfirmar: MINUTOS_PARA_CONFIRMAR }, { status: 201 });
   } catch (error) {
     if (error instanceof ErrorReserva) {
-      return NextResponse.json({ success: false, error: error.message }, { status: error.status });
+      return NextResponse.json({ success: false, error: error.message, code: error.code }, { status: error.status });
     }
     if ((error as { code?: string }).code === "23505") {
       return NextResponse.json(
-        { success: false, error: "Alguien acaba de reservar ese horario. Elige otro." },
+        { success: false, error: "Alguien acaba de reservar ese horario. Elige otro.", code: "TURNO_OCUPADO" },
         { status: 409 }
       );
     }

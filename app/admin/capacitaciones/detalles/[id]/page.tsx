@@ -6,7 +6,9 @@ import toast from "react-hot-toast";
 import { ColumnDef } from "@tanstack/react-table";
 import AdminProtection from "@/components/AdminProtection";
 import Table from "@/components/Table";
-import EstadoSelector from "@/components/EstadoSelector";
+import EstadoSelector, {
+  type TransicionInscripcion,
+} from "@/components/EstadoSelector";
 
 interface Capacitacion {
   id: number;
@@ -22,6 +24,8 @@ interface EstadoInscripcion {
 interface Inscripcion {
   id: number;
   estado: EstadoInscripcion;
+  /** Cambios de estado que el servidor permite al rol de la sesión. */
+  transiciones: TransicionInscripcion[];
   fecha_inscripcion: string;
   fecha_ultima_actualizacion: string;
   biometria?: {
@@ -75,6 +79,7 @@ interface ApiResponse {
     capacitacion: Capacitacion;
     estudiantes: EstudianteInscrito[];
     estadisticas: Record<string, Estadistica>;
+    puede_gestionar?: boolean;
     totales: {
       total_inscritos: number;
       con_correo_verificado: number;
@@ -99,31 +104,59 @@ export default function DetallesCapacitacionPage() {
     EstadoInscripcion[]
   >([]);
 
+  // Carga (o recarga, p. ej. tras un conflicto 409) los estudiantes inscritos
+  const cargarDatos = useCallback(async () => {
+    try {
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+      const response = await fetch(
+        `${basePath}/api/admin/capacitaciones/${capacitacionId}/estudiantes`
+      );
+
+      if (!response.ok) {
+        throw new Error("Error al cargar los datos");
+      }
+
+      const result: ApiResponse = await response.json();
+      setData(result.data);
+      setError(null);
+    } catch (error) {
+      console.error("Error fetching datos:", error);
+      setError("Error al cargar los datos de la capacitación");
+      toast.error("Error al cargar los datos");
+    } finally {
+      setLoading(false);
+    }
+  }, [capacitacionId]);
+
   // Función para manejar cambios de estado
   const handleEstadoChange = useCallback(
-    (inscripcionId: number, nuevoEstado: EstadoInscripcion) => {
-      if (!data) return;
-
-      // Actualizar el estado local
-      const estudiantesActualizados = data.estudiantes.map((estudiante) => {
-        if (estudiante.inscripcion.id === inscripcionId) {
-          return {
-            ...estudiante,
-            inscripcion: {
-              ...estudiante.inscripcion,
-              estado: nuevoEstado,
-            },
-          };
-        }
-        return estudiante;
-      });
-
-      setData({
-        ...data,
-        estudiantes: estudiantesActualizados,
-      });
+    (
+      inscripcionId: number,
+      nuevoEstado: EstadoInscripcion,
+      transiciones: TransicionInscripcion[]
+    ) => {
+      // Actualizar el estado local con lo que devolvió el servidor
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              estudiantes: prev.estudiantes.map((estudiante) =>
+                estudiante.inscripcion.id === inscripcionId
+                  ? {
+                      ...estudiante,
+                      inscripcion: {
+                        ...estudiante.inscripcion,
+                        estado: nuevoEstado,
+                        transiciones,
+                      },
+                    }
+                  : estudiante
+              ),
+            }
+          : prev
+      );
     },
-    [data]
+    []
   );
 
   // Definición de columnas para la tabla
@@ -212,8 +245,10 @@ export default function DetallesCapacitacionPage() {
           <EstadoSelector
             inscripcionId={row.original.inscripcion.id}
             estadoActual={row.original.inscripcion.estado}
+            transiciones={row.original.inscripcion.transiciones ?? []}
             estadosDisponibles={estadosDisponibles}
             onEstadoChange={handleEstadoChange}
+            onConflicto={cargarDatos}
           />
         ),
       },
@@ -249,34 +284,12 @@ export default function DetallesCapacitacionPage() {
         ),
       },
     ],
-    [estadosDisponibles, handleEstadoChange]
+    [estadosDisponibles, handleEstadoChange, cargarDatos]
   );
 
   useEffect(() => {
-    const fetchDetallesCapacitacion = async () => {
-      try {
-        const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-        const response = await fetch(
-          `${basePath}/api/admin/capacitaciones/${capacitacionId}/estudiantes`
-        );
-
-        if (!response.ok) {
-          throw new Error("Error al cargar los datos");
-        }
-
-        const result: ApiResponse = await response.json();
-        setData(result.data);
-      } catch (error) {
-        console.error("Error fetching datos:", error);
-        setError("Error al cargar los datos de la capacitación");
-        toast.error("Error al cargar los datos");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDetallesCapacitacion();
-  }, [capacitacionId]);
+    cargarDatos();
+  }, [cargarDatos]);
 
   // Cargar estados disponibles
   useEffect(() => {

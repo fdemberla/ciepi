@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import AdminProtection from "@/components/AdminProtection";
 import { withBasePath, assetUrl } from "@/lib/basePath";
 import { DIAS_SEMANA, DURACIONES_MENTORIA, type Turno } from "@/lib/mentorias";
+import { MOTIVO_MENTOR_NO_DISPONIBLE } from "@/lib/estados/mentoriaReserva";
 
 interface Bloque {
   dia_semana: number;
@@ -161,7 +162,7 @@ export default function ConfigurarMentorPage() {
     }
   };
 
-  const guardar = async () => {
+  const guardar = async (cancelacion?: { motivo: string }) => {
     if (!mentor) return;
     if (mentor.es_mentor && mentor.disponibilidad.length === 0) {
       toast("El mentor está activo pero no tiene horario: no aparecerán turnos.", { icon: "⚠️" });
@@ -177,10 +178,35 @@ export default function ConfigurarMentorPage() {
           foto: mentor.foto,
           area_ids: mentor.area_ids,
           disponibilidad: mentor.disponibilidad,
+          ...(cancelacion ? { cancelar_reservas: true, motivo_cancelacion: cancelacion.motivo } : {}),
         }),
       }).then((r) => r.json());
+      // Desactivar con mentorías activas: el servidor no guarda nada y pide confirmar la cancelación.
+      if (!res.success && res.code === "RESERVAS_ACTIVAS" && Array.isArray(res.reservas)) {
+        const lista = (res.reservas as { id: number; inicio: string; nombre: string }[])
+          .map(
+            (r) =>
+              `• #${r.id} ${new Date(r.inicio).toLocaleString("es-PA", {
+                timeZone: "America/Panama",
+                dateStyle: "medium",
+                timeStyle: "short",
+              })} — ${r.nombre}`
+          )
+          .join("\n");
+        const motivo = window.prompt(
+          `${res.error}\n\n${lista}\n\nSi continúas, se cancelarán y se avisará a cada persona por correo. Motivo:`,
+          MOTIVO_MENTOR_NO_DISPONIBLE
+        );
+        if (motivo !== null && motivo.trim()) {
+          setSaving(false);
+          return guardar({ motivo: motivo.trim() });
+        }
+        toast("No se guardó: el mentor sigue activo.", { icon: "ℹ️" });
+        return;
+      }
       if (!res.success) throw new Error(res.error);
-      toast.success("Configuración guardada");
+      toast.success(res.canceladas ? `Configuración guardada. Se cancelaron ${res.canceladas} reserva(s).` : "Configuración guardada");
+      (res.avisos ?? []).forEach((a: string) => toast(a, { icon: "⚠️", duration: 8000 }));
       await cargarTurnos();
     } catch (e) {
       toast.error((e as Error).message || "No se pudo guardar");
@@ -201,6 +227,7 @@ export default function ConfigurarMentorPage() {
     setMentor((m) => m && { ...m, bloqueos: [...m.bloqueos, res.data].sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio)) });
     setNuevoBloqueo({ fecha_inicio: "", fecha_fin: "", motivo: "" });
     toast.success("Fechas bloqueadas");
+    (res.avisos ?? []).forEach((a: string) => toast(a, { icon: "⚠️", duration: 8000 }));
     cargarTurnos();
   };
 
@@ -480,7 +507,7 @@ export default function ConfigurarMentorPage() {
           <div className="sticky bottom-4 z-10 flex justify-end">
             <button
               type="button"
-              onClick={guardar}
+              onClick={() => guardar()}
               disabled={saving}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-secondary text-white font-semibold shadow-lg hover:brightness-95 disabled:opacity-60"
             >
