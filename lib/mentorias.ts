@@ -84,6 +84,12 @@ export function fechaPanama(instante: Date): string {
   return `${local.getUTCFullYear()}-${pad(local.getUTCMonth() + 1)}-${pad(local.getUTCDate())}`;
 }
 
+/** Hora local de Panamá ("HH:MM") de un instante. */
+export function horaPanama(instante: Date): string {
+  const local = new Date(instante.getTime() + PANAMA_OFFSET_HORAS * 3600_000);
+  return `${pad(local.getUTCHours())}:${pad(local.getUTCMinutes())}`;
+}
+
 /** Instante UTC de una fecha y hora locales de Panamá. */
 export function instantePanama(fecha: string, minutos: number): Date {
   const [y, m, d] = fecha.split("-").map(Number);
@@ -239,4 +245,50 @@ export function generarTurnos(o: OpcionesTurnos): Turno[] {
     }
   }
   return [...turnos.values()].sort((a, b) => a.inicio.localeCompare(b.inicio));
+}
+
+// ---------------------------------------------------------------- estados de reserva
+
+export const ESTADOS_RESERVA = [
+  "pendiente_verificacion",
+  "expirada",
+  "confirmada",
+  "completada",
+  "no_asistio",
+  "cancelada_usuario",
+  "cancelada_ciepi",
+] as const;
+export type EstadoReserva = (typeof ESTADOS_RESERVA)[number];
+
+export const ETIQUETA_ESTADO_RESERVA: Record<EstadoReserva, string> = {
+  pendiente_verificacion: "Pendiente de confirmar",
+  expirada: "Expirada",
+  confirmada: "Confirmada",
+  completada: "Realizada",
+  no_asistio: "No asistió",
+  cancelada_usuario: "Cancelada por la persona",
+  cancelada_ciepi: "Cancelada por CIEPI",
+};
+
+/**
+ * Estados a los que el administrador puede mover una reserva:
+ * - antes de la sesión: solo cancelarla (avisando a la persona);
+ * - desde que empieza: marcarla como realizada o como inasistencia;
+ * - realizada e inasistencia se pueden corregir entre sí.
+ * Expiradas y canceladas son finales.
+ */
+export function transicionesAdminReserva(estado: string, inicio: Date, ahora: Date): EstadoReserva[] {
+  const empezo = inicio.getTime() <= ahora.getTime();
+  switch (estado) {
+    case "pendiente_verificacion":
+      return empezo ? [] : ["cancelada_ciepi"];
+    case "confirmada":
+      return empezo ? ["completada", "no_asistio"] : ["cancelada_ciepi"];
+    case "completada":
+      return ["no_asistio"];
+    case "no_asistio":
+      return ["completada"];
+    default:
+      return [];
+  }
 }

@@ -181,3 +181,56 @@ export async function enviarCorreosCancelacion(r: ReservaCompleta) {
   const resultados = await Promise.allSettled(envios);
   resultados.forEach((res) => res.status === "rejected" && console.error("Error enviando correo de cancelación:", res.reason));
 }
+
+/** 4) Cancelación por CIEPI: avisa a la persona (con el motivo) y al mentor. */
+export async function enviarCorreosCancelacionCiepi(r: ReservaCompleta, motivo: string | null) {
+  const motivoHtml = motivo ? `<p><strong>Motivo:</strong> ${escapeHtml(motivo)}</p>` : "";
+  const envios: Promise<unknown>[] = [
+    sendEmail({
+      to: r.correo,
+      subject: "Tu mentoría fue cancelada — CIEPI",
+      text: `Hola ${r.nombre},\n\nLamentamos informarte que CIEPI canceló esta mentoría:\n${detalleTexto(r)}\n${motivo ? `\nMotivo: ${motivo}\n` : ""}\nPuedes reservar otro horario en ${getBaseUrl()}/mentorias`,
+      html: plantilla(
+        "Tu mentoría fue cancelada",
+        `<p>Hola ${escapeHtml(r.nombre)},</p><p>Lamentamos informarte que CIEPI canceló esta mentoría:</p>${detalleHtml(r)}${motivoHtml}`,
+        { href: `${getBaseUrl()}/mentorias`, texto: "Reservar otro horario" }
+      ),
+      attachments: [icsAdjunto(r, true)],
+    }),
+  ];
+  if (r.mentor_correo) {
+    envios.push(
+      sendEmail({
+        to: r.mentor_correo,
+        subject: `Mentoría cancelada por CIEPI: ${formatoFechaHoraPanama(r.inicio)}`,
+        text: `CIEPI canceló esta mentoría.\n${detalleTexto(r)}\nSolicitante: ${r.nombre}${motivo ? `\nMotivo: ${motivo}` : ""}`,
+        html: plantilla(
+          "Mentoría cancelada por CIEPI",
+          `${detalleHtml(r)}<p><strong>Solicitante:</strong> ${escapeHtml(r.nombre)}</p>${motivoHtml}`
+        ),
+        attachments: [icsAdjunto(r, true)],
+      })
+    );
+  }
+  const resultados = await Promise.allSettled(envios);
+  resultados.forEach((res) => res.status === "rejected" && console.error("Error enviando cancelación de CIEPI:", res.reason));
+  if (resultados[0].status === "rejected") throw resultados[0].reason;
+}
+
+/** 5) Enlace de la reunión virtual: a la persona, con el .ics actualizado (mismo UID). */
+export async function enviarEnlaceReunion(r: ReservaCompleta) {
+  if (!r.enlace_reunion) throw new Error("La reserva no tiene enlace de reunión.");
+  await sendEmail({
+    to: r.correo,
+    cc: r.mentor_correo ?? undefined,
+    subject: "Enlace de tu mentoría — CIEPI",
+    text: `Hola ${r.nombre},\n\nEste es el enlace para tu mentoría:\n${r.enlace_reunion}\n\n${detalleTexto(r)}`,
+    html: plantilla(
+      "Enlace de tu mentoría",
+      `<p>Hola ${escapeHtml(r.nombre)},</p><p>Te compartimos el enlace para conectarte a tu mentoría:</p>
+       <p style="word-break:break-all;"><a href="${escapeHtml(r.enlace_reunion)}">${escapeHtml(r.enlace_reunion)}</a></p>${detalleHtml(r)}`,
+      { href: r.enlace_reunion, texto: "Unirme a la reunión" }
+    ),
+    attachments: [icsAdjunto(r)],
+  });
+}

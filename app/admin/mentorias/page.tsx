@@ -6,6 +6,8 @@ import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
 import AdminProtection from "@/components/AdminProtection";
 import { withBasePath, assetUrl } from "@/lib/basePath";
+import ReservasPanel from "@/components/admin/mentorias/ReservasPanel";
+import AgendaPanel from "@/components/admin/mentorias/AgendaPanel";
 
 interface MentorRow {
   id: number;
@@ -27,10 +29,10 @@ interface Area {
   mentores: number;
 }
 
-type Tab = "mentores" | "areas";
+type Tab = "reservas" | "agenda" | "mentores" | "areas";
 
 export default function MentoriasAdminPage() {
-  const [tab, setTab] = useState<Tab>("mentores");
+  const [tab, setTab] = useState<Tab>("reservas");
   const [mentores, setMentores] = useState<MentorRow[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,13 +97,15 @@ export default function MentoriasAdminPage() {
             <span aria-hidden="true" className="block w-12 h-1.5 rounded-full bg-brand-green mb-3" />
             <h1 className="text-3xl md:text-4xl font-bold text-primary dark:text-white">Mentorías</h1>
             <p className="text-dark_grey dark:text-gray-400 mt-2">
-              Activa a los profesores que dan mentorías, define sus áreas y su horario semanal.
+              Gestiona las reservas, consulta la agenda y configura a los mentores, sus áreas y su horario semanal.
             </p>
           </div>
 
-          <div role="tablist" className="flex gap-2 mb-6">
+          <div role="tablist" className="flex flex-wrap gap-2 mb-6">
             {(
               [
+                ["reservas", "Reservas", "solar:clipboard-list-linear"],
+                ["agenda", "Agenda", "solar:calendar-linear"],
                 ["mentores", `Mentores (${totalMentores})`, "solar:users-group-rounded-linear"],
                 ["areas", `Áreas de mentoría (${areas.filter((a) => a.activo).length})`, "solar:tag-linear"],
               ] as const
@@ -123,7 +127,11 @@ export default function MentoriasAdminPage() {
             ))}
           </div>
 
-          {loading ? (
+          {tab === "reservas" ? (
+            <ReservasPanel mentores={mentores} />
+          ) : tab === "agenda" ? (
+            <AgendaPanel />
+          ) : loading ? (
             <div className="flex justify-center py-16">
               <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary/20 border-t-primary" />
             </div>
