@@ -26,6 +26,10 @@ function put(body: unknown, id = "10") {
 
 function sesion(rolId: number, adminId = 5) {
   mockSession.mockResolvedValue({ user: { isAdmin: true, adminId, rolId, email: "admin@example.com" } });
+  // requireArea lee el rol de la BD (usuario activo).
+  mockQuery.mockImplementation(async (sql: string) =>
+    /FROM ciepi\.usuarios_administradores/.test(sql) ? { rows: [{ rol_id: rolId }] } : { rows: [] }
+  );
 }
 
 describe("PUT /api/admin/inscripciones/[id]", () => {
@@ -33,6 +37,14 @@ describe("PUT /api/admin/inscripciones/[id]", () => {
     mockQuery.mockReset();
     txQuery.mockReset();
     mockSession.mockReset();
+  });
+
+  it("403 si el rol en la BD ya no permite gestionar aunque el JWT diga CIEPI", async () => {
+    sesion(Role.CIEPI);
+    mockQuery.mockResolvedValue({ rows: [{ rol_id: Role.RELACIONES_PUBLICAS }] });
+    const res = await put({ estado_inscripcion: 3, estado_actual: 1 });
+    expect(res.status).toBe(403);
+    expect(txQuery).not.toHaveBeenCalled();
   });
 
   it("401 sin sesión de administrador", async () => {
@@ -46,7 +58,8 @@ describe("PUT /api/admin/inscripciones/[id]", () => {
     const res = await put({ estado_inscripcion: 3, estado_actual: 1 });
     expect(res.status).toBe(403);
     expect(txQuery).not.toHaveBeenCalled();
-    expect(mockQuery).not.toHaveBeenCalled();
+    // Solo la lectura del rol en la BD; nada más.
+    expect(mockQuery).toHaveBeenCalledTimes(1);
   });
 
   it("400 si falta estado_actual", async () => {

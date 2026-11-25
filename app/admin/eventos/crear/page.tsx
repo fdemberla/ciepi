@@ -57,6 +57,11 @@ const CrearEventoPage = () => {
     try {
       setIsSubmitting(true);
 
+      // Misma validación que la API: fin >= inicio (los valores datetime-local se comparan como texto)
+      if (data.fecha_fin && data.fecha_inicio && String(data.fecha_fin) < String(data.fecha_inicio)) {
+        throw new Error("La fecha de fin debe ser igual o posterior a la fecha de inicio");
+      }
+
       const submitFormData = new FormData();
       submitFormData.append("nombre", data.nombre as string);
       submitFormData.append("descripcion", (data.descripcion as string) || "");

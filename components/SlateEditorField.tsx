@@ -10,9 +10,15 @@ import {
 } from "slate";
 import { Slate, Editable, withReact, useSlate } from "slate-react";
 import { Icon } from "@iconify/react";
+// Evita que el clic del ratón quite el foco (y la selección) del editor.
+// La acción se ejecuta en onClick, que también se dispara con Enter/Espacio,
+// así la barra funciona con teclado.
+const keepEditorFocus = (e: React.MouseEvent) => e.preventDefault();
+
 // Toolbar button component
 interface ToolbarButtonProps {
   onClick: () => void;
+  /** Estado de un botón conmutable (negrita, lista…). Omitir si no lo es. */
   active?: boolean;
   label: string;
   children?: ReactNode;
@@ -25,14 +31,14 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({
 }) => (
   <button
     type="button"
-    onMouseDown={(e) => {
-      e.preventDefault();
-      onClick();
-    }}
-    className={`px-2 py-1 rounded hover:bg-gray-200 ${
+    onMouseDown={keepEditorFocus}
+    onClick={onClick}
+    className={`px-2 py-1 rounded hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-primary ${
       active ? "bg-gray-300" : ""
     }`}
     title={label}
+    aria-label={label}
+    aria-pressed={active === undefined ? undefined : active}
   >
     {children || label}
   </button>
@@ -210,6 +216,13 @@ interface SlateEditorFieldProps {
   id: string;
   name: string;
   required?: boolean;
+  /** id del elemento que da nombre al editor (la etiqueta del campo). */
+  ariaLabelledBy?: string;
+  /** Nombre accesible si no hay etiqueta visible. */
+  ariaLabel?: string;
+  /** id del mensaje de error u otra descripción. */
+  ariaDescribedBy?: string;
+  ariaInvalid?: boolean;
 }
 
 const initialValue: Descendant[] = [
@@ -252,10 +265,9 @@ const LinkButton = () => {
             setShowLinkInput(!showLinkInput);
           }
         }}
-        active={isLinkActive(editor)}
         label={isLinkActive(editor) ? "Quitar enlace" : "Agregar enlace"}
       >
-        <Icon icon="ic:baseline-add-link" className="w-4 h-4" />
+        <Icon icon="ic:baseline-add-link" className="w-4 h-4" aria-hidden="true" />
       </ToolbarButton>
 
       {showLinkInput && (
@@ -266,6 +278,7 @@ const LinkButton = () => {
               value={linkUrl}
               onChange={(e) => setLinkUrl(e.target.value)}
               placeholder="https://ejemplo.com"
+              aria-label="Dirección del enlace"
               className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -310,64 +323,76 @@ const ColorPickerButton = () => {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const currentColor = getColorMark(editor);
 
+  // Sin negro ni blanco: en las páginas públicas el texto negro desaparece en
+  // modo oscuro y el blanco en modo claro. "Restablecer color" deja el color
+  // del tema. (SlateRenderer además ignora esos colores en contenido antiguo.)
   const colors = [
-    "#000000", // Black
-    "#FFFFFF", // White
-    "#EF4444", // Red
-    "#F97316", // Orange
-    "#EAB308", // Yellow
-    "#22C55E", // Green
-    "#06B6D4", // Cyan
-    "#3B82F6", // Blue
-    "#8B5CF6", // Purple
-    "#EC4899", // Pink
+    { value: "#EF4444", name: "Rojo" },
+    { value: "#F97316", name: "Naranja" },
+    { value: "#EAB308", name: "Amarillo" },
+    { value: "#22C55E", name: "Verde" },
+    { value: "#06B6D4", name: "Cian" },
+    { value: "#3B82F6", name: "Azul" },
+    { value: "#8B5CF6", name: "Morado" },
+    { value: "#EC4899", name: "Rosa" },
   ];
 
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && showColorPicker) {
+          e.stopPropagation();
+          setShowColorPicker(false);
+        }
+      }}
+    >
       <button
         type="button"
-        onMouseDown={(e) => {
-          e.preventDefault();
-          setShowColorPicker(!showColorPicker);
-        }}
-        className="px-2 py-1 rounded hover:bg-gray-200 flex items-center gap-1"
+        onMouseDown={keepEditorFocus}
+        onClick={() => setShowColorPicker(!showColorPicker)}
+        className="px-2 py-1 rounded hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-primary flex items-center gap-1"
         title="Color de texto"
+        aria-label="Color de texto"
+        aria-expanded={showColorPicker}
       >
-        <Icon icon="ic:baseline-format-color-text" className="w-4 h-4" />
-        <div
+        <Icon icon="ic:baseline-format-color-text" className="w-4 h-4" aria-hidden="true" />
+        <span
+          aria-hidden="true"
           className="w-3 h-3 rounded border border-gray-400"
           style={{ backgroundColor: currentColor }}
         />
       </button>
 
       {showColorPicker && (
-        <div className="absolute top-full left-0 mt-2 bg-white border border-gray-300 rounded-md shadow-lg p-6 z-10 grid grid-cols-5 gap-4 w-max">
+        <div className="absolute top-full left-0 mt-2 bg-white border border-gray-300 rounded-md shadow-lg p-6 z-10 grid grid-cols-4 gap-4 w-max">
           {colors.map((color) => (
             <button
-              key={color}
+              key={color.value}
               type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setColorMark(editor, color);
+              onMouseDown={keepEditorFocus}
+              onClick={() => {
+                setColorMark(editor, color.value);
                 setShowColorPicker(false);
               }}
-              className="w-12 h-12 rounded border-3 hover:border-gray-600 transition-all cursor-pointer hover:scale-110"
+              className="w-12 h-12 rounded border-3 hover:border-gray-600 transition-all cursor-pointer hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
               style={{
-                backgroundColor: color,
-                borderColor: currentColor === color ? "#000000" : "#ddd",
+                backgroundColor: color.value,
+                borderColor: currentColor === color.value ? "#000000" : "#ddd",
               }}
-              title={color}
+              title={color.name}
+              aria-label={`Color ${color.name.toLowerCase()}`}
+              aria-pressed={currentColor === color.value}
             />
           ))}
           <button
             type="button"
-            onMouseDown={(e) => {
-              e.preventDefault();
+            onMouseDown={keepEditorFocus}
+            onClick={() => {
               Editor.removeMark(editor, "color");
               setShowColorPicker(false);
             }}
-            className="col-span-5 px-4 py-3 text-sm bg-gray-200 hover:bg-gray-300 rounded font-medium transition-colors"
+            className="col-span-4 px-4 py-3 text-sm bg-gray-200 hover:bg-gray-300 rounded font-medium transition-colors"
           >
             Restablecer color
           </button>
@@ -392,17 +417,27 @@ const FontSizeSelector = () => {
   ];
 
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && showSizeMenu) {
+          e.stopPropagation();
+          setShowSizeMenu(false);
+        }
+      }}
+    >
       <button
         type="button"
-        onMouseDown={(e) => {
-          e.preventDefault();
-          setShowSizeMenu(!showSizeMenu);
-        }}
-        className="px-2 py-1 rounded hover:bg-gray-200 flex items-center gap-1 text-sm"
+        onMouseDown={keepEditorFocus}
+        onClick={() => setShowSizeMenu(!showSizeMenu)}
+        className="px-2 py-1 rounded hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-primary flex items-center gap-1 text-sm"
         title="Tamaño de fuente"
+        aria-label={`Tamaño de fuente: ${
+          fontSizes.find((s) => s.value === currentSize)?.label || "Normal"
+        }`}
+        aria-expanded={showSizeMenu}
       >
-        <Icon icon="ic:baseline-format-size" className="w-4 h-4" />
+        <Icon icon="ic:baseline-format-size" className="w-4 h-4" aria-hidden="true" />
         <span className="text-xs font-medium">
           {fontSizes.find((s) => s.value === currentSize)?.label || "Normal"}
         </span>
@@ -414,11 +449,12 @@ const FontSizeSelector = () => {
             <button
               key={size.value}
               type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
+              onMouseDown={keepEditorFocus}
+              onClick={() => {
                 setFontSizeMark(editor, size.value);
                 setShowSizeMenu(false);
               }}
+              aria-pressed={currentSize === size.value}
               className={`w-full text-left px-3 py-2 text-sm rounded transition-colors ${
                 currentSize === size.value
                   ? "bg-blue-500 text-white"
@@ -431,8 +467,8 @@ const FontSizeSelector = () => {
           ))}
           <button
             type="button"
-            onMouseDown={(e) => {
-              e.preventDefault();
+            onMouseDown={keepEditorFocus}
+            onClick={() => {
               Editor.removeMark(editor, "fontSize");
               setShowSizeMenu(false);
             }}
@@ -450,39 +486,43 @@ const FontSizeSelector = () => {
 const Toolbar = () => {
   const editor = useSlate();
   return (
-    <div className="flex flex-wrap gap-1 mb-2 relative">
+    <div
+      role="toolbar"
+      aria-label="Formato de texto"
+      className="flex flex-wrap gap-1 mb-2 relative"
+    >
       {/* Text formatting */}
       <ToolbarButton
         onClick={() => toggleMark(editor, "bold")}
         active={isMarkActive(editor, "bold")}
         label="Negrita"
       >
-        <Icon icon="ic:baseline-format-bold" className="w-4 h-4" />
+        <Icon icon="ic:baseline-format-bold" className="w-4 h-4" aria-hidden="true" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => toggleMark(editor, "italic")}
         active={isMarkActive(editor, "italic")}
         label="Itálica"
       >
-        <Icon icon="ic:baseline-format-italic" className="w-4 h-4" />
+        <Icon icon="ic:baseline-format-italic" className="w-4 h-4" aria-hidden="true" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => toggleMark(editor, "underline")}
         active={isMarkActive(editor, "underline")}
         label="Subrayado"
       >
-        <Icon icon="ic:baseline-format-underlined" className="w-4 h-4" />
+        <Icon icon="ic:baseline-format-underlined" className="w-4 h-4" aria-hidden="true" />
       </ToolbarButton>
 
       {/* Separator */}
-      <div className="w-px bg-gray-300 mx-1"></div>
+      <div aria-hidden="true" className="w-px bg-gray-300 mx-1"></div>
 
       {/* Color and Font Size */}
       <ColorPickerButton />
       <FontSizeSelector />
 
       {/* Separator */}
-      <div className="w-px bg-gray-300 mx-1"></div>
+      <div aria-hidden="true" className="w-px bg-gray-300 mx-1"></div>
 
       {/* Alignment */}
       <ToolbarButton
@@ -495,32 +535,32 @@ const Toolbar = () => {
         }
         label="Alinear a la izquierda"
       >
-        <Icon icon="ic:baseline-format-align-left" className="w-4 h-4" />
+        <Icon icon="ic:baseline-format-align-left" className="w-4 h-4" aria-hidden="true" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => toggleAlignment(editor, "center")}
         active={isAlignmentActive(editor, "center")}
         label="Centrar"
       >
-        <Icon icon="ic:baseline-format-align-center" className="w-4 h-4" />
+        <Icon icon="ic:baseline-format-align-center" className="w-4 h-4" aria-hidden="true" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => toggleAlignment(editor, "right")}
         active={isAlignmentActive(editor, "right")}
         label="Alinear a la derecha"
       >
-        <Icon icon="ic:baseline-format-align-right" className="w-4 h-4" />
+        <Icon icon="ic:baseline-format-align-right" className="w-4 h-4" aria-hidden="true" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => toggleAlignment(editor, "justify")}
         active={isAlignmentActive(editor, "justify")}
         label="Justificar"
       >
-        <Icon icon="ic:baseline-format-align-justify" className="w-4 h-4" />
+        <Icon icon="ic:baseline-format-align-justify" className="w-4 h-4" aria-hidden="true" />
       </ToolbarButton>
 
       {/* Separator */}
-      <div className="w-px bg-gray-300 mx-1"></div>
+      <div aria-hidden="true" className="w-px bg-gray-300 mx-1"></div>
 
       {/* Lists */}
       <ToolbarButton
@@ -528,18 +568,18 @@ const Toolbar = () => {
         active={isBlockActive(editor, "bulleted-list")}
         label="Lista de viñetas"
       >
-        <Icon icon="ic:baseline-format-list-bulleted" className="w-4 h-4" />
+        <Icon icon="ic:baseline-format-list-bulleted" className="w-4 h-4" aria-hidden="true" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => toggleBlock(editor, "numbered-list")}
         active={isBlockActive(editor, "numbered-list")}
         label="Lista numerada"
       >
-        <Icon icon="ic:baseline-format-list-numbered" className="w-4 h-4" />
+        <Icon icon="ic:baseline-format-list-numbered" className="w-4 h-4" aria-hidden="true" />
       </ToolbarButton>
 
       {/* Separator */}
-      <div className="w-px bg-gray-300 mx-1"></div>
+      <div aria-hidden="true" className="w-px bg-gray-300 mx-1"></div>
 
       {/* Headings */}
       <ToolbarButton
@@ -572,21 +612,21 @@ const Toolbar = () => {
       </ToolbarButton>
 
       {/* Separator */}
-      <div className="w-px bg-gray-300 mx-1"></div>
+      <div aria-hidden="true" className="w-px bg-gray-300 mx-1"></div>
 
       {/* Indentation */}
       <ToolbarButton onClick={() => indent(editor)} label="Indentar">
-        <Icon icon="ic:baseline-format-indent-increase" className="w-4 h-4" />
+        <Icon icon="ic:baseline-format-indent-increase" className="w-4 h-4" aria-hidden="true" />
       </ToolbarButton>
       <ToolbarButton
         onClick={() => outdent(editor)}
         label="Quitar indentación"
       >
-        <Icon icon="ic:baseline-format-indent-decrease" className="w-4 h-4" />
+        <Icon icon="ic:baseline-format-indent-decrease" className="w-4 h-4" aria-hidden="true" />
       </ToolbarButton>
 
       {/* Separator */}
-      <div className="w-px bg-gray-300 mx-1"></div>
+      <div aria-hidden="true" className="w-px bg-gray-300 mx-1"></div>
 
       {/* Links */}
       <LinkButton />
@@ -600,6 +640,10 @@ const SlateEditorField: React.FC<SlateEditorFieldProps> = ({
   id,
   name,
   required = false,
+  ariaLabelledBy,
+  ariaLabel,
+  ariaDescribedBy,
+  ariaInvalid = false,
 }) => {
   const editor = useMemo(() => withReact(createEditor()), []);
 
@@ -787,12 +831,18 @@ const SlateEditorField: React.FC<SlateEditorFieldProps> = ({
           id={id}
           name={name}
           placeholder="Escribe aquí..."
+          aria-multiline="true"
+          aria-labelledby={ariaLabelledBy}
+          aria-label={ariaLabelledBy ? undefined : ariaLabel || "Editor de texto"}
+          aria-describedby={ariaDescribedBy}
+          aria-invalid={ariaInvalid || undefined}
+          aria-required={required || undefined}
           className="flex-1 focus:outline-none overflow-y-auto min-h-screen"
           renderLeaf={renderLeaf}
           renderElement={renderElement}
         />
       </Slate>
-      {required && isEmpty && (
+      {required && isEmpty && !ariaInvalid && (
         <span className="text-red-500 text-sm mt-1">
           Este campo es obligatorio.
         </span>

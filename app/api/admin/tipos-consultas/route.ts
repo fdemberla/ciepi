@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
+import { requireArea } from "@/lib/adminAuth";
+import { safeErrorDetail } from "@/lib/apiError";
 
 // GET: Listar todos los tipos de consulta (público)
 export async function GET() {
@@ -27,7 +27,7 @@ export async function GET() {
       {
         success: false,
         error: "Error al obtener tipos de consulta",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );
@@ -37,15 +37,9 @@ export async function GET() {
 // POST: Crear nuevo tipo de consulta (solo admin)
 export async function POST(request: NextRequest) {
   try {
-    // Verificar autenticación y permisos de admin
-    const session = await getServerSession(authOptions);
-
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 }
-      );
-    }
+    // Solo roles de configuración (rol leído de la BD, usuario activo).
+    const auth = await requireArea("configuracion");
+    if (!auth.ok) return auth.respuesta;
 
     const body = await request.json();
     const { nombre, activo } = body;
@@ -99,7 +93,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: "Error al crear tipo de consulta",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );

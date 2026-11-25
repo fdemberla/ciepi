@@ -1,7 +1,10 @@
 /**
  * Utilidad servidor para verificar tokens de Cloudflare Turnstile.
- * Si TURNSTILE_SECRET_KEY no está configurada, omite la verificación (modo desarrollo/sin Turnstile).
+ * Política (ver lib/captchaPolicy.ts): con TURNSTILE_SECRET_KEY el token es obligatorio;
+ * sin la clave, en producción se rechaza (503) y en desarrollo se omite con un aviso.
  */
+import { resultadoSinClave, MENSAJE_CAPTCHA_NO_DISPONIBLE, type ResultadoCaptcha } from "@/lib/captchaPolicy";
+
 export function isTurnstileEnabled(): boolean {
   return Boolean(process.env.TURNSTILE_SECRET_KEY?.trim());
 }
@@ -9,15 +12,16 @@ export function isTurnstileEnabled(): boolean {
 export async function verifyTurnstileToken(
   token: string | null | undefined,
   remoteIp?: string | null,
-): Promise<{ success: boolean; skipped?: boolean; error?: string }> {
+): Promise<ResultadoCaptcha> {
   const secret = process.env.TURNSTILE_SECRET_KEY?.trim();
   if (!secret) {
-    return { success: true, skipped: true };
+    return resultadoSinClave("Turnstile", "TURNSTILE_SECRET_KEY");
   }
 
-  if (!token || !token.trim()) {
+  if (typeof token !== "string" || !token.trim()) {
     return {
       success: false,
+      status: 403,
       error: "Completa la verificación de seguridad (Turnstile) para continuar.",
     };
   }
@@ -44,6 +48,7 @@ export async function verifyTurnstileToken(
     if (!data.success) {
       return {
         success: false,
+        status: 403,
         error: "Verificación de seguridad inválida o expirada. Intenta de nuevo.",
       };
     }
@@ -53,7 +58,8 @@ export async function verifyTurnstileToken(
     console.error("[Turnstile] Error verificando token:", err);
     return {
       success: false,
-      error: "No se pudo validar la verificación de seguridad.",
+      status: 503,
+      error: MENSAJE_CAPTCHA_NO_DISPONIBLE,
     };
   }
 }

@@ -3,53 +3,7 @@ import { query } from "@/lib/db";
 import { safeErrorDetail } from "@/lib/apiError";
 import { registrarHistorial } from "@/lib/estadosServer";
 import { getClientIp } from "@/lib/verificationUtils";
-
-// Función para verificar reCAPTCHA
-async function verifyRecaptcha(
-  token: string
-): Promise<{ success: boolean; score?: number }> {
-  const secretKey = process.env.RECAPTCHA_SECRET_KEY;
-
-  if (!secretKey) {
-    console.error(
-      "[reCAPTCHA] ERROR: RECAPTCHA_SECRET_KEY no está configurada en .env"
-    );
-    console.error(
-      "[reCAPTCHA] Verifica que .env contenga: RECAPTCHA_SECRET_KEY=tu_clave_secreta"
-    );
-    return { success: false };
-  }
-
-  try {
-    console.log("[reCAPTCHA] Verificando token con Google...");
-    const response = await fetch(
-      "https://www.google.com/recaptcha/api/siteverify",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: `secret=${secretKey}&response=${token}`,
-      }
-    );
-
-    const data = await response.json();
-    console.log("[reCAPTCHA] Respuesta de Google:", {
-      success: data.success,
-      score: data.score,
-      action: data.action,
-      challenge_ts: data.challenge_ts,
-    });
-
-    return {
-      success: data.success,
-      score: data.score,
-    };
-  } catch (error) {
-    console.error("[reCAPTCHA] Error verificando reCAPTCHA:", error);
-    return { success: false };
-  }
-}
+import { verifyRecaptchaToken } from "@/lib/recaptcha";
 
 export async function POST(request: NextRequest) {
   try {
@@ -85,43 +39,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar reCAPTCHA si el token está presente
-    let recaptchaScore = null;
-    if (recaptchaToken) {
-      console.log("[Consultas] Verificando reCAPTCHA...");
-      const recaptchaResult = await verifyRecaptcha(recaptchaToken);
-
-      if (!recaptchaResult.success) {
-        console.warn("[Consultas] reCAPTCHA falló - Token inválido o vencido");
-        return NextResponse.json(
-          {
-            error:
-              "Verificación de reCAPTCHA fallida. Por favor, intenta de nuevo.",
-            details: "Token inválido o vencido",
-          },
-          { status: 400 }
-        );
-      }
-
-      recaptchaScore = recaptchaResult.score || null;
-      console.log(`[Consultas] reCAPTCHA válido - Score: ${recaptchaScore}`);
-
-      // Rechazar si el score es muy bajo (posible bot)
-      if (recaptchaScore !== null && recaptchaScore < 0.5) {
-        console.warn(
-          `[Consultas] Posible bot detectado - Score muy bajo: ${recaptchaScore}`
-        );
-        return NextResponse.json(
-          {
-            error:
-              "Verificación de seguridad fallida. Por favor, intenta de nuevo más tarde.",
-          },
-          { status: 400 }
-        );
-      }
-    } else {
-      console.warn("[Consultas] Sin token reCAPTCHA - Saltando verificación");
+    // Verificar reCAPTCHA: obligatorio si RECAPTCHA_SECRET_KEY está configurada; en
+    // producción, si falta la clave, se rechaza el envío (fallo cerrado).
+    const captcha = await verifyRecaptchaToken(recaptchaToken, {
+      accion: "submit",
+      remoteIp: getClientIp(request),
+    });
+    if (!captcha.success) {
+      console.warn("[Consultas] Verificación reCAPTCHA rechazada", { status: captcha.status, score: captcha.score });
+      return NextResponse.json(
+        { error: captcha.error ?? "Verificación de seguridad fallida. Por favor, intenta de nuevo." },
+        { status: captcha.status ?? 400 }
+      );
     }
+    const recaptchaScore = captcha.score ?? null;
 
     // Validar email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

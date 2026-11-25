@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
 import { query, withTransaction } from "@/lib/db";
-import { requireAdmin, parseId } from "@/lib/adminAuth";
+import { requireAdmin, requireArea, parseId } from "@/lib/adminAuth";
 import {
   estadoEfectivoReserva,
   validarTransicionReserva,
@@ -44,9 +42,8 @@ export async function GET(_request: NextRequest, { params }: Params) {
  * Los correos se envían después del commit; si fallan se devuelven como `avisos`.
  */
 export async function PATCH(request: NextRequest, { params }: Params) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
-  const session = await getServerSession(authOptions);
+  const auth = await requireArea("mentorias");
+  if (!auth.ok) return auth.respuesta;
   const id = parseId((await params).id);
   if (!id) return NextResponse.json({ success: false, error: "Reserva no válida." }, { status: 400 });
 
@@ -68,10 +65,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const actor = {
     tipo: "admin" as const,
-    id: session?.user?.adminId ?? null,
-    descripcion: session?.user?.email ?? null,
+    id: auth.adminId,
+    descripcion: auth.email,
   };
-  const rol = session?.user?.rolId;
+  const rol = auth.rol;
 
   try {
     const { estadoPrevio } = await withTransaction(async (q) => {

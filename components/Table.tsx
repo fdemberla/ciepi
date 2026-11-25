@@ -77,6 +77,16 @@ export default function Table<T>({
     }
   }, [searchValue, table, enableFiltering]);
 
+  // Filas visibles tras filtrar: si la búsqueda no encuentra nada también hay
+  // que mostrar el estado vacío (antes solo se miraba data.length).
+  const rows = table.getRowModel().rows;
+  const filtroActivo = enableFiltering && searchValue.trim() !== "";
+  const sinFilas = data.length === 0 || rows.length === 0;
+  const mensajeVacio =
+    data.length > 0 && filtroActivo
+      ? `No se encontraron resultados para “${searchValue.trim()}”`
+      : emptyMessage;
+
   return (
     <div
       className={`bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden ${className}`}
@@ -95,9 +105,11 @@ export default function Table<T>({
                 <Icon
                   icon="solar:magnifer-linear"
                   className="absolute left-3 top-1/2 transform -translate-y-1/2 text-dark_grey dark:text-gray-400 w-4 h-4"
+                  aria-hidden="true"
                 />
                 <input
-                  type="text"
+                  type="search"
+                  aria-label={searchPlaceholder}
                   placeholder={searchPlaceholder}
                   value={searchValue}
                   onChange={(e) => onSearchChange(e.target.value)}
@@ -105,11 +117,16 @@ export default function Table<T>({
                 />
                 {searchValue && (
                   <button
+                    type="button"
                     onClick={() => onSearchChange("")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-dark_grey dark:text-gray-400 hover:text-midnight_text dark:hover:text-white transition-colors"
                     aria-label="Limpiar búsqueda"
                   >
-                    <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
+                    <Icon
+                      icon="solar:close-circle-bold"
+                      className="w-4 h-4"
+                      aria-hidden="true"
+                    />
                   </button>
                 )}
               </div>
@@ -119,15 +136,25 @@ export default function Table<T>({
       )}
 
       {/* Tabla */}
-      {data.length === 0 ? (
-        <div className="p-12 text-center">
+      {sinFilas ? (
+        <div className="p-12 text-center" role="status">
           <Icon
-            icon={emptyIcon}
+            icon={filtroActivo && data.length > 0 ? "solar:magnifer-linear" : emptyIcon}
             className="w-16 h-16 text-dark_grey dark:text-gray-500 mx-auto mb-4"
+            aria-hidden="true"
           />
           <p className="text-dark_grey dark:text-gray-400 text-lg">
-            {emptyMessage}
+            {mensajeVacio}
           </p>
+          {filtroActivo && data.length > 0 && onSearchChange && (
+            <button
+              type="button"
+              onClick={() => onSearchChange("")}
+              className="mt-4 text-sm font-medium text-primary hover:underline"
+            >
+              Limpiar búsqueda
+            </button>
+          )}
         </div>
       ) : (
         <>
@@ -192,7 +219,7 @@ export default function Table<T>({
                 ))}
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {table.getRowModel().rows.map((row) => (
+                {rows.map((row) => (
                   <tr
                     key={row.id}
                     className="hover:bg-slateGray dark:hover:bg-gray-700/50 transition-colors"
@@ -240,6 +267,7 @@ export default function Table<T>({
                 </div>
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => table.setPageIndex(0)}
                     disabled={!table.getCanPreviousPage()}
                     aria-label="Ir a la primera página"
@@ -252,6 +280,7 @@ export default function Table<T>({
                     />
                   </button>
                   <button
+                    type="button"
                     onClick={() => table.previousPage()}
                     disabled={!table.getCanPreviousPage()}
                     aria-label="Página anterior"
@@ -273,6 +302,7 @@ export default function Table<T>({
                   </span>
 
                   <button
+                    type="button"
                     onClick={() => table.nextPage()}
                     disabled={!table.getCanNextPage()}
                     aria-label="Página siguiente"
@@ -285,6 +315,7 @@ export default function Table<T>({
                     />
                   </button>
                   <button
+                    type="button"
                     onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                     disabled={!table.getCanNextPage()}
                     aria-label="Ir a la última página"

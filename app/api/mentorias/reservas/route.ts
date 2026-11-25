@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
   const turnstile = await verifyTurnstileToken(body?.turnstileToken, getClientIp(request));
   if (!turnstile.success) {
-    return NextResponse.json({ success: false, error: turnstile.error }, { status: 403 });
+    return NextResponse.json({ success: false, error: turnstile.error }, { status: turnstile.status ?? 403 });
   }
 
   const v = validarSolicitudReserva(body);

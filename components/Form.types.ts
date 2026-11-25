@@ -50,13 +50,18 @@ export type FormFieldOrSection = FormFieldConfig | FormSection;
 
 export interface FormProps {
   fields: FormFieldOrSection[];
-  onSubmit: (data: Record<string, unknown>) => void;
+  // Si devuelve una promesa, Form la espera y mantiene el botón bloqueado
+  // hasta que termine (evita envíos dobles).
+  onSubmit: (data: Record<string, unknown>) => void | Promise<void>;
   className?: string;
   submitLabel?: string;
   title?: string;
-  initialValues?: Record<string, unknown>; // For editing existing data
+  // Valores iniciales. Se aplican al montar y cuando cambia su CONTENIDO (no la
+  // referencia): un objeto literal nuevo en cada render ya no borra lo escrito.
+  // Para reiniciar el formulario por completo, cambiar la prop `key`.
+  initialValues?: Record<string, unknown>;
   requireCaptcha?: boolean;
   onFieldChange?: (fieldName: string, value: unknown) => void; // Callback when field value changes
-  isSubmitting?: boolean; // Indicates if form is being submitted
+  isSubmitting?: boolean; // Envío en curso controlado por el padre (se suma al estado interno)
   children?: ReactNode; // Secciones adicionales dentro del formulario
 }

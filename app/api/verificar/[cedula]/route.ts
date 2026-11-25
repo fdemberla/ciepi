@@ -126,7 +126,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     if (!turnstileCheck.success) {
       return NextResponse.json(
         { error: turnstileCheck.error || "Verificación de seguridad fallida" },
-        { status: 403 },
+        { status: turnstileCheck.status ?? 403 },
       );
     }
 

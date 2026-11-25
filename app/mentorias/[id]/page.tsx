@@ -287,7 +287,7 @@ export default function MentorPage() {
                 <form onSubmit={reservar} className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label className="flex flex-col gap-1 sm:col-span-2">
                     <span className="text-sm font-semibold">Nombre completo *</span>
-                    <input required maxLength={200} autoComplete="name" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className={INPUT} />
+                    <input required maxLength={100} autoComplete="name" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} className={INPUT} />
                   </label>
                   <label className="flex flex-col gap-1">
                     <span className="text-sm font-semibold">Correo electrónico *</span>

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import BrandLogos from "@/components/brand/BrandLogos";
 import { useSession, signOut } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, type FocusEvent } from "react";
 import { Icon } from "@iconify/react";
 import { withBasePath } from "@/lib/basePath";
 import {
@@ -21,6 +21,35 @@ export default function Navbar() {
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [sticky, setSticky] = useState(false);
+  // Botones que abren cada desplegable: al cerrar con Escape el foco vuelve a
+  // ellos (patrón disclosure: botón con aria-expanded + aria-controls).
+  const adminButtonRef = useRef<HTMLButtonElement>(null);
+  const userButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Abrir un desplegable cierra los demás (antes podían quedar dos abiertos).
+  const toggleAdminMenu = () => {
+    setShowAdminMenu((v) => !v);
+    setShowUserMenu(false);
+    setShowMobileMenu(false);
+  };
+  const toggleUserMenu = () => {
+    setShowUserMenu((v) => !v);
+    setShowAdminMenu(false);
+    setShowMobileMenu(false);
+  };
+  const toggleMobileMenu = () => {
+    setShowMobileMenu((v) => !v);
+    setShowAdminMenu(false);
+    setShowUserMenu(false);
+  };
+
+  // Cierra el desplegable cuando el foco sale de él con Tab.
+  const closeOnFocusOut =
+    (close: () => void) => (event: FocusEvent<HTMLElement>) => {
+      const next = event.relatedTarget as Node | null;
+      if (next && !event.currentTarget.contains(next)) close();
+    };
 
   const isAdmin = session?.user?.isAdmin ?? false;
   const isAuthenticated = !!session;
@@ -83,24 +112,32 @@ export default function Navbar() {
       }
     };
 
-    // Cerrar menús al presionar la tecla Escape
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setShowUserMenu(false);
-        setShowAdminMenu(false);
-        setShowMobileMenu(false);
-      }
-    };
-
     document.addEventListener("click", handleClickOutside);
-    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
       document.removeEventListener("click", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+
+  // Escape cierra el desplegable abierto y devuelve el foco a su botón.
+  useEffect(() => {
+    if (!showUserMenu && !showAdminMenu && !showMobileMenu) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      const trigger = showAdminMenu
+        ? adminButtonRef.current
+        : showUserMenu
+          ? userButtonRef.current
+          : mobileButtonRef.current;
+      setShowUserMenu(false);
+      setShowAdminMenu(false);
+      setShowMobileMenu(false);
+      trigger?.focus();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showUserMenu, showAdminMenu, showMobileMenu]);
 
   return (
     <header
@@ -121,12 +158,17 @@ export default function Navbar() {
               // Si la sección requiere admin, mostrarla como dropdown
               if (section.requiresAdmin) {
                 return (
-                  <div key={sectionIdx} className="relative" data-menu>
+                  <div
+                    key={sectionIdx}
+                    className="relative"
+                    data-menu
+                    onBlur={closeOnFocusOut(() => setShowAdminMenu(false))}
+                  >
                     <button
+                      ref={adminButtonRef}
                       type="button"
-                      onClick={() => setShowAdminMenu(!showAdminMenu)}
+                      onClick={toggleAdminMenu}
                       aria-expanded={showAdminMenu}
-                      aria-haspopup="menu"
                       aria-controls="admin-dropdown-menu"
                       className="px-6 py-3 text-midnight_text dark:text-gray-300 hover:bg-slateGray dark:hover:bg-gray-800 rounded-full transition-all duration-300 font-medium flex items-center gap-2"
                     >
@@ -147,19 +189,20 @@ export default function Navbar() {
                     {showAdminMenu && (
                       <div
                         id="admin-dropdown-menu"
-                        role="menu"
                         className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-xl py-3 z-50 border border-gray-100 dark:border-gray-700"
                       >
                         {section.links.map((link, linkIdx) => (
                           <Link
                             key={linkIdx}
                             href={link.href}
+                            aria-current={isActive(link.href) ? "page" : undefined}
                             className="flex items-center px-5 py-3 text-sm text-midnight_text dark:text-gray-200 hover:bg-slateGray dark:hover:bg-gray-700 transition-colors group"
                             onClick={() => setShowAdminMenu(false)}
                           >
                             <Icon
                               icon={link.icon}
                               className="w-5 h-5 mr-3 text-primary group-hover:scale-110 transition-transform"
+                              aria-hidden="true"
                             />
                             {link.name}
                           </Link>
@@ -202,8 +245,9 @@ export default function Navbar() {
           <div className="flex items-center gap-3">
             {/* Mobile Menu Button */}
             <button
+              ref={mobileButtonRef}
               type="button"
-              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              onClick={toggleMobileMenu}
               aria-label={
                 showMobileMenu
                   ? "Cerrar menú de navegación"
@@ -226,15 +270,19 @@ export default function Navbar() {
             </button>
 
             {status === "loading" ? (
-              <div className="text-dark_grey text-sm">Cargando...</div>
+              <div className="text-dark_grey dark:text-gray-400 text-sm">Cargando...</div>
             ) : session ? (
-              <div className="relative" data-menu>
+              <div
+                className="relative"
+                data-menu
+                onBlur={closeOnFocusOut(() => setShowUserMenu(false))}
+              >
                 <button
+                  ref={userButtonRef}
                   type="button"
-                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  onClick={toggleUserMenu}
                   aria-label="Menú de usuario"
                   aria-expanded={showUserMenu}
-                  aria-haspopup="menu"
                   aria-controls="user-dropdown-menu"
                   className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                 >
@@ -254,7 +302,6 @@ export default function Navbar() {
                 {showUserMenu && (
                   <div
                     id="user-dropdown-menu"
-                    role="menu"
                     className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-2xl shadow-xl py-3 z-50 border border-gray-100 dark:border-gray-700"
                   >
                     <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
@@ -282,6 +329,7 @@ export default function Navbar() {
                       </div>
                     </div>
                     <button
+                      type="button"
                       onClick={() => {
                         setShowUserMenu(false);
                         signOut({ callbackUrl: withBasePath("/admin/login") });
@@ -327,6 +375,7 @@ export default function Navbar() {
                     <Link
                       key={linkIdx}
                       href={link.href}
+                      aria-current={isActive(link.href) ? "page" : undefined}
                       className="flex items-center px-4 py-3 text-midnight_text dark:text-gray-300 hover:bg-slateGray dark:hover:bg-gray-800 rounded-lg transition-all duration-300 font-medium"
                       onClick={() => setShowMobileMenu(false)}
                     >
@@ -373,6 +422,7 @@ export default function Navbar() {
                     </div>
                   </div>
                   <button
+                    type="button"
                     onClick={() => {
                       setShowMobileMenu(false);
                       signOut({ callbackUrl: withBasePath("/admin/login") });

@@ -1,22 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { ArchivoNoValidoError } from "@/lib/fileUpload";
 import { query } from "@/lib/db";
 import { safeErrorDetail } from "@/lib/apiError";
+import { requireAdmin, requireArea } from "@/lib/adminAuth";
+import { validarFechasEvento } from "@/lib/eventoEstado";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 }
-      );
-    }
+    const noAutorizado = await requireAdmin();
+    if (noAutorizado) return noAutorizado;
 
     const searchParams = request.nextUrl.searchParams;
-    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "50"), 1), 100);
-    const offset = Math.max(parseInt(searchParams.get("offset") || "0"), 0);
+    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "50", 10) || 50, 1), 100);
+    const offset = Math.max(parseInt(searchParams.get("offset") || "0", 10) || 0, 0);
 
     console.log(`🔍 [GET /api/admin/eventos] Fetching eventos`);
 
@@ -62,13 +58,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 }
-      );
-    }
+    // Modificar eventos requiere un rol del área "contenido" (leído de la BD).
+    const auth = await requireArea("contenido");
+    if (!auth.ok) return auth.respuesta;
 
     const formData = await request.formData();
 
@@ -79,6 +71,18 @@ export async function POST(request: NextRequest) {
     if (!nombre) {
       return NextResponse.json(
         { success: false, error: "El nombre es obligatorio" },
+        { status: 400 }
+      );
+    }
+
+    // Fechas: inicio obligatorio, fin >= inicio (se valida antes de guardar el banner)
+    const fechas = validarFechasEvento(
+      formData.get("fecha_inicio"),
+      formData.get("fecha_fin")
+    );
+    if (!fechas.ok) {
+      return NextResponse.json(
+        { success: false, error: fechas.error },
         { status: 400 }
       );
     }
@@ -106,8 +110,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const fecha_inicio = (formData.get("fecha_inicio") as string) || null;
-    const fecha_fin = (formData.get("fecha_fin") as string) || null;
+    const { fecha_inicio, fecha_fin } = fechas;
     const ubicacion = (formData.get("ubicacion") as string) || null;
 
     // Insert into database
@@ -148,12 +151,15 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error(`❌ [POST /api/admin/eventos] Error:`, error);
+    if (error instanceof ArchivoNoValidoError) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
 
     return NextResponse.json(
       {
         success: false,
         error: "Error al crear evento",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: safeErrorDetail(error),
       },
       { status: 500 }
     );

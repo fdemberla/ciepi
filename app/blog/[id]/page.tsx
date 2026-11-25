@@ -5,7 +5,6 @@ import { Icon } from "@iconify/react";
 import Link from "next/link";
 import SlateRenderer from "@/components/SlateRenderer";
 import { JsonLdScript } from "@/components/JsonLdScript";
-import { sanitizeForJsonLd } from "@/lib/security";
 import { getPublishedBlog, type PublishedBlog } from "@/lib/blogPublic";
 import { assetUrl } from "@/lib/basePath";
 
@@ -96,10 +95,12 @@ export default async function BlogPostPage({
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-ES", {
+    // Zona fija: en el servidor no se puede depender de la TZ del proceso.
+    return new Date(dateString).toLocaleDateString("es-PA", {
       year: "numeric",
       month: "long",
       day: "numeric",
+      timeZone: "America/Panama",
     });
   };
 
@@ -215,25 +216,23 @@ export default async function BlogPostPage({
 
       {/* JSON-LD Structured Data */}
       <JsonLdScript
-        data={
-          sanitizeForJsonLd({
-            "@context": "https://schema.org",
-            "@type": "BlogPosting",
-            headline: blog.titulo,
-            image: blog.imagen_banner ? [assetUrl(blog.imagen_banner)] : undefined,
-            datePublished: blog.creado_en,
-            author: {
-              "@type": "Person",
-              name: blog.autor_nombre,
-            },
-            publisher: {
-              "@type": "Organization",
-              name: "CIEPI",
-            },
-            description: blog.titulo,
-            keywords: blog.palabras_clave?.join(", "),
-          }) as Record<string, unknown>
-        }
+        data={{
+          "@context": "https://schema.org",
+          "@type": "BlogPosting",
+          headline: blog.titulo,
+          image: blog.imagen_banner ? [assetUrl(blog.imagen_banner)] : undefined,
+          datePublished: blog.creado_en,
+          author: {
+            "@type": "Person",
+            name: blog.autor_nombre,
+          },
+          publisher: {
+            "@type": "Organization",
+            name: "CIEPI",
+          },
+          description: blog.titulo,
+          keywords: blog.palabras_clave?.join(", "),
+        }}
       />
     </div>
   );

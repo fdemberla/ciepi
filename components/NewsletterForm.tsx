@@ -1,16 +1,40 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
 import toast from "react-hot-toast";
 import { withBasePath } from "@/lib/basePath";
+
+const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim();
+
+/** Token de reCAPTCHA v3 para la acción "newsletter" (el servidor lo exige si tiene la clave). */
+async function obtenerTokenRecaptcha(): Promise<string | undefined> {
+  if (!RECAPTCHA_SITE_KEY) return undefined;
+  if (!window.grecaptcha?.execute) {
+    throw new Error("No se pudo cargar la verificación de seguridad. Recarga la página e intenta de nuevo.");
+  }
+  return window.grecaptcha.execute(RECAPTCHA_SITE_KEY, { action: "newsletter" });
+}
 
 export default function NewsletterForm() {
   const [email, setEmail] = useState("");
   const [aceptoPolitica, setAceptoPolitica] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
+
+  // Carga el script de reCAPTCHA v3 (el mismo que usa el formulario de contacto).
+  useEffect(() => {
+    if (!RECAPTCHA_SITE_KEY || window.grecaptcha) return;
+    const scriptId = "recaptcha-v3-script";
+    if (document.getElementById(scriptId)) return;
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.src = `https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`;
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -25,12 +49,14 @@ export default function NewsletterForm() {
 
     try {
       setLoading(true);
+      const recaptchaToken = await obtenerTokenRecaptcha();
       const response = await fetch(withBasePath("/api/newsletter/suscribir"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.trim(),
           aceptoPolitica,
+          recaptchaToken,
         }),
       });
       const data = await response.json();

@@ -1,21 +1,20 @@
 /**
- * Componente seguro para JSON-LD Structured Data
- * Evita XSS utilizando suppressHydrationWarning y renderizado seguro
+ * Datos estructurados JSON-LD.
+ * El contenido se serializa con serializeJsonLd, que escapa `<`, `>` y `&`
+ * para que un título con `</script>` no pueda cerrar el bloque e inyectar HTML.
  */
+import { serializeJsonLd } from "@/lib/security";
 
 interface JsonLdProps {
   data: Record<string, unknown>;
 }
 
 export function JsonLdScript({ data }: JsonLdProps) {
-  // Crear el string JSON de forma segura
-  const jsonString = JSON.stringify(data);
-
   return (
     <script
       type="application/ld+json"
       suppressHydrationWarning
-      dangerouslySetInnerHTML={{ __html: jsonString }}
+      dangerouslySetInnerHTML={{ __html: serializeJsonLd(data) }}
     />
   );
 }

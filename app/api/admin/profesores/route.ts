@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { requireAdmin, requireArea } from "@/lib/adminAuth";
 import { query } from "@/lib/db";
 import { safeErrorDetail } from "@/lib/apiError";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 },
-      );
-    }
+    const noAutorizado = await requireAdmin();
+    if (noAutorizado) return noAutorizado;
 
     const soloActivos = request.nextUrl.searchParams.get("activo") === "true";
     const result = await query(
@@ -43,13 +37,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 },
-      );
-    }
+    const auth = await requireArea("capacitaciones");
+    if (!auth.ok) return auth.respuesta;
 
     const body = await request.json();
     const nombre = typeof body.nombre === "string" ? body.nombre.trim().slice(0, 120) : "";

@@ -47,7 +47,10 @@ FROM (VALUES
   ('10. fase2_maquinas_estado.sql',
      to_regclass('ciepi.estado_historial') IS NOT NULL
      AND to_regclass('ciepi.consultas_respuestas') IS NOT NULL
-     AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_inscripciones_estado_rango'))
+     AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_inscripciones_estado_rango')),
+  ('11. fase3_correcciones.sql',
+     EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'eventos_fecha_fin_posterior_chk')
+     AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_capacitaciones_fechas_inscripcion'))
 ) AS t(script, ok)
 ORDER BY script;
 

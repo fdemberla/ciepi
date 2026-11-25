@@ -8,8 +8,8 @@ export interface PublishedBlog {
   palabras_clave: string[];
   contenido: unknown;
   creado_en: string;
+  // Solo el nombre visible: el correo del autor no se expone en la API pública.
   autor_nombre: string;
-  autor_email: string;
 }
 
 // En la BD el id es entero (el script SQL de referencia dice UUID, pero no es lo desplegado).
@@ -33,8 +33,7 @@ export const getPublishedBlog = cache(
         b.palabras_clave,
         b.contenido,
         b.creado_en,
-        u.nombre as autor_nombre,
-        u.correo as autor_email
+        u.nombre as autor_nombre
       FROM ciepi.blogs b
       LEFT JOIN ciepi.usuarios_administradores u ON b.creado_por = u.id
       WHERE b.id = $1 AND b.estado = 6

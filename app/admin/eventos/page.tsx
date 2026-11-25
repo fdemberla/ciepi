@@ -10,7 +10,7 @@ interface Evento {
   nombre: string;
   descripcion: unknown;
   fecha_inicio: string;
-  fecha_fin: string;
+  fecha_fin: string | null;
   ubicacion: string | null;
   banner: string | null;
   galeria: unknown;
@@ -51,7 +51,8 @@ const EventosPage = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "—";
     const date = new Date(dateString);
     return date.toLocaleDateString("es-PA", {
       year: "numeric",
@@ -59,6 +60,7 @@ const EventosPage = () => {
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "America/Panama",
     });
   };
 

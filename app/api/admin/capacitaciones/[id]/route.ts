@@ -1,29 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
-import { query } from "@/lib/db";
-import { parseCapacitacionExtraFields } from "@/lib/capacitacionDetails";
+import { query, withTransaction } from "@/lib/db";
+import { safeErrorDetail } from "@/lib/apiError";
+import { parseId, requireAdmin, requireArea } from "@/lib/adminAuth";
+import {
+  parseCapacitacionBaseFields,
+  parseCapacitacionExtraFields,
+} from "@/lib/capacitacionDetails";
+import {
+  ArchivoNoValidoError,
+  deleteSavedFile,
+  saveFile,
+  validarArchivoParaCarpeta,
+} from "@/lib/fileUpload";
+import {
+  ErrorReferenciaCapacitacion,
+  guardarHijosCapacitacion,
+  validarReferenciasCapacitacion,
+} from "@/lib/capacitacionesServer";
 
+/**
+ * Detalle para el admin (incluye capacitaciones inactivas y profesores inactivos
+ * asignados, marcados con `activo`). La página de edición carga desde aquí.
+ */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   let id: string = "";
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isAdmin) {
+    const noAutorizado = await requireAdmin();
+    if (noAutorizado) return noAutorizado;
+
+    id = (await params).id;
+    const capacitacionId = parseId(id);
+    if (!capacitacionId) {
       return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 }
+        { success: false, error: "Capacitación no encontrada" },
+        { status: 404 }
       );
     }
-
-    const resolvedParams = await params;
-    id = resolvedParams.id;
-
-    console.log(
-      `🔍 [GET /api/admin/capacitaciones/${id}] Fetching capacitacion`
-    );
 
     const queryText = `
       SELECT 
@@ -43,6 +58,9 @@ export async function GET(
         COALESCE(s.nombre, c.sede) AS sede,
         COALESCE(e.nombre, c.edificio) AS edificio,
         COALESCE(a.nombre, c.salon) AS salon,
+        c.sede AS sede_texto,
+        c.edificio AS edificio_texto,
+        c.salon AS salon_texto,
         c.sede_id,
         c.edificio_id,
         c.aula_id,
@@ -72,7 +90,8 @@ export async function GET(
                 'nombre', p.nombre,
                 'apellido', p.apellido,
                 'especialidad', p.especialidad,
-                'biografia', p.biografia
+                'biografia', p.biografia,
+                'activo', p.activo
               )
               ORDER BY p.apellido, p.nombre
             )
@@ -89,17 +108,14 @@ export async function GET(
       WHERE c.id = $1
     `;
 
-    const result = await query(queryText, [id]);
+    const result = await query(queryText, [capacitacionId]);
 
     if (result.rows.length === 0) {
-      console.log(`❌ Capacitacion ${id} not found`);
       return NextResponse.json(
         { success: false, error: "Capacitación no encontrada" },
         { status: 404 }
       );
     }
-
-    console.log(`✅ Capacitacion ${id} found:`, result.rows[0].nombre);
 
     return NextResponse.json(
       {
@@ -115,7 +131,7 @@ export async function GET(
       {
         success: false,
         error: "Error al obtener capacitación",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: safeErrorDetail(error),
       },
       { status: 500 }
     );
@@ -127,223 +143,169 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   let id: string = "";
+  const archivosGuardados: string[] = [];
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 }
-      );
-    }
+    const auth = await requireArea("capacitaciones");
+    if (!auth.ok) return auth.respuesta;
 
-    const resolvedParams = await params;
-    id = resolvedParams.id;
-    const formData = await request.formData();
-
-    console.log(`🔍 [PUT /api/admin/capacitaciones/${id}] Processing update`);
-
-    // Extract and validate required fields
-    const nombre = formData.get("nombre") as string;
-    if (!nombre) {
-      return NextResponse.json(
-        { success: false, error: "El nombre es obligatorio" },
-        { status: 400 }
-      );
-    }
-
-    // First, get the existing capacitacion to preserve old file paths if no new files uploaded
-    const existingResult = await query(
-      "SELECT banner, archivo_adjunto FROM ciepi.capacitaciones WHERE id = $1",
-      [id]
-    );
-
-    if (existingResult.rows.length === 0) {
+    id = (await params).id;
+    const capacitacionId = parseId(id);
+    if (!capacitacionId) {
       return NextResponse.json(
         { success: false, error: "Capacitación no encontrada" },
         { status: 404 }
       );
     }
 
-    const existingData = existingResult.rows[0];
+    const formData = await request.formData();
 
-    // Extract files
-    const bannerFile = formData.get("Banner") as File | null;
-    const archivoAdjuntoFile = formData.get("archivoAdjunto") as File | null;
+    // 1. Validar TODO antes de escribir (misma validación que crear).
+    const base = parseCapacitacionBaseFields(formData);
+    if (!base.ok) {
+      return NextResponse.json({ success: false, error: base.error }, { status: 400 });
+    }
+    const extra = parseCapacitacionExtraFields(formData);
+    if (!extra.ok) {
+      return NextResponse.json({ success: false, error: extra.error }, { status: 400 });
+    }
 
-    console.log("📁 Files received:", {
-      banner: bannerFile?.name,
-      adjunto: archivoAdjuntoFile?.name,
+    const bannerFile = formData.get("Banner");
+    const archivoAdjuntoFile = formData.get("archivoAdjunto");
+    const banner = bannerFile instanceof File && bannerFile.size > 0 ? bannerFile : null;
+    const adjunto =
+      archivoAdjuntoFile instanceof File && archivoAdjuntoFile.size > 0 ? archivoAdjuntoFile : null;
+    if (banner) await validarArchivoParaCarpeta(banner, "banners");
+    if (adjunto) await validarArchivoParaCarpeta(adjunto, "attachments");
+
+    // `activo` solo cambia si llega en la petición (antes se reactivaba por defecto).
+    const activoStr = formData.get("activo");
+    const activo =
+      typeof activoStr === "string" && activoStr
+        ? activoStr === "true" || activoStr === "1"
+        : null;
+
+    const d = { ...base.data, ...extra.data };
+
+    // 2. Archivos nuevos (si la transacción falla se borran).
+    const bannerNuevo = banner ? await saveFile(banner, "banners") : null;
+    if (bannerNuevo) archivosGuardados.push(bannerNuevo);
+    const adjuntoNuevo = adjunto ? await saveFile(adjunto, "attachments") : null;
+    if (adjuntoNuevo) archivosGuardados.push(adjuntoNuevo);
+
+    // 3. Todo en una transacción: si falla un profesor u horario no queda la
+    //    capacitación modificada a medias ni sin profesores/horarios.
+    const actualizada = await withTransaction(async (q) => {
+      const existente = await q(
+        `SELECT c.horario, c.sede, c.edificio, c.salon, c.sede_id, c.edificio_id, c.aula_id,
+                COALESCE(
+                  (SELECT array_agg(cp.profesor_id) FROM ciepi.capacitacion_profesores cp
+                   WHERE cp.capacitacion_id = c.id),
+                  '{}'::int[]
+                ) AS profesor_ids
+         FROM ciepi.capacitaciones c
+         WHERE c.id = $1
+         FOR UPDATE`,
+        [capacitacionId]
+      );
+      const actual = existente.rows[0];
+      if (!actual) return null;
+
+      await validarReferenciasCapacitacion(
+        q,
+        { sedeId: d.sedeId, edificioId: d.edificioId, aulaId: d.aulaId, profesorIds: d.profesorIds },
+        {
+          sedeId: actual.sede_id,
+          edificioId: actual.edificio_id,
+          aulaId: actual.aula_id,
+          profesorIds: (actual.profesor_ids as number[]) ?? [],
+        }
+      );
+
+      // Textos antiguos (anteriores a sede_id/edificio_id/aula_id y a los bloques
+      // horarios): solo se reemplazan si llegan en el formulario. Antes se ponían
+      // en NULL al guardar y la capacitación perdía su ubicación.
+      const legado = (campo: "horario" | "sede" | "edificio" | "salon") =>
+        formData.has(campo) ? d[campo] : actual[campo];
+
+      const result = await q(
+        `UPDATE ciepi.capacitaciones
+         SET banner = COALESCE($1, banner),
+             nombre = $2,
+             descripcion = $3,
+             cantidad_horas = $4,
+             cantidad_participantes = $5,
+             archivo_adjunto = COALESCE($6, archivo_adjunto),
+             fecha_inicio_inscripcion = $7,
+             fecha_final_inscripcion = $8,
+             fecha_inicio_capacitacion = $9,
+             fecha_final_capacitacion = $10,
+             horario = $11,
+             modalidad = $12,
+             sede = $13,
+             edificio = $14,
+             salon = $15,
+             sede_id = $16,
+             edificio_id = $17,
+             aula_id = $18,
+             activo = COALESCE($19, activo),
+             fecha_actualizacion = NOW()
+         WHERE id = $20
+         RETURNING *`,
+        [
+          bannerNuevo,
+          d.nombre,
+          d.descripcion ? JSON.stringify(d.descripcion) : null,
+          d.cantidadHoras,
+          d.cantidadParticipantes,
+          adjuntoNuevo,
+          d.fechaInicioInscripcion,
+          d.fechaFinalInscripcion,
+          d.fechaInicioCapacitacion,
+          d.fechaFinalCapacitacion,
+          legado("horario"),
+          d.modalidad,
+          legado("sede"),
+          legado("edificio"),
+          legado("salon"),
+          d.sedeId,
+          d.edificioId,
+          d.aulaId,
+          activo,
+          capacitacionId,
+        ]
+      );
+
+      await guardarHijosCapacitacion(q, capacitacionId, d.profesorIds, d.horarios, true);
+      return result.rows[0];
     });
 
-    // Use existing paths or save new files
-    let bannerPath: string | null = existingData.banner;
-    let archivoAdjuntoPath: string | null = existingData.archivo_adjunto;
-
-    // Only update banner if a new file was uploaded
-    if (bannerFile && bannerFile.size > 0) {
-      const { saveFile } = await import("@/lib/fileUpload");
-      bannerPath = await saveFile(bannerFile, "banners");
-      console.log("✅ New banner saved:", bannerPath);
-    }
-
-    // Only update attachment if a new file was uploaded
-    if (archivoAdjuntoFile && archivoAdjuntoFile.size > 0) {
-      const { saveFile } = await import("@/lib/fileUpload");
-      archivoAdjuntoPath = await saveFile(archivoAdjuntoFile, "attachments");
-      console.log("✅ New attachment saved:", archivoAdjuntoPath);
-    }
-
-    // Extract other fields
-    const descripcionStr = formData.get("descripcion") as string;
-    let descripcion = null;
-
-    if (descripcionStr) {
-      try {
-        descripcion = JSON.parse(descripcionStr);
-      } catch {
-        descripcion = descripcionStr;
-      }
-    }
-
-    const cantidadHoras = formData.get("cantidadHoras")
-      ? parseInt(formData.get("cantidadHoras") as string)
-      : null;
-
-    const cantidadParticipantes = formData.get("cantidad_participantes")
-      ? parseInt(formData.get("cantidad_participantes") as string)
-      : null;
-
-    const fechaInicioInscripcion =
-      (formData.get("fechaInicioInscripcion") as string) || null;
-    const fechaFinalInscripcion =
-      (formData.get("fechaFinalInscripcion") as string) || null;
-    const fechaInicioCapacitacion =
-      (formData.get("fechaInicioCapacitacion") as string) || null;
-    const fechaFinalCapacitacion =
-      (formData.get("fechaFinalCapacitacion") as string) || null;
-
-    // Get activo status (default to existing or true)
-    const activoStr = formData.get("activo") as string;
-    const activo = activoStr ? activoStr === "true" || activoStr === "1" : true;
-
-    const extraParsed = parseCapacitacionExtraFields(formData);
-    if (!extraParsed.ok) {
+    if (!actualizada) {
+      await Promise.all(archivosGuardados.map(deleteSavedFile));
       return NextResponse.json(
-        { success: false, error: extraParsed.error },
-        { status: 400 }
+        { success: false, error: "Capacitación no encontrada" },
+        { status: 404 }
       );
     }
-    const {
-      horario,
-      modalidad,
-      sede,
-      edificio,
-      salon,
-      sedeId,
-      edificioId,
-      aulaId,
-      profesorIds,
-      horarios,
-    } = extraParsed.data;
-
-    // Update in database
-    const updateQuery = `
-      UPDATE ciepi.capacitaciones
-      SET 
-        banner = $1,
-        nombre = $2,
-        descripcion = $3,
-        cantidad_horas = $4,
-        cantidad_participantes = $5,
-        archivo_adjunto = $6,
-        fecha_inicio_inscripcion = $7,
-        fecha_final_inscripcion = $8,
-        fecha_inicio_capacitacion = $9,
-        fecha_final_capacitacion = $10,
-        horario = $11,
-        modalidad = $12,
-        sede = $13,
-        edificio = $14,
-        salon = $15,
-        sede_id = $16,
-        edificio_id = $17,
-        aula_id = $18,
-        activo = $19,
-        fecha_actualizacion = NOW()
-      WHERE id = $20
-      RETURNING *
-    `;
-
-    const values = [
-      bannerPath,
-      nombre,
-      descripcion ? JSON.stringify(descripcion) : null,
-      cantidadHoras,
-      cantidadParticipantes,
-      archivoAdjuntoPath,
-      fechaInicioInscripcion,
-      fechaFinalInscripcion,
-      fechaInicioCapacitacion,
-      fechaFinalCapacitacion,
-      horario,
-      modalidad,
-      sede,
-      edificio,
-      salon,
-      sedeId,
-      edificioId,
-      aulaId,
-      activo,
-      id,
-    ];
-
-    console.log("📊 Executing UPDATE query");
-
-    const result = await query(updateQuery, values);
-
-    await query(
-      `DELETE FROM ciepi.capacitacion_profesores WHERE capacitacion_id = $1`,
-      [id]
-    );
-    if (profesorIds.length > 0) {
-      await query(
-        `INSERT INTO ciepi.capacitacion_profesores (capacitacion_id, profesor_id)
-         SELECT $1, unnest($2::int[])
-         ON CONFLICT DO NOTHING`,
-        [id, profesorIds]
-      );
-    }
-
-    await query(
-      `DELETE FROM ciepi.capacitacion_horarios WHERE capacitacion_id = $1`,
-      [id]
-    );
-    for (const h of horarios) {
-      await query(
-        `INSERT INTO ciepi.capacitacion_horarios (capacitacion_id, dia_semana, hora_inicio, hora_fin)
-         VALUES ($1, $2, $3, $4)`,
-        [id, h.dia_semana, h.hora_inicio, h.hora_fin]
-      );
-    }
-
-    console.log(`✅ Capacitación ${id} updated successfully`);
 
     return NextResponse.json(
       {
         success: true,
         message: "Capacitación actualizada exitosamente",
-        data: result.rows[0],
+        data: actualizada,
       },
       { status: 200 }
     );
   } catch (error) {
-    console.error(`❌ [PUT /api/admin/capacitaciones/${id}] Error:`, error);
-
+    await Promise.all(archivosGuardados.map(deleteSavedFile));
+    if (error instanceof ArchivoNoValidoError || error instanceof ErrorReferenciaCapacitacion) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+    console.error(`[PUT /api/admin/capacitaciones/${id}] Error:`, error);
     return NextResponse.json(
       {
         success: false,
         error: "Error al actualizar capacitación",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: safeErrorDetail(error),
       },
       { status: 500 }
     );

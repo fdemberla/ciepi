@@ -4,7 +4,7 @@ import { useRouter, useParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import Form from "@/components/Form";
 import type { FormFieldConfig } from "@/components/Form.types";
-import { toDateTimeLocalInput } from "@/lib/dateInput";
+import { aInputPanama } from "@/lib/eventoEstado";
 
 interface Evento {
   id: number;
@@ -54,8 +54,8 @@ const EditarEventoPage = () => {
       setInitialValues({
         nombre: eventoData.nombre || "",
         descripcion: eventoData.descripcion || "",
-        fecha_inicio: toDateTimeLocalInput(eventoData.fecha_inicio),
-        fecha_fin: toDateTimeLocalInput(eventoData.fecha_fin),
+        fecha_inicio: aInputPanama(eventoData.fecha_inicio),
+        fecha_fin: aInputPanama(eventoData.fecha_fin),
         ubicacion: eventoData.ubicacion || "",
       });
     } catch (err) {
@@ -115,6 +115,11 @@ const EditarEventoPage = () => {
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       setIsSubmitting(true);
+
+      // Misma validación que la API: fin >= inicio (los valores datetime-local se comparan como texto)
+      if (data.fecha_fin && data.fecha_inicio && String(data.fecha_fin) < String(data.fecha_inicio)) {
+        throw new Error("La fecha de fin debe ser igual o posterior a la fecha de inicio");
+      }
 
       const submitFormData = new FormData();
       submitFormData.append("nombre", data.nombre as string);

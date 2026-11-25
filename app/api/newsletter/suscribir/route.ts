@@ -11,6 +11,7 @@ import {
 import { safeErrorDetail } from "@/lib/apiError";
 import { sendEmail } from "@/lib/smtp";
 import { getClientIp } from "@/lib/verificationUtils";
+import { verifyRecaptchaToken } from "@/lib/recaptcha";
 import {
   NEWSLETTER_POLICY_VERSION,
   generateConfirmToken,
@@ -20,29 +21,6 @@ import {
   isValidEmail,
   normalizeEmail,
 } from "@/lib/newsletter";
-
-async function verifyRecaptcha(token: string): Promise<boolean> {
-  const secretKey = process.env.RECAPTCHA_SECRET_KEY;
-  if (!secretKey) return true;
-
-  try {
-    const response = await fetch(
-      "https://www.google.com/recaptcha/api/siteverify",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: `secret=${secretKey}&response=${encodeURIComponent(token)}`,
-      },
-    );
-    const data = await response.json();
-    if (!data.success) return false;
-    if (typeof data.score === "number" && data.score < 0.5) return false;
-    return true;
-  } catch (error) {
-    console.error("[Newsletter] Error verificando reCAPTCHA:", error);
-    return false;
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,18 +47,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (recaptchaToken) {
-      const recaptchaOk = await verifyRecaptcha(recaptchaToken);
-      if (!recaptchaOk) {
-        return NextResponse.json(
-          { error: "Verificación de seguridad fallida. Intenta de nuevo." },
-          { status: 400 },
-        );
-      }
-    }
-
     const email = normalizeEmail(rawEmail);
     const clientIp = getClientIp(request);
+
+    // El token es obligatorio si RECAPTCHA_SECRET_KEY está configurada (y en producción
+    // la falta de la clave rechaza el envío): evita el envío masivo de confirmaciones.
+    const captcha = await verifyRecaptchaToken(recaptchaToken, { accion: "newsletter", remoteIp: clientIp });
+    if (!captcha.success) {
+      return NextResponse.json(
+        { error: captcha.error ?? "Verificación de seguridad fallida. Intenta de nuevo." },
+        { status: captcha.status ?? 400 },
+      );
+    }
 
     const token = generateConfirmToken();
     const tokenHash = hashConfirmToken(token);

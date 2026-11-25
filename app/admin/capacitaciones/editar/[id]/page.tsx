@@ -13,6 +13,8 @@ import UbicacionHorariosSelector, {
 import { withBasePath } from "@/lib/basePath";
 import {
   CAPACITACION_LOGISTICA_SECTION,
+  errorRangoFechas,
+  validarHorarios,
   type HorarioInput,
 } from "@/lib/capacitacionDetails";
 
@@ -65,9 +67,9 @@ const fields: FormFieldOrSection[] = [
         required: false,
         multiple: true,
         dropzoneText:
-          "Arrastra documentos aquí o haz clic para seleccionar (pdf, docx, xlsx, etc.)",
+          "Arrastra documentos aquí o haz clic para seleccionar (PDF o Word, máx. 20 MB)",
         accept:
-          ".pdf,.doc,.docx,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          ".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       },
     ],
   },
@@ -150,6 +152,7 @@ const EditarCapacitacionPage = () => {
     aulaId: null,
   });
   const [horarios, setHorarios] = useState<HorarioInput[]>([]);
+  const [ubicacionLegada, setUbicacionLegada] = useState<string | null>(null);
   const [initialData, setInitialData] = useState<Record<
     string,
     unknown
@@ -158,8 +161,9 @@ const EditarCapacitacionPage = () => {
   useEffect(() => {
     const fetchCapacitacion = async () => {
       try {
-        console.log(`Fetching capacitacion ${id}...`);
-        const response = await fetch(withBasePath(`/api/capacitaciones/${id}`));
+        // Endpoint de admin: incluye capacitaciones inactivas y profesores inactivos
+        // asignados (el público los oculta y al guardar se perdían).
+        const response = await fetch(withBasePath(`/api/admin/capacitaciones/${id}`));
         const result = await response.json();
 
         if (!response.ok || !result.success) {
@@ -167,7 +171,6 @@ const EditarCapacitacionPage = () => {
         }
 
         const data = result.data;
-        console.log("Capacitacion loaded:", data);
 
         // Format dates for date inputs (YYYY-MM-DD)
         const formatDateForInput = (dateString: string) => {
@@ -212,6 +215,12 @@ const EditarCapacitacionPage = () => {
         if (Array.isArray(data.horarios)) {
           setHorarios(data.horarios);
         }
+        // Textos de ubicación/horario anteriores a la parametrización: se conservan al guardar.
+        setUbicacionLegada(
+          [data.horario, data.sede_texto, data.edificio_texto, data.salon_texto]
+            .filter((t: unknown) => typeof t === "string" && t.trim())
+            .join(" · ") || null,
+        );
 
         setInitialData(formData);
         setLoading(false);
@@ -231,6 +240,17 @@ const EditarCapacitacionPage = () => {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
+      // Misma validación que el servidor, para avisar antes de enviar.
+      const errorHorarios = validarHorarios(horarios);
+      if (!errorHorarios.ok) throw new Error(errorHorarios.error);
+      const errorFechas = errorRangoFechas({
+        fechaInicioInscripcion: (data.fechaInicioInscripcion as string) || null,
+        fechaFinalInscripcion: (data.fechaFinalInscripcion as string) || null,
+        fechaInicioCapacitacion: (data.fechaInicioCapacitacion as string) || null,
+        fechaFinalCapacitacion: (data.fechaFinalCapacitacion as string) || null,
+      });
+      if (errorFechas) throw new Error(errorFechas);
+
       // Create FormData to send files and data
       const formData = new FormData();
 
@@ -382,6 +402,13 @@ const EditarCapacitacionPage = () => {
               submitLabel="Guardar Cambios"
               initialValues={initialData}
             >
+              {ubicacionLegada && (
+                <p className="mb-4 text-xs text-dark_grey dark:text-gray-400 bg-slateGray/60 dark:bg-gray-900/40 rounded-xl p-3">
+                  <span className="font-semibold">Datos anteriores (texto libre):</span>{" "}
+                  {ubicacionLegada}. Se conservan al guardar; la sede, el aula y los
+                  horarios de abajo tienen prioridad donde estén definidos.
+                </p>
+              )}
               <UbicacionHorariosSelector
                 ubicacion={ubicacion}
                 onUbicacionChange={setUbicacion}

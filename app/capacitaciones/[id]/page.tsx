@@ -34,6 +34,9 @@ interface Capacitacion {
   salon: string | null;
   profesores?: ProfesorDetalle[];
   activo: boolean;
+  /** Calculado en el servidor con la ventana de inscripción (hora de Panamá). */
+  inscripcion_abierta?: boolean;
+  inscripcion_estado?: "abierta" | "proximamente" | "cerrada";
   fecha_creacion: string;
   fecha_actualizacion: string;
 }
@@ -60,6 +63,9 @@ const CapacitacionDetailPage = () => {
         `${basePath}/api/capacitaciones/${capacitacionId}`,
       );
 
+      if (response.status === 404) {
+        throw new Error("Esta capacitación no existe o ya no está disponible.");
+      }
       if (!response.ok) {
         throw new Error("Error al cargar la capacitación");
       }
@@ -142,6 +148,12 @@ const CapacitacionDetailPage = () => {
   }
 
   const cap: Capacitacion = capacitacion as Capacitacion;
+  // El servidor decide si la inscripción está abierta (no se calcula con la hora del navegador).
+  const inscripcionAbierta = cap.inscripcion_abierta === true;
+  const motivoCerrada =
+    cap.inscripcion_estado === "proximamente"
+      ? `La inscripción abre el ${formatDate(cap.fecha_inicio_inscripcion)}. Vuelve ese día para inscribirte.`
+      : "El período de inscripción de esta capacitación ya terminó. Revisa las otras capacitaciones disponibles.";
 
   return (
     <section className="bg-slateGray dark:bg-gray-900 min-h-screen pt-32 pb-20">
@@ -435,24 +447,42 @@ const CapacitacionDetailPage = () => {
                     className="text-white text-3xl"
                   />
                   <h3 className="text-3xl sm:text-4xl font-bold">
-                    ¿Listo para inscribirte?
+                    {inscripcionAbierta
+                      ? "¿Listo para inscribirte?"
+                      : cap.inscripcion_estado === "proximamente"
+                        ? "La inscripción abrirá pronto"
+                        : "La inscripción está cerrada"}
                   </h3>
                 </div>
                 <p className="text-white/90 text-lg mb-8 max-w-2xl">
-                  No pierdas la oportunidad de participar en esta capacitación.
-                  ¡Inscríbete ahora y comienza tu desarrollo profesional!
+                  {inscripcionAbierta
+                    ? "No pierdas la oportunidad de participar en esta capacitación. ¡Inscríbete ahora y comienza tu desarrollo profesional!"
+                    : motivoCerrada}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <button
-                    onClick={handleInscribirse}
-                    className="flex-1 bg-white text-primary py-5 px-8 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-white/30 transition-all duration-300 font-bold text-lg shadow-xl hover:shadow-2xl hover:-translate-y-1"
-                  >
-                    Inscríbete Ahora
-                    <Icon
-                      icon="solar:arrow-right-linear"
-                      className="w-6 h-6 inline-block ml-2"
-                    />
-                  </button>
+                  {inscripcionAbierta ? (
+                    <button
+                      onClick={handleInscribirse}
+                      className="flex-1 bg-white text-primary py-5 px-8 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-white/30 transition-all duration-300 font-bold text-lg shadow-xl hover:shadow-2xl hover:-translate-y-1"
+                    >
+                      Inscríbete Ahora
+                      <Icon
+                        icon="solar:arrow-right-linear"
+                        className="w-6 h-6 inline-block ml-2"
+                      />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      aria-disabled="true"
+                      className="flex-1 bg-white/70 text-primary/70 py-5 px-8 rounded-full font-bold text-lg cursor-not-allowed"
+                    >
+                      {cap.inscripcion_estado === "proximamente"
+                        ? "Inscripción próximamente"
+                        : "Inscripción cerrada"}
+                    </button>
+                  )}
                   <button
                     onClick={handleVolver}
                     className="flex-1 sm:flex-initial bg-white/10 backdrop-blur-sm text-white py-5 px-8 rounded-full border-2 border-white/30 hover:bg-white/20 transition-all duration-300 font-semibold"

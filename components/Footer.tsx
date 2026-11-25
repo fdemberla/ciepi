@@ -166,9 +166,14 @@ const Footer = () => {
                   />
                 </div>
                 <div>
-                  <p className="text-dark_grey dark:text-gray-400 text-sm">
+                  {/* Mismo correo que /privacidad y /contacto. PENDIENTE: confirmar
+                      con CIEPI la dirección oficial y cambiarla en los tres sitios. */}
+                  <a
+                    href="mailto:info@ciepi.pa"
+                    className="text-dark_grey dark:text-gray-400 text-sm hover:text-primary dark:hover:text-primary hover:underline transition-colors"
+                  >
                     info@ciepi.pa
-                  </p>
+                  </a>
                 </div>
               </div>
             </div>

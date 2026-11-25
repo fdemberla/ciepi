@@ -12,6 +12,8 @@ import { Icon } from "@iconify/react";
 import { withBasePath } from "@/lib/basePath";
 import {
   CAPACITACION_LOGISTICA_SECTION,
+  errorRangoFechas,
+  validarHorarios,
   type HorarioInput,
 } from "@/lib/capacitacionDetails";
 
@@ -64,9 +66,9 @@ const fields: FormFieldOrSection[] = [
         required: false,
         multiple: true,
         dropzoneText:
-          "Arrastra documentos aquí o haz clic para seleccionar (pdf, docx, xlsx, etc.)",
+          "Arrastra documentos aquí o haz clic para seleccionar (PDF o Word, máx. 20 MB)",
         accept:
-          ".pdf,.doc,.docx,.xls,.xlsx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          ".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       },
     ],
   },
@@ -128,6 +130,17 @@ const Page = () => {
 
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
+      // Misma validación que el servidor, para avisar antes de enviar.
+      const errorHorarios = validarHorarios(horarios);
+      if (!errorHorarios.ok) throw new Error(errorHorarios.error);
+      const errorFechas = errorRangoFechas({
+        fechaInicioInscripcion: (data.fechaInicioInscripcion as string) || null,
+        fechaFinalInscripcion: (data.fechaFinalInscripcion as string) || null,
+        fechaInicioCapacitacion: (data.fechaInicioCapacitacion as string) || null,
+        fechaFinalCapacitacion: (data.fechaFinalCapacitacion as string) || null,
+      });
+      if (errorFechas) throw new Error(errorFechas);
+
       // Create FormData to send files and data
       const formData = new FormData();
 

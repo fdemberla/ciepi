@@ -1,17 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { safeErrorDetail } from "@/lib/apiError";
+import { parseId } from "@/lib/adminAuth";
+import { ventanaInscripcionSql } from "@/lib/inscripcionVentana";
+
+/**
+ * Detalle público de una capacitación.
+ * - 404 si no existe o está inactiva (el admin usa /api/admin/capacitaciones/[id]).
+ * - `inscripcion_abierta` se calcula en el servidor con la ventana de inscripción
+ *   (último día incluido, hora de Panamá); `inscripcion_estado` dice por qué no:
+ *   "proximamente" (aún no abre) o "cerrada" (ya cerró).
+ */
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   let id: string = "";
   try {
     const resolvedParams = await params;
     id = resolvedParams.id;
-
-    console.log(`🔍 [GET /api/capacitaciones/${id}] Fetching capacitacion`);
+    const capacitacionId = parseId(id);
+    if (!capacitacionId) {
+      return NextResponse.json(
+        { success: false, error: "Capacitación no encontrada" },
+        { status: 404 }
+      );
+    }
 
     const queryText = `
       SELECT 
@@ -35,6 +50,7 @@ export async function GET(
         c.edificio_id,
         c.aula_id,
         c.activo,
+        ${ventanaInscripcionSql("c")},
         c.fecha_creacion,
         c.fecha_actualizacion,
         COALESCE(
@@ -74,25 +90,33 @@ export async function GET(
       LEFT JOIN ciepi.sedes s ON s.id = c.sede_id
       LEFT JOIN ciepi.edificios e ON e.id = c.edificio_id
       LEFT JOIN ciepi.aulas a ON a.id = c.aula_id
-      WHERE c.id = $1
+      WHERE c.id = $1 AND c.activo = true
     `;
 
-    const result = await query(queryText, [id]);
+    const result = await query(queryText, [capacitacionId]);
 
     if (result.rows.length === 0) {
-      console.log(`❌ Capacitacion ${id} not found`);
       return NextResponse.json(
         { success: false, error: "Capacitación no encontrada" },
         { status: 404 }
       );
     }
 
-    console.log(`✅ Capacitacion ${id} found:`, result.rows[0].nombre);
+    const { inscripcion_iniciada, inscripcion_vigente, ...fila } = result.rows[0];
+    const inscripcion_estado = !inscripcion_iniciada
+      ? "proximamente"
+      : !inscripcion_vigente
+        ? "cerrada"
+        : "abierta";
 
     return NextResponse.json(
       {
         success: true,
-        data: result.rows[0],
+        data: {
+          ...fila,
+          inscripcion_abierta: inscripcion_estado === "abierta",
+          inscripcion_estado,
+        },
       },
       { status: 200 }
     );

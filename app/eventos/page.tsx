@@ -1,27 +1,29 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
-import EventoCard from "@/components/EventoCard";
+import EventoCard, { type Evento } from "@/components/EventoCard";
 import CalendarGrid from "@/components/CalendarGrid";
 import type { CalendarEvent } from "@/lib/calendarUtils";
+import {
+  fechaPanamaEvento,
+  ZONA_PANAMA,
+  type EstadoEvento,
+} from "@/lib/eventoEstado";
 
-interface Evento {
-  id: number;
-  nombre: string;
-  descripcion?: string;
-  fecha_inicio: string;
-  fecha_fin: string;
-  ubicacion?: string;
-  banner?: string;
-  galeria?: unknown;
-  fecha_creacion: string;
-  fecha_actualizacion: string;
-}
+type EventoFiltro = "todos" | EstadoEvento;
 
-type EventoFiltro = "todos" | "pasados" | "en-curso" | "futuros";
+type Conteos = Record<EventoFiltro, number>;
+const CONTEOS_VACIOS: Conteos = { todos: 0, proximo: 0, en_curso: 0, finalizado: 0 };
+
+const TEXTO_FILTRO: Record<EstadoEvento, string> = {
+  proximo: "próximos",
+  en_curso: "en curso",
+  finalizado: "pasados",
+};
 
 const EventosPage = () => {
   const [eventos, setEventos] = useState<Evento[]>([]);
+  const [conteos, setConteos] = useState<Conteos>(CONTEOS_VACIOS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [filtro, setFiltro] = useState<EventoFiltro>("todos");
@@ -30,65 +32,50 @@ const EventosPage = () => {
   const [calYear, setCalYear] = useState(now.getFullYear());
   const [calMonth, setCalMonth] = useState(now.getMonth());
 
+  // El filtro por estado se aplica en la API (en SQL, antes del LIMIT).
   useEffect(() => {
-    fetchEventos();
-  }, []);
+    let cancelado = false;
+    const fetchEventos = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+        const qs = filtro === "todos" ? "" : `?estado=${filtro}`;
+        const response = await fetch(`${basePath}/api/eventos${qs}`, {
+          method: "GET",
+        });
 
-  const fetchEventos = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-      const response = await fetch(`${basePath}/api/eventos`, {
-        method: "GET",
-      });
+        if (!response.ok) {
+          throw new Error("Error al cargar eventos");
+        }
 
-      if (!response.ok) {
-        throw new Error("Error al cargar eventos");
+        const data = await response.json();
+        if (cancelado) return;
+        setEventos(Array.isArray(data.data) ? data.data : []);
+        if (data.conteos) setConteos({ ...CONTEOS_VACIOS, ...data.conteos });
+      } catch (err) {
+        if (cancelado) return;
+        console.error("Error fetching eventos:", err);
+        setError(
+          err instanceof Error ? err.message : "Error al cargar los eventos",
+        );
+      } finally {
+        if (!cancelado) setLoading(false);
       }
+    };
+    fetchEventos();
+    return () => {
+      cancelado = true;
+    };
+  }, [filtro]);
 
-      const data = await response.json();
-      setEventos(Array.isArray(data.data) ? data.data : []);
-    } catch (err) {
-      console.error("Error fetching eventos:", err);
-      setError(
-        err instanceof Error ? err.message : "Error al cargar los eventos",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getEstado = (evento: Evento): "pasado" | "en-curso" | "futuro" => {
-    const now = new Date();
-    const inicio = new Date(evento.fecha_inicio);
-    const fin = new Date(evento.fecha_fin);
-
-    if (now > fin) return "pasado";
-    if (now >= inicio && now <= fin) return "en-curso";
-    return "futuro";
-  };
-
-  const eventosFiltrados = eventos.filter((evento) => {
-    const estado = getEstado(evento);
-
-    switch (filtro) {
-      case "pasados":
-        return estado === "pasado";
-      case "en-curso":
-        return estado === "en-curso";
-      case "futuros":
-        return estado === "futuro";
-      default:
-        return true;
-    }
-  });
+  const eventosFiltrados = eventos;
 
   const stats = {
-    todos: eventos.length,
-    pasados: eventos.filter((e) => getEstado(e) === "pasado").length,
-    enCurso: eventos.filter((e) => getEstado(e) === "en-curso").length,
-    futuros: eventos.filter((e) => getEstado(e) === "futuro").length,
+    todos: conteos.todos,
+    pasados: conteos.finalizado,
+    enCurso: conteos.en_curso,
+    futuros: conteos.proximo,
   };
 
   return (
@@ -130,9 +117,9 @@ const EventosPage = () => {
               </button>
 
               <button
-                onClick={() => setFiltro("futuros")}
+                onClick={() => setFiltro("proximo")}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm transition-all duration-200 ${
-                  filtro === "futuros"
+                  filtro === "proximo"
                     ? "bg-primary text-white shadow-md"
                     : "bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:border-primary/40 hover:text-primary"
                 }`}
@@ -142,9 +129,9 @@ const EventosPage = () => {
               </button>
 
               <button
-                onClick={() => setFiltro("en-curso")}
+                onClick={() => setFiltro("en_curso")}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm transition-all duration-200 ${
-                  filtro === "en-curso"
+                  filtro === "en_curso"
                     ? "bg-primary text-white shadow-md"
                     : "bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:border-primary/40 hover:text-primary"
                 }`}
@@ -154,9 +141,9 @@ const EventosPage = () => {
               </button>
 
               <button
-                onClick={() => setFiltro("pasados")}
+                onClick={() => setFiltro("finalizado")}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-sm transition-all duration-200 ${
-                  filtro === "pasados"
+                  filtro === "finalizado"
                     ? "bg-primary text-white shadow-md"
                     : "bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:border-primary/40 hover:text-primary"
                 }`}
@@ -214,13 +201,17 @@ const EventosPage = () => {
               setCalMonth(m);
             }}
             events={eventosFiltrados.map((ev): CalendarEvent => {
-              const d = new Date(ev.fecha_inicio);
-              const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-              const startTime = d.toLocaleTimeString("es-PA", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              });
+              // Día y hora en Panamá, igual que en las tarjetas
+              const inicio = ev.fecha_inicio ?? ev.fecha_fin;
+              const dateStr = fechaPanamaEvento(inicio);
+              const startTime = inicio
+                ? new Date(inicio).toLocaleTimeString("es-PA", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false,
+                    timeZone: ZONA_PANAMA,
+                  })
+                : undefined;
               return {
                 id: `evento-${ev.id}`,
                 title: ev.nombre,
@@ -245,7 +236,7 @@ const EventosPage = () => {
             <p className="text-dark_grey dark:text-gray-400">
               {filtro === "todos"
                 ? "No hay eventos disponibles en este momento"
-                : `No hay eventos ${filtro.replace("-", " ")} en este momento`}
+                : `No hay eventos ${TEXTO_FILTRO[filtro]} en este momento`}
             </p>
           </div>
         ) : (

@@ -34,6 +34,15 @@ interface Sede {
   edificios: Edificio[];
 }
 
+/** Etiqueta «Inactivo»: no se ofrece en asignaciones nuevas, pero se conserva donde ya se usa. */
+function BadgeInactivo() {
+  return (
+    <span className="ml-2 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+      Inactivo
+    </span>
+  );
+}
+
 export default function AdminSedesPage() {
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,6 +140,26 @@ export default function AdminSedesPage() {
     }
   };
 
+  /**
+   * Activa o desactiva una sede, edificio o aula. Desactivar no toca las capacitaciones
+   * ni las reservas que ya la usan: solo deja de ofrecerse para asignaciones nuevas.
+   */
+  const handleToggleActivo = async (endpoint: string, body: Record<string, unknown>) => {
+    try {
+      const res = await fetch(withBasePath(endpoint), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Error al actualizar");
+      toast.success(body.activo ? "Activado" : "Desactivado");
+      fetchSedes();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al actualizar");
+    }
+  };
+
   const handleDelete = async (
     endpoint: string,
     confirmMsg: string,
@@ -138,7 +167,9 @@ export default function AdminSedesPage() {
     if (!confirm(confirmMsg)) return;
     try {
       const res = await fetch(withBasePath(endpoint), { method: "DELETE" });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      // 409: está en uso (capacitaciones, horarios o reservas). El mensaje explica
+      // cuántas y recomienda desactivar.
       if (!res.ok) throw new Error(data.error || "Error al eliminar");
       toast.success(data.message || "Eliminado");
       fetchSedes();
@@ -235,6 +266,7 @@ export default function AdminSedesPage() {
                             {sede.codigo}
                           </span>
                         )}
+                        {!sede.activo && <BadgeInactivo />}
                       </div>
                       {sede.direccion && (
                         <p className="text-xs text-dark_grey dark:text-gray-400 mt-1">
@@ -242,18 +274,35 @@ export default function AdminSedesPage() {
                         </p>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleDelete(
-                          `/api/admin/sedes/${sede.id}`,
-                          `¿Eliminar la sede "${sede.nombre}" y todos sus edificios/aulas?`,
-                        )
-                      }
-                      className="text-xs text-red-600 hover:underline font-semibold"
-                    >
-                      Eliminar sede
-                    </button>
+                    <div className="flex items-center gap-4">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleToggleActivo(`/api/admin/sedes/${sede.id}`, {
+                            nombre: sede.nombre,
+                            codigo: sede.codigo,
+                            direccion: sede.direccion,
+                            telefono: sede.telefono,
+                            activo: !sede.activo,
+                          })
+                        }
+                        className="text-xs text-primary hover:underline font-semibold"
+                      >
+                        {sede.activo ? "Desactivar sede" : "Activar sede"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleDelete(
+                            `/api/admin/sedes/${sede.id}`,
+                            `¿Eliminar la sede "${sede.nombre}" con todos sus edificios y aulas? Si está en uso no se eliminará; en ese caso desactívala.`,
+                          )
+                        }
+                        className="text-xs text-red-600 hover:underline font-semibold"
+                      >
+                        Eliminar sede
+                      </button>
+                    </div>
                   </div>
 
                   {/* Agregar edificio */}
@@ -304,19 +353,35 @@ export default function AdminSedesPage() {
                                   className="text-primary"
                                 />
                                 {ed.nombre}
+                                {!ed.activo && <BadgeInactivo />}
                               </h4>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleDelete(
-                                    `/api/admin/edificios/${ed.id}`,
-                                    `¿Eliminar edificio "${ed.nombre}"?`,
-                                  )
-                                }
-                                className="text-xs text-red-600 hover:underline"
-                              >
-                                Eliminar
-                              </button>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleToggleActivo(`/api/admin/edificios/${ed.id}`, {
+                                      nombre: ed.nombre,
+                                      codigo: ed.codigo,
+                                      activo: !ed.activo,
+                                    })
+                                  }
+                                  className="text-xs text-primary hover:underline"
+                                >
+                                  {ed.activo ? "Desactivar" : "Activar"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDelete(
+                                      `/api/admin/edificios/${ed.id}`,
+                                      `¿Eliminar el edificio "${ed.nombre}" con sus aulas?`,
+                                    )
+                                  }
+                                  className="text-xs text-red-600 hover:underline"
+                                >
+                                  Eliminar
+                                </button>
+                              </div>
                             </div>
 
                             {/* Aulas list */}
@@ -341,7 +406,23 @@ export default function AdminSedesPage() {
                                           ? ` · ${aula.capacidad} cupos`
                                           : ""}
                                       </span>
+                                      {!aula.activo && <BadgeInactivo />}
                                     </div>
+                                    <div className="flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleToggleActivo(`/api/admin/aulas/${aula.id}`, {
+                                          nombre: aula.nombre,
+                                          capacidad: aula.capacidad,
+                                          tipo: aula.tipo,
+                                          activo: !aula.activo,
+                                        })
+                                      }
+                                      className="text-primary hover:underline"
+                                    >
+                                      {aula.activo ? "Desactivar" : "Activar"}
+                                    </button>
                                     <button
                                       type="button"
                                       onClick={() =>
@@ -351,10 +432,11 @@ export default function AdminSedesPage() {
                                         )
                                       }
                                       className="text-red-500 hover:text-red-700"
-                                      aria-label="Eliminar aula"
+                                      aria-label={`Eliminar aula ${aula.nombre}`}
                                     >
                                       <Icon icon="solar:trash-bin-trash-linear" />
                                     </button>
+                                    </div>
                                   </div>
                                 ))
                               )}

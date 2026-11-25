@@ -2,18 +2,21 @@
 import { Icon } from "@iconify/react";
 import EventoCountdown from "./EventoCountdown";
 import { getBasePath } from "@/lib/basePath";
+import { estadoEvento, ZONA_PANAMA, type EstadoEvento } from "@/lib/eventoEstado";
 
-interface Evento {
+export interface Evento {
   id: number;
   nombre: string;
   descripcion?: string;
-  fecha_inicio: string;
-  fecha_fin: string;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
   ubicacion?: string;
   banner?: string;
   galeria?: unknown;
   fecha_creacion: string;
   fecha_actualizacion: string;
+  /** Calculado por la API (lib/eventoEstado.ts). */
+  estado?: EstadoEvento;
 }
 
 interface EventoCardProps {
@@ -22,18 +25,34 @@ interface EventoCardProps {
 
 type EventoEstado = "pasado" | "en-curso" | "futuro";
 
+const ESTADO_VISUAL: Record<EstadoEvento, EventoEstado> = {
+  proximo: "futuro",
+  en_curso: "en-curso",
+  finalizado: "pasado",
+};
+
+// Fechas siempre en hora de Panamá, sin depender de la zona del navegador.
+const formatDate = (dateString: string) =>
+  new Date(dateString).toLocaleDateString("es-PA", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: ZONA_PANAMA,
+  });
+
+const formatTime = (dateString: string) =>
+  new Date(dateString).toLocaleTimeString("es-PA", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: ZONA_PANAMA,
+  });
+
 const EventoCard: React.FC<EventoCardProps> = ({ evento }) => {
-  const getEstado = (): EventoEstado => {
-    const now = new Date();
-    const inicio = new Date(evento.fecha_inicio);
-    const fin = new Date(evento.fecha_fin);
-
-    if (now > fin) return "pasado";
-    if (now >= inicio && now <= fin) return "en-curso";
-    return "futuro";
-  };
-
-  const estado = getEstado();
+  // El estado lo calcula la API; si falta, se usa la misma función pura.
+  const estado: EventoEstado =
+    ESTADO_VISUAL[
+      evento.estado ?? estadoEvento(evento.fecha_inicio, evento.fecha_fin)
+    ];
 
   const getStatusColor = () => {
     switch (estado) {
@@ -48,23 +67,6 @@ const EventoCard: React.FC<EventoCardProps> = ({ evento }) => {
         return _exhaustive;
       }
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("es-ES", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  };
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("es-ES", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   };
 
   const bannerBgColor =
@@ -150,32 +152,36 @@ const EventoCard: React.FC<EventoCardProps> = ({ evento }) => {
               : "text-dark_grey dark:text-gray-400"
           }`}
         >
-          <div className="flex items-start gap-2">
-            <Icon
-              icon="solar:calendar-bold"
-              className="w-4 h-4 flex-shrink-0 mt-0.5"
-            />
-            <div>
-              <div className="font-medium">
-                {formatDate(evento.fecha_inicio)}
-              </div>
-              <div className="text-xs">
-                Inicia: {formatTime(evento.fecha_inicio)}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-start gap-2">
-            <Icon
-              icon="solar:calendar-bold"
-              className="w-4 h-4 flex-shrink-0 mt-0.5"
-            />
-            <div>
-              <div className="font-medium">{formatDate(evento.fecha_fin)}</div>
-              <div className="text-xs">
-                Finaliza: {formatTime(evento.fecha_fin)}
+          {evento.fecha_inicio && (
+            <div className="flex items-start gap-2">
+              <Icon
+                icon="solar:calendar-bold"
+                className="w-4 h-4 flex-shrink-0 mt-0.5"
+              />
+              <div>
+                <div className="font-medium">
+                  {formatDate(evento.fecha_inicio)}
+                </div>
+                <div className="text-xs">
+                  Inicia: {formatTime(evento.fecha_inicio)}
+                </div>
               </div>
             </div>
-          </div>
+          )}
+          {evento.fecha_fin && (
+            <div className="flex items-start gap-2">
+              <Icon
+                icon="solar:calendar-bold"
+                className="w-4 h-4 flex-shrink-0 mt-0.5"
+              />
+              <div>
+                <div className="font-medium">{formatDate(evento.fecha_fin)}</div>
+                <div className="text-xs">
+                  Finaliza: {formatTime(evento.fecha_fin)}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Descripción */}

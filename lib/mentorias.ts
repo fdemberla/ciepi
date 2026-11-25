@@ -164,12 +164,7 @@ export function validarDisponibilidad(raw: unknown): ResultadoValidacion {
     for (let b = a + 1; b < items.length; b++) {
       const x = items[a];
       const y = items[b];
-      if (x.dia_semana !== y.dia_semana) continue;
-      const solapan = parseHora(x.hora_inicio)! < parseHora(y.hora_fin)! && parseHora(y.hora_inicio)! < parseHora(x.hora_fin)!;
-      const vigenciasCruzan =
-        (!x.vigente_hasta || !y.vigente_desde || String(y.vigente_desde) <= String(x.vigente_hasta)) &&
-        (!y.vigente_hasta || !x.vigente_desde || String(x.vigente_desde) <= String(y.vigente_hasta));
-      if (solapan && vigenciasCruzan) {
+      if (bloquesSeCruzan(x, y)) {
         return {
           ok: false,
           error: `Los bloques ${a + 1} y ${b + 1} (${DIAS_SEMANA[x.dia_semana]}) se solapan.`,
@@ -178,6 +173,52 @@ export function validarDisponibilidad(raw: unknown): ResultadoValidacion {
     }
   }
   return { ok: true, items };
+}
+
+/**
+ * true si dos bloques semanales coinciden en día, se solapan en hora y sus vigencias
+ * se cruzan (una vigencia vacía es abierta por ese lado).
+ */
+export function bloquesSeCruzan(x: DisponibilidadInput, y: DisponibilidadInput): boolean {
+  if (x.dia_semana !== y.dia_semana) return false;
+  const xi = parseHora(x.hora_inicio);
+  const xf = parseHora(x.hora_fin);
+  const yi = parseHora(y.hora_inicio);
+  const yf = parseHora(y.hora_fin);
+  if (xi === null || xf === null || yi === null || yf === null) return false;
+  const solapan = xi < yf && yi < xf;
+  const xd = x.vigente_desde ? claveFecha(x.vigente_desde) : null;
+  const xh = x.vigente_hasta ? claveFecha(x.vigente_hasta) : null;
+  const yd = y.vigente_desde ? claveFecha(y.vigente_desde) : null;
+  const yh = y.vigente_hasta ? claveFecha(y.vigente_hasta) : null;
+  const vigenciasCruzan = (!xh || !yd || yd <= xh) && (!yh || !xd || xd <= yh);
+  return solapan && vigenciasCruzan;
+}
+
+/** Bloque presencial de otro mentor, para comprobar choques de aula. */
+export interface BloqueAulaAjeno extends DisponibilidadInput {
+  mentor: string;
+}
+
+/**
+ * Busca el primer bloque presencial propio que usa la misma aula que un bloque de OTRO
+ * mentor en un horario que se cruza (evita reservar la misma aula a la misma hora dos veces).
+ * Devuelve el mensaje de error o null si no hay choque.
+ */
+export function choqueDeAula(propios: DisponibilidadInput[], ajenos: BloqueAulaAjeno[]): string | null {
+  for (const [i, p] of propios.entries()) {
+    if (p.modalidad !== "presencial" || p.aula_id == null) continue;
+    for (const o of ajenos) {
+      if (o.modalidad !== "presencial" || o.aula_id == null || o.aula_id !== p.aula_id) continue;
+      if (bloquesSeCruzan(p, o)) {
+        return (
+          `Bloque ${i + 1} (${DIAS_SEMANA[p.dia_semana]} ${p.hora_inicio}–${p.hora_fin}): el aula ya está asignada ` +
+          `a ${o.mentor} de ${o.hora_inicio.slice(0, 5)} a ${o.hora_fin.slice(0, 5)}. Elige otra aula u otro horario.`
+        );
+      }
+    }
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------- turnos

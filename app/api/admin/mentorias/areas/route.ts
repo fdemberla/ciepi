@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin } from "@/lib/adminAuth";
+import { requireAdmin, requireArea } from "@/lib/adminAuth";
 
 /** Catálogo de áreas de mentoría, con cuántos mentores atiende cada una. */
 export async function GET() {
@@ -22,8 +22,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
+  const auth = await requireArea("mentorias");
+  if (!auth.ok) return auth.respuesta;
   try {
     const body = await request.json().catch(() => ({}));
     const nombre = typeof body.nombre === "string" ? body.nombre.trim().slice(0, 120) : "";

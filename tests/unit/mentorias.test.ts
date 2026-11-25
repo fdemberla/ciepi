@@ -4,6 +4,8 @@ import {
   validarDisponibilidad,
   instantePanama,
   fechaPanama,
+  choqueDeAula,
+  type BloqueAulaAjeno,
   type DisponibilidadInput,
 } from "@/lib/mentorias";
 
@@ -159,3 +161,37 @@ describe("validarDisponibilidad", () => {
 });
 
 // La máquina de estados de las reservas se prueba en tests/unit/estadosMentoriaReserva.test.ts.
+
+describe("choqueDeAula", () => {
+  const lunes = (ini: string, fin: string, aula: number | null, extra: Partial<BloqueAulaAjeno> = {}): BloqueAulaAjeno => ({
+    dia_semana: 1,
+    hora_inicio: ini,
+    hora_fin: fin,
+    modalidad: "presencial",
+    sede_id: 1,
+    aula_id: aula,
+    mentor: "Mentor B",
+    ...extra,
+  });
+
+  it("detecta la misma aula a la misma hora con otro mentor", () => {
+    const msg = choqueDeAula([lunes("09:00", "12:00", 5)], [lunes("11:00", "13:00", 5)]);
+    expect(msg).toContain("Bloque 1");
+    expect(msg).toContain("Mentor B");
+  });
+
+  it("permite horarios contiguos, otra aula, otro día o bloques virtuales", () => {
+    expect(choqueDeAula([lunes("09:00", "12:00", 5)], [lunes("12:00", "14:00", 5)])).toBeNull();
+    expect(choqueDeAula([lunes("09:00", "12:00", 5)], [lunes("09:00", "12:00", 6)])).toBeNull();
+    expect(choqueDeAula([lunes("09:00", "12:00", 5)], [lunes("09:00", "12:00", 5, { dia_semana: 2 })])).toBeNull();
+    expect(
+      choqueDeAula([{ ...lunes("09:00", "12:00", null), modalidad: "virtual" }], [lunes("09:00", "12:00", 5)])
+    ).toBeNull();
+  });
+
+  it("tiene en cuenta la vigencia de los bloques", () => {
+    const propio = lunes("09:00", "12:00", 5, { vigente_desde: "2027-01-01" });
+    expect(choqueDeAula([propio], [lunes("09:00", "12:00", 5, { vigente_hasta: "2026-12-31" })])).toBeNull();
+    expect(choqueDeAula([propio], [lunes("09:00", "12:00", 5, { vigente_hasta: "2027-01-10" })])).not.toBeNull();
+  });
+});

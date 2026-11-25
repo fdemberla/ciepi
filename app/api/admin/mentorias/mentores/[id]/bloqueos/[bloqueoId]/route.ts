@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin, parseId } from "@/lib/adminAuth";
+import { requireArea, parseId } from "@/lib/adminAuth";
 
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string; bloqueoId: string }> }
 ) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
+  const auth = await requireArea("mentorias");
+  if (!auth.ok) return auth.respuesta;
   const p = await params;
   const id = parseId(p.id);
   const bloqueoId = parseId(p.bloqueoId);

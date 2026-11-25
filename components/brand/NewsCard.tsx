@@ -11,8 +11,15 @@ export interface NewsCardProps {
   contenido_preview?: string | null;
 }
 
+// timeZone fijo: la portada formatea en el servidor y /blog en el navegador;
+// sin él, la misma noticia podía mostrar días distintos.
 const formatDate = (value: string) =>
-  new Date(value).toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" });
+  new Date(value).toLocaleDateString("es-PA", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "America/Panama",
+  });
 
 /** Tarjeta de noticia (blog): imagen, título azul, autor y fecha, extracto y "Leer más". */
 export default function NewsCard({ id, titulo, imagen_banner, creado_en, autor_nombre, contenido_preview }: NewsCardProps) {

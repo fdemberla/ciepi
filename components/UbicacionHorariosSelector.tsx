@@ -5,7 +5,12 @@ import Link from "next/link";
 import { Icon } from "@iconify/react";
 import { withBasePath } from "@/lib/basePath";
 import { DIAS_SEMANA_LARGOS } from "@/lib/calendarUtils";
-import { siguienteHorario, type HorarioInput } from "@/lib/capacitacionDetails";
+import {
+  errorHorario,
+  siguienteHorario,
+  validarHorarios,
+  type HorarioInput,
+} from "@/lib/capacitacionDetails";
 import ModalRapido, { CampoModal, CAMPO_MODAL } from "@/components/admin/ModalRapido";
 
 type ModalUbicacion = null | "sede" | "edificio" | "aula";
@@ -83,7 +88,8 @@ export default function UbicacionHorariosSelector({
       const res = await fetch(withBasePath("/api/admin/sedes"));
       const data = await res.json();
       if (res.ok && data.success) {
-        setSedes((data.data || []).filter((s: SedeItem) => s.activo));
+        // Se guardan todas: las inactivas solo se muestran si ya están seleccionadas.
+        setSedes(data.data || []);
       }
     } catch (err) {
       console.error("Error cargando sedes:", err);
@@ -129,10 +135,22 @@ export default function UbicacionHorariosSelector({
     return null;
   };
 
+  // Las sedes, edificios y aulas inactivos no se ofrecen para asignaciones nuevas,
+  // pero el que ya tiene asignado la capacitación se sigue mostrando (marcado).
+  const sedesVisibles = sedes.filter((s) => s.activo || s.id === ubicacion.sedeId);
   const selectedSede = sedes.find((s) => s.id === ubicacion.sedeId);
-  const edificios = (selectedSede?.edificios || []).filter((e) => e.activo);
+  const edificios = (selectedSede?.edificios || []).filter(
+    (e) => e.activo || e.id === ubicacion.edificioId,
+  );
   const selectedEdificio = edificios.find((e) => e.id === ubicacion.edificioId);
-  const aulas = (selectedEdificio?.aulas || []).filter((a) => a.activo);
+  const aulas = (selectedEdificio?.aulas || []).filter(
+    (a) => a.activo || a.id === ubicacion.aulaId,
+  );
+
+  // Mismas reglas que el servidor: se avisa antes de enviar en vez de descartar el bloque.
+  const erroresBloque = horarios.map((h, i) => errorHorario(h, i + 1));
+  const validacion = erroresBloque.some(Boolean) ? null : validarHorarios(horarios);
+  const errorSolape = validacion && !validacion.ok ? validacion.error : null;
 
   // Cada día nuevo es el siguiente al último, con las mismas horas.
   const addHorario = () => {
@@ -196,9 +214,10 @@ export default function UbicacionHorariosSelector({
                 className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm"
               >
                 <option value="">Seleccionar sede...</option>
-                {sedes.map((s) => (
+                {sedesVisibles.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.nombre}
+                    {s.activo ? "" : " (inactiva)"}
                   </option>
                 ))}
               </select>
@@ -226,6 +245,7 @@ export default function UbicacionHorariosSelector({
                 {edificios.map((ed) => (
                   <option key={ed.id} value={ed.id}>
                     {ed.nombre}
+                    {ed.activo ? "" : " (inactivo)"}
                   </option>
                 ))}
               </select>
@@ -253,13 +273,14 @@ export default function UbicacionHorariosSelector({
                   <option key={au.id} value={au.id}>
                     {au.nombre}
                     {au.capacidad ? ` (${au.capacidad} cupos)` : ""}
+                    {au.activo ? "" : " (inactiva)"}
                   </option>
                 ))}
               </select>
             </div>
           </div>
         )}
-        {sedes.length === 0 && !loadingSedes && (
+        {sedesVisibles.length === 0 && !loadingSedes && (
           <p className="text-xs text-dark_grey dark:text-gray-400 mt-2">
             No hay sedes registradas: créala con «Nueva sede».
           </p>
@@ -348,9 +369,11 @@ export default function UbicacionHorariosSelector({
         ) : (
           <div className="space-y-3">
             {horarios.map((h, idx) => (
+              <div key={idx}>
               <div
-                key={idx}
-                className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center bg-slateGray/50 dark:bg-gray-900/40 p-3 rounded-xl"
+                className={`grid grid-cols-1 sm:grid-cols-12 gap-3 items-center bg-slateGray/50 dark:bg-gray-900/40 p-3 rounded-xl ${
+                  erroresBloque[idx] ? "ring-1 ring-red-400" : ""
+                }`}
               >
                 <div className="sm:col-span-5">
                   <select
@@ -398,7 +421,18 @@ export default function UbicacionHorariosSelector({
                   </button>
                 </div>
               </div>
+              {erroresBloque[idx] && (
+                <p role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {erroresBloque[idx]}
+                </p>
+              )}
+              </div>
             ))}
+            {errorSolape && (
+              <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+                {errorSolape}
+              </p>
+            )}
           </div>
         )}
       </div>

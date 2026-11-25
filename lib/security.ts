@@ -97,40 +97,19 @@ export function escapeHtml(text: string | null | undefined): string {
 }
 
 /**
- * Sanitiza un objeto para JSON.stringify en dangerouslySetInnerHTML
- * - Escapa strings que puedan contener caracteres peligrosos
- * - Valida URLs
+ * Serializa datos para un <script type="application/ld+json"> insertado con
+ * dangerouslySetInnerHTML. JSON.stringify ya escapa comillas y barras; lo que
+ * falta es impedir que el contenido cierre el <script> (`</script>`) o abra un
+ * comentario HTML (`<!--`). Se escapan `<`, `>`, `&` y los separadores U+2028 /
+ * U+2029 como secuencias \uXXXX, que siguen siendo JSON válido con el mismo valor.
+ * (Sustituye a sanitizeForJsonLd, que escapaba las comillas dos veces y no
+ * escapaba `<`.)
  */
-export function sanitizeForJsonLd(obj: unknown): unknown {
-  if (obj === null || obj === undefined) {
-    return obj;
-  }
-
-  if (typeof obj === "string") {
-    // Escapar solo caracteres que puedan romper JSON
-    return obj
-      .replace(/\\/g, "\\\\")
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, "\\n")
-      .replace(/\r/g, "\\r")
-      .replace(/\t/g, "\\t");
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map((item) => sanitizeForJsonLd(item));
-  }
-
-  if (typeof obj === "object") {
-    const sanitized: Record<string, unknown> = {};
-    for (const key in obj as Record<string, unknown>) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        sanitized[key] = sanitizeForJsonLd(
-          (obj as Record<string, unknown>)[key]
-        );
-      }
-    }
-    return sanitized;
-  }
-
-  return obj;
+export function serializeJsonLd(data: unknown): string {
+  return (JSON.stringify(data) ?? "null")
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 }

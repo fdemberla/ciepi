@@ -1,4 +1,14 @@
 import React from "react";
+import { colorTextoSeguro } from "./slateColor";
+import { isSafeUrl } from "@/lib/security";
+
+/** Solo enlaces http(s), relativos, mailto: o tel:. Bloquea javascript:, data:, etc. */
+function hrefSeguro(url: unknown): string | undefined {
+  if (typeof url !== "string") return undefined;
+  const u = url.trim();
+  if (/^(mailto|tel):[^\s<>"']+$/i.test(u)) return u;
+  return isSafeUrl(u) ? u : undefined;
+}
 
 interface SlateNode {
   type?: string;
@@ -43,8 +53,11 @@ const SlateRenderer: React.FC<SlateRendererProps> = ({
 
       // Create inline styles for color and font size
       const textStyles: React.CSSProperties = {};
-      if (node.color) {
-        textStyles.color = node.color;
+      // Negro, blanco y tonos cercanos se ignoran: el texto sigue al tema
+      // (si no, queda invisible en modo oscuro o en modo claro).
+      const color = colorTextoSeguro(node.color);
+      if (color) {
+        textStyles.color = color;
       }
       if (node.fontSize) {
         textStyles.fontSize = node.fontSize;
@@ -215,7 +228,7 @@ const SlateRenderer: React.FC<SlateRendererProps> = ({
         return (
           <a
             key={index}
-            href={node.url || "#"}
+            href={hrefSeguro(node.url)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-primary hover:text-primary/80 underline transition-colors"

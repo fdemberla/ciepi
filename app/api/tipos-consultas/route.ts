@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeErrorDetail } from "@/lib/apiError";
 import { query } from "@/lib/db";
 
 // GET: Listar tipos de consulta activos (público para formulario de contacto)
@@ -26,7 +27,7 @@ export async function GET() {
       {
         success: false,
         error: "Error al obtener tipos de consulta",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );

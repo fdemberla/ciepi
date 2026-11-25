@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
-import { query, withTransaction } from "@/lib/db";
+import { withTransaction } from "@/lib/db";
 import { safeErrorDetail } from "@/lib/apiError";
-import { parseId } from "@/lib/adminAuth";
+import { parseId, requireArea } from "@/lib/adminAuth";
+import {
+  describirDependencias,
+  ESTADOS_RESERVA_ACTIVA,
+  respuestaErrorFk,
+} from "@/lib/capacitacionesServer";
 import { MOTIVO_MENTOR_NO_DISPONIBLE } from "@/lib/estados/mentoriaReserva";
 import { respuestaErrorTransicion } from "@/lib/estadosServer";
 import {
@@ -18,13 +21,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 },
-      );
-    }
+    const auth = await requireArea("capacitaciones");
+    if (!auth.ok) return auth.respuesta;
 
     const { id } = await params;
     const body = await request.json();
@@ -89,8 +87,8 @@ export async function PUT(
         activo: Boolean(datos.activo),
         cancelarReservas,
         motivo: MOTIVO_MENTOR_NO_DISPONIBLE,
-        actor: { tipo: "admin", id: session.user?.adminId ?? null, descripcion: session.user?.email ?? null },
-        rol: session.user?.rolId,
+        actor: { tipo: "admin", id: auth.adminId, descripcion: auth.email },
+        rol: auth.rol,
       });
       return { fila: datos, canceladas: canceladasTx };
     });
@@ -142,37 +140,68 @@ export async function PUT(
   }
 }
 
+/**
+ * Elimina un profesor solo si no está asignado a capacitaciones ni tiene reservas de
+ * mentoría. Antes el ON DELETE CASCADE lo quitaba en silencio de todos los cursos; ahora
+ * responde 409 y recomienda desactivarlo (activo = false), que conserva el historial.
+ */
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 },
-      );
+    const auth = await requireArea("capacitaciones");
+    if (!auth.ok) return auth.respuesta;
+
+    const profesorId = parseId(String((await params).id));
+    if (!profesorId) {
+      return NextResponse.json({ success: false, error: "Profesor no encontrado" }, { status: 404 });
     }
 
-    const { id } = await params;
-    const result = await query(
-      `DELETE FROM ciepi.profesores WHERE id = $1 RETURNING id`,
-      [id],
-    );
-
-    if (result.rows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Profesor no encontrado" },
-        { status: 404 },
+    return await withTransaction(async (q) => {
+      const fila = await q(`SELECT id FROM ciepi.profesores WHERE id = $1 FOR UPDATE`, [profesorId]);
+      if (fila.rows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: "Profesor no encontrado" },
+          { status: 404 },
+        );
+      }
+      const dep = await q(
+        `SELECT
+           (SELECT COUNT(*) FROM ciepi.capacitacion_profesores WHERE profesor_id = $1)::int AS capacitaciones,
+           (SELECT COUNT(*) FROM ciepi.mentoria_reservas WHERE profesor_id = $1)::int AS reservas,
+           (SELECT COUNT(*) FROM ciepi.mentoria_reservas
+             WHERE profesor_id = $1 AND estado = ANY($2::text[]))::int AS reservas_activas`,
+        [profesorId, ESTADOS_RESERVA_ACTIVA],
       );
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: "Profesor eliminado exitosamente",
+      const { capacitaciones, reservas, reservas_activas } = dep.rows[0];
+      const detalle = describirDependencias([
+        [capacitaciones, "capacitación", "capacitaciones"],
+        [reservas, "reserva de mentoría", "reservas de mentoría"],
+      ]);
+      if (detalle) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Este profesor está asignado a ${detalle}. No se puede eliminar sin perder ese historial. Desactívalo para que no se pueda asignar a nuevas capacitaciones.`,
+            dependencias: { capacitaciones, reservas, reservasActivas: reservas_activas },
+            sugerencia: "desactivar",
+          },
+          { status: 409 },
+        );
+      }
+      await q(`DELETE FROM ciepi.profesores WHERE id = $1`, [profesorId]);
+      return NextResponse.json({
+        success: true,
+        message: "Profesor eliminado exitosamente",
+      });
     });
   } catch (error) {
+    const fk = respuestaErrorFk(
+      error,
+      "El profesor tiene registros asociados y no se puede eliminar. Desactívalo en su lugar.",
+    );
+    if (fk) return fk;
     console.error("[DELETE /api/admin/profesores/[id]] Error:", error);
     return NextResponse.json(
       {

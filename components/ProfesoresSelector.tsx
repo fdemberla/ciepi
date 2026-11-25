@@ -11,6 +11,7 @@ interface ProfesorOption {
   nombre: string;
   apellido: string;
   especialidad: string | null;
+  activo: boolean;
 }
 
 interface ProfesoresSelectorProps {
@@ -27,10 +28,22 @@ export default function ProfesoresSelector({
   const [creando, setCreando] = useState(false);
   const vacio = { nombre: "", apellido: "", correo: "", telefono: "", especialidad: "" };
   const [nuevo, setNuevo] = useState(vacio);
+  // Profesores inactivos que estaban asignados: se siguen mostrando (marcados) aunque
+  // se desmarquen, para que el admin pueda volver a marcarlos. Antes no aparecían y se
+  // quitaban de la capacitación en silencio al guardar.
+  const [inactivosAsignados, setInactivosAsignados] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    const nuevos = selectedIds.filter(
+      (id) => !inactivosAsignados.has(id) && profesores.some((p) => p.id === id && !p.activo),
+    );
+    if (nuevos.length) setInactivosAsignados(new Set([...inactivosAsignados, ...nuevos]));
+  }, [selectedIds, profesores, inactivosAsignados]);
 
   const cargar = async () => {
     try {
-      const res = await fetch(withBasePath("/api/admin/profesores?activo=true"));
+      // Todos (activos e inactivos): los inactivos solo se muestran si ya estaban asignados.
+      const res = await fetch(withBasePath("/api/admin/profesores"));
       const data = await res.json();
       if (res.ok && data.success) {
         setProfesores(data.data || []);
@@ -61,6 +74,9 @@ export default function ProfesoresSelector({
     setCreando(false);
     return null;
   };
+
+  const visibles = profesores.filter((p) => p.activo || inactivosAsignados.has(p.id));
+  const hayInactivos = visibles.some((p) => !p.activo);
 
   const toggle = (id: number) => {
     if (selectedIds.includes(id)) {
@@ -109,13 +125,13 @@ export default function ProfesoresSelector({
         <p className="text-sm text-dark_grey dark:text-gray-400">
           Cargando lista de profesores...
         </p>
-      ) : profesores.length === 0 ? (
+      ) : visibles.length === 0 ? (
         <p className="text-sm text-dark_grey dark:text-gray-400">
           No hay profesores activos registrados todavía: créalo con «Nuevo profesor».
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {profesores.map((prof) => {
+          {visibles.map((prof) => {
             const checked = selectedIds.includes(prof.id);
             return (
               <label
@@ -135,6 +151,11 @@ export default function ProfesoresSelector({
                 <div className="text-sm">
                   <div className="font-semibold text-midnight_text dark:text-white">
                     {prof.nombre} {prof.apellido}
+                    {!prof.activo && (
+                      <span className="ml-2 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                        Inactivo
+                      </span>
+                    )}
                   </div>
                   {prof.especialidad && (
                     <div className="text-xs text-dark_grey dark:text-gray-400">
@@ -146,6 +167,14 @@ export default function ProfesoresSelector({
             );
           })}
         </div>
+      )}
+
+      {hayInactivos && (
+        <p className="mt-3 text-xs text-amber-700 dark:text-amber-300 flex items-start gap-1.5">
+          <Icon icon="solar:danger-triangle-linear" className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+          Los profesores marcados como «Inactivo» ya estaban asignados y se conservan
+          si los dejas marcados. Si los desmarcas y guardas, se quitarán de esta capacitación.
+        </p>
       )}
 
       {creando && (

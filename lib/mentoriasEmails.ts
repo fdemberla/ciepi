@@ -8,6 +8,7 @@ import {
   MINUTOS_PARA_CONFIRMAR,
   formatoFechaHoraPanama,
   generarIcs,
+  nombreParaCorreo,
 } from "@/lib/mentoriaSolicitud";
 import {
   lugarReserva,
@@ -18,6 +19,15 @@ import {
 
 export function urlGestionReserva(token: string): string {
   return `${getBaseUrl()}/mentorias/reserva/${token}`;
+}
+
+/**
+ * Saludo a la persona. El nombre lo escribe cualquiera en el formulario público y el correo
+ * sale del SMTP institucional: se filtra para que no pueda llevar enlaces ni texto engañoso.
+ */
+function saludo(r: Pick<ReservaCompleta, "nombre">): string {
+  const nombre = nombreParaCorreo(r.nombre);
+  return nombre ? `Hola ${nombre}` : "Hola";
 }
 
 function plantilla(titulo: string, cuerpoHtml: string, boton?: { href: string; texto: string }) {
@@ -93,10 +103,10 @@ export async function enviarCorreoVerificacion(r: ReservaCompleta, token: string
   await sendEmail({
     to: r.correo,
     subject: "Confirma tu reserva de mentoría — CIEPI",
-    text: `Hola ${r.nombre},\n\nRecibimos tu solicitud de mentoría:\n${detalleTexto(r)}\n\nPara confirmarla, abre este enlace y pulsa "Confirmar reserva" en los próximos ${MINUTOS_PARA_CONFIRMAR} minutos:\n${url}\n\nSi no lo confirmas a tiempo, el horario quedará libre para otras personas. Si no hiciste esta solicitud, ignora este correo.`,
+    text: `${saludo(r)},\n\nRecibimos tu solicitud de mentoría:\n${detalleTexto(r)}\n\nPara confirmarla, abre este enlace y pulsa "Confirmar reserva" en los próximos ${MINUTOS_PARA_CONFIRMAR} minutos:\n${url}\n\nSi no lo confirmas a tiempo, el horario quedará libre para otras personas. Si no hiciste esta solicitud, ignora este correo.`,
     html: plantilla(
       "Confirma tu reserva de mentoría",
-      `<p>Hola ${escapeHtml(r.nombre)},</p>
+      `<p>${escapeHtml(saludo(r))},</p>
        <p>Recibimos tu solicitud de mentoría:</p>${detalleHtml(r)}
        <p>Para confirmarla, abre el enlace y pulsa <strong>«Confirmar reserva»</strong> en los próximos <strong>${MINUTOS_PARA_CONFIRMAR} minutos</strong>. Si no la confirmas a tiempo, el horario quedará libre para otras personas.</p>
        <p style="font-size:13px;color:#6b7280;">Si no hiciste esta solicitud, ignora este correo.</p>`,
@@ -118,10 +128,10 @@ export async function enviarCorreosConfirmacion(r: ReservaCompleta, token: strin
     sendEmail({
       to: r.correo,
       subject: "Tu mentoría está confirmada — CIEPI",
-      text: `Hola ${r.nombre},\n\nTu mentoría está confirmada:\n${detalleTexto(r)}\n\nAdjuntamos un archivo para agregarla a tu calendario.\nSi necesitas cancelarla: ${url}`,
+      text: `${saludo(r)},\n\nTu mentoría está confirmada:\n${detalleTexto(r)}\n\nAdjuntamos un archivo para agregarla a tu calendario.\nSi necesitas cancelarla: ${url}`,
       html: plantilla(
         "Tu mentoría está confirmada",
-        `<p>Hola ${escapeHtml(r.nombre)},</p><p>Tu mentoría quedó confirmada:</p>${detalleHtml(r)}
+        `<p>${escapeHtml(saludo(r))},</p><p>Tu mentoría quedó confirmada:</p>${detalleHtml(r)}
          <p>Adjuntamos un archivo para agregarla a tu calendario (Outlook, Google Calendar).${
            r.modalidad === "virtual" ? " El enlace de la reunión te llegará por correo antes de la sesión." : ""
          }</p>
@@ -162,10 +172,10 @@ export async function enviarCorreosCancelacion(r: ReservaCompleta) {
     sendEmail({
       to: r.correo,
       subject: "Cancelaste tu mentoría — CIEPI",
-      text: `Hola ${r.nombre},\n\nCancelaste esta mentoría:\n${detalleTexto(r)}\n\nPuedes reservar otro horario cuando quieras en ${getBaseUrl()}/mentorias`,
+      text: `${saludo(r)},\n\nCancelaste esta mentoría:\n${detalleTexto(r)}\n\nPuedes reservar otro horario cuando quieras en ${getBaseUrl()}/mentorias`,
       html: plantilla(
         "Mentoría cancelada",
-        `<p>Hola ${escapeHtml(r.nombre)},</p><p>Cancelaste esta mentoría:</p>${detalleHtml(r)}`,
+        `<p>${escapeHtml(saludo(r))},</p><p>Cancelaste esta mentoría:</p>${detalleHtml(r)}`,
         { href: `${getBaseUrl()}/mentorias`, texto: "Reservar otro horario" }
       ),
       attachments: [icsAdjunto(r, true)],
@@ -201,10 +211,10 @@ export async function enviarCorreosCancelacionCiepi(
     sendEmail({
       to: r.correo,
       subject: "Tu mentoría fue cancelada — CIEPI",
-      text: `Hola ${r.nombre},\n\nLamentamos informarte que CIEPI canceló esta mentoría:\n${detalleTexto(r)}\n${motivo ? `\nMotivo: ${motivo}\n` : ""}\nPuedes reservar otro horario en ${getBaseUrl()}/mentorias`,
+      text: `${saludo(r)},\n\nLamentamos informarte que CIEPI canceló esta mentoría:\n${detalleTexto(r)}\n${motivo ? `\nMotivo: ${motivo}\n` : ""}\nPuedes reservar otro horario en ${getBaseUrl()}/mentorias`,
       html: plantilla(
         "Tu mentoría fue cancelada",
-        `<p>Hola ${escapeHtml(r.nombre)},</p><p>Lamentamos informarte que CIEPI canceló esta mentoría:</p>${detalleHtml(r)}${motivoHtml}`,
+        `<p>${escapeHtml(saludo(r))},</p><p>Lamentamos informarte que CIEPI canceló esta mentoría:</p>${detalleHtml(r)}${motivoHtml}`,
         { href: `${getBaseUrl()}/mentorias`, texto: "Reservar otro horario" }
       ),
       attachments: [icsAdjunto(r, true)],
@@ -260,10 +270,10 @@ export async function enviarEnlaceReunion(r: ReservaCompleta) {
     to: r.correo,
     cc: r.mentor_correo ?? undefined,
     subject: "Enlace de tu mentoría — CIEPI",
-    text: `Hola ${r.nombre},\n\nEste es el enlace para tu mentoría:\n${r.enlace_reunion}\n\n${detalleTexto(r)}`,
+    text: `${saludo(r)},\n\nEste es el enlace para tu mentoría:\n${r.enlace_reunion}\n\n${detalleTexto(r)}`,
     html: plantilla(
       "Enlace de tu mentoría",
-      `<p>Hola ${escapeHtml(r.nombre)},</p><p>Te compartimos el enlace para conectarte a tu mentoría:</p>
+      `<p>${escapeHtml(saludo(r))},</p><p>Te compartimos el enlace para conectarte a tu mentoría:</p>
        <p style="word-break:break-all;"><a href="${escapeHtml(r.enlace_reunion)}">${escapeHtml(r.enlace_reunion)}</a></p>${detalleHtml(r)}`,
       { href: r.enlace_reunion, texto: "Unirme a la reunión" }
     ),
@@ -288,10 +298,10 @@ export async function enviarRecordatorio(r: ReservaCompleta) {
   await sendEmail({
     to: r.correo,
     subject: "Recordatorio: tu mentoría es mañana — CIEPI",
-    text: `Hola ${r.nombre},\n\nTe recordamos tu mentoría:\n${detalleTexto(r)}\n${enlaceTexto}\nSi no puedes asistir, cancélala con el enlace "Ver o cancelar mi reserva" del correo de confirmación para liberar el horario.`,
+    text: `${saludo(r)},\n\nTe recordamos tu mentoría:\n${detalleTexto(r)}\n${enlaceTexto}\nSi no puedes asistir, cancélala con el enlace "Ver o cancelar mi reserva" del correo de confirmación para liberar el horario.`,
     html: plantilla(
       "Tu mentoría es mañana",
-      `<p>Hola ${escapeHtml(r.nombre)},</p><p>Te recordamos tu mentoría:</p>${detalleHtml(r)}${enlaceHtml}
+      `<p>${escapeHtml(saludo(r))},</p><p>Te recordamos tu mentoría:</p>${detalleHtml(r)}${enlaceHtml}
        <p style="font-size:13px;color:#6b7280;">Si no puedes asistir, cancélala con el enlace «Ver o cancelar mi reserva» del correo de confirmación, para que otra persona pueda usar el horario.</p>`
     ),
   });

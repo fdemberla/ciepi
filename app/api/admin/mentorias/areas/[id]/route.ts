@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin, parseId } from "@/lib/adminAuth";
+import { requireArea, parseId } from "@/lib/adminAuth";
 
 /** Renombra un área o la activa/desactiva (no se borran: conservan el historial de reservas). */
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
+  const auth = await requireArea("mentorias");
+  if (!auth.ok) return auth.respuesta;
   const id = parseId((await params).id);
   if (!id) return NextResponse.json({ success: false, error: "Área no válida." }, { status: 400 });
 

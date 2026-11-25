@@ -133,7 +133,7 @@ export default function AdminProfesoresPage() {
   const handleDelete = async (prof: Profesor) => {
     if (
       !confirm(
-        `¿Eliminar al profesor ${prof.nombre} ${prof.apellido}? Se desvinculará de las capacitaciones asignadas.`,
+        `¿Eliminar al profesor ${prof.nombre} ${prof.apellido}? Si está asignado a capacitaciones o tiene mentorías no se eliminará; en ese caso desactívalo.`,
       )
     ) {
       return;
@@ -142,7 +142,8 @@ export default function AdminProfesoresPage() {
       const res = await fetch(withBasePath(`/api/admin/profesores/${prof.id}`), {
         method: "DELETE",
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      // 409: está asignado a capacitaciones o tiene mentorías; el mensaje recomienda desactivarlo.
       if (!res.ok) throw new Error(data.error || "Error al eliminar profesor");
       toast.success(data.message);
       fetchProfesores();

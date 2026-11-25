@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
+import { ArchivoNoValidoError } from "@/lib/fileUpload";
 import { query } from "@/lib/db";
+import { safeErrorDetail } from "@/lib/apiError";
+import { parseId, requireAdmin, requireArea } from "@/lib/adminAuth";
+import { validarFechasEvento } from "@/lib/eventoEstado";
 
 export async function GET(
   request: NextRequest,
@@ -9,16 +11,17 @@ export async function GET(
 ) {
   let id: string = "";
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 }
-      );
-    }
+    const noAutorizado = await requireAdmin();
+    if (noAutorizado) return noAutorizado;
 
     const resolvedParams = await params;
     id = resolvedParams.id;
+    if (parseId(id) === null) {
+      return NextResponse.json(
+        { success: false, error: "ID de evento no válido" },
+        { status: 400 }
+      );
+    }
 
     console.log(`🔍 [GET /api/admin/eventos/${id}] Fetching evento`);
 
@@ -61,7 +64,7 @@ export async function GET(
       {
         success: false,
         error: "Error al obtener evento",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: safeErrorDetail(error),
       },
       { status: 500 }
     );
@@ -74,16 +77,18 @@ export async function PUT(
 ) {
   let id: string = "";
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 }
-      );
-    }
+    // Modificar eventos requiere un rol del área "contenido" (leído de la BD).
+    const auth = await requireArea("contenido");
+    if (!auth.ok) return auth.respuesta;
 
     const resolvedParams = await params;
     id = resolvedParams.id;
+    if (parseId(id) === null) {
+      return NextResponse.json(
+        { success: false, error: "ID de evento no válido" },
+        { status: 400 }
+      );
+    }
     const formData = await request.formData();
 
     console.log(`🔍 [PUT /api/admin/eventos/${id}] Processing update`);
@@ -93,6 +98,18 @@ export async function PUT(
     if (!nombre) {
       return NextResponse.json(
         { success: false, error: "El nombre es obligatorio" },
+        { status: 400 }
+      );
+    }
+
+    // Fechas: inicio obligatorio, fin >= inicio
+    const fechas = validarFechasEvento(
+      formData.get("fecha_inicio"),
+      formData.get("fecha_fin")
+    );
+    if (!fechas.ok) {
+      return NextResponse.json(
+        { success: false, error: fechas.error },
         { status: 400 }
       );
     }
@@ -141,8 +158,7 @@ export async function PUT(
       }
     }
 
-    const fecha_inicio = (formData.get("fecha_inicio") as string) || null;
-    const fecha_fin = (formData.get("fecha_fin") as string) || null;
+    const { fecha_inicio, fecha_fin } = fechas;
     const ubicacion = (formData.get("ubicacion") as string) || null;
 
     // Update in database
@@ -183,12 +199,15 @@ export async function PUT(
     });
   } catch (error) {
     console.error(`❌ [PUT /api/admin/eventos/${id}] Error:`, error);
+    if (error instanceof ArchivoNoValidoError) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
 
     return NextResponse.json(
       {
         success: false,
         error: "Error al actualizar evento",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: safeErrorDetail(error),
       },
       { status: 500 }
     );
@@ -201,16 +220,18 @@ export async function DELETE(
 ) {
   let id: string = "";
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 }
-      );
-    }
+    // Modificar eventos requiere un rol del área "contenido" (leído de la BD).
+    const auth = await requireArea("contenido");
+    if (!auth.ok) return auth.respuesta;
 
     const resolvedParams = await params;
     id = resolvedParams.id;
+    if (parseId(id) === null) {
+      return NextResponse.json(
+        { success: false, error: "ID de evento no válido" },
+        { status: 400 }
+      );
+    }
 
     console.log(`🔍 [DELETE /api/admin/eventos/${id}] Processing delete`);
 
@@ -243,7 +264,7 @@ export async function DELETE(
       {
         success: false,
         error: "Error al eliminar evento",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: safeErrorDetail(error),
       },
       { status: 500 }
     );

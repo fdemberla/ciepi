@@ -136,3 +136,52 @@ Script para producción: `database/fase2_maquinas_estado.sql`. Es idempotente y 
 - La confirmación se hace con POST tras pulsar un botón, no al abrir el enlace, y es idempotente.
 - Consentimientos y bajas quedan en el historial.
 - Solo Admin, Super Admin y RR.PP. gestionan el newsletter.
+
+## Fase 3: implementada
+
+Script para producción: `database/fase3_correcciones.sql`. Es idempotente y requiere las fases 1 y 2.
+
+**Seguridad**
+- **Captcha obligatorio.** Si la clave secreta está configurada, el token se exige. Si falta en producción, el formulario responde 503. Variables: `TURNSTILE_SECRET_KEY` (con su clave de sitio, para la inscripción y las mentorías) y `RECAPTCHA_SECRET_KEY` (con su clave de sitio, para contacto y newsletter).
+- **Permisos por rol** en todas las modificaciones de la API de administración (`requireArea`, que lee el rol de la base de datos):
+
+  | Área | Roles |
+  |---|---|
+  | Capacitaciones y mentorías | Admin, Super Admin y CIEPI |
+  | Eventos y blog | Admin, Super Admin, CIEPI y RR.PP. |
+  | Newsletter | Admin, Super Admin y RR.PP. |
+  | Configuración | Admin y Super Admin |
+
+- **XSS:** se corrigió el JSON-LD del blog y se bloquean los enlaces `javascript:` del contenido.
+- **Datos expuestos:** el correo del autor ya no aparece en la API pública y los errores internos de la base de datos ya no llegan al cliente.
+- **Correos de mentorías:** nombre y tema se limpian para que no se puedan usar con fines de phishing.
+- **Aulas:** una misma aula no puede quedar reservada a la misma hora para dos mentores.
+- **Subidas:** máximo de 10 MB para imágenes y 20 MB para documentos, con comprobación del tipo real de archivo.
+
+**Funcionalidad**
+- La búsqueda del blog funciona y la paginación tiene límites.
+- **Eventos:**
+  - El estado se calcula con una sola regla en hora de Panamá.
+  - El filtro se aplica en la base de datos.
+  - La fecha de fin no puede ser anterior a la de inicio.
+- **Capacitaciones:**
+  - Crear y editar usan transacción.
+  - Ya no se pierden los textos antiguos ni los profesores inactivos asignados.
+  - Los horarios inválidos se notifican en lugar de descartarse.
+  - El detalle público indica si la inscripción está abierta, próximamente o cerrada.
+- **Sedes, edificios, aulas y profesores:** no se pueden eliminar si están en uso (responde 409); en su lugar se pueden desactivar.
+
+**Interfaz y accesibilidad**
+- **Form:**
+  - No borra lo escrito.
+  - Valida también los campos dentro de secciones.
+  - Evita los envíos dobles.
+  - Etiquetas y errores accesibles.
+- **Editor Slate:** se puede usar con teclado.
+- **Logos:** visibles en modo oscuro.
+- **Colores del editor:** el texto en blanco o negro ya no queda invisible.
+- **Tabla:** muestra un mensaje cuando la búsqueda no encuentra resultados.
+- **Navbar:** los menús desplegables se pueden usar con teclado.
+- **Fechas de noticias:** se muestran en hora de Panamá.
+
+**Pendiente de decidir:** el correo `info@ciepi.pa` y el teléfono del pie de página son de relleno.

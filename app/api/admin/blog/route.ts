@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/authOptions";
 import { query, withTransaction } from "@/lib/db";
 import { BlogState, canCreateBlog } from "@/lib/permissions";
 import { safeErrorDetail } from "@/lib/apiError";
+import { requireArea } from "@/lib/adminAuth";
 import { puedeEditarBlog, transicionesBlog, type ContextoBlog } from "@/lib/estados/blog";
 import { registrarHistorial } from "@/lib/estadosServer";
 
@@ -160,31 +161,10 @@ export async function GET(request: NextRequest) {
 // POST: Crear nuevo blog
 export async function POST(request: NextRequest) {
   try {
-    // Verificar autenticación
-    const session = await getServerSession(authOptions);
-
-    if (!session || !session.user) {
-      return NextResponse.json(
-        { error: "No autorizado. Debe iniciar sesión." },
-        { status: 401 }
-      );
-    }
-
-    // Obtener el rol del usuario desde la BD
-    const roleQuery = `
-      SELECT rol_id FROM ciepi.usuarios_administradores 
-      WHERE id = $1
-    `;
-    const roleResult = await query(roleQuery, [session.user.adminId]);
-
-    if (roleResult.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Usuario no encontrado" },
-        { status: 404 }
-      );
-    }
-
-    const userRole = roleResult.rows[0].rol_id;
+    // Rol leído de la BD (usuario activo) y del área de contenido.
+    const auth = await requireArea("contenido");
+    if (!auth.ok) return auth.respuesta;
+    const userRole = auth.rol;
 
     // Verificar permisos para crear blogs
     if (!canCreateBlog(userRole)) {
@@ -256,7 +236,7 @@ export async function POST(request: NextRequest) {
           JSON.stringify(contenido),
           typeof imagen_banner === "string" && imagen_banner ? imagen_banner : null,
           JSON.stringify(palabras_clave || []),
-          session.user.adminId,
+          auth.adminId,
           estadoInicial,
         ]
       );
@@ -267,7 +247,7 @@ export async function POST(request: NextRequest) {
         de: null,
         a: estadoInicial,
         accion: estadoInicial === BlogState.EN_REVISION_CIEPI ? "crear_y_enviar" : "crear",
-        actor: { tipo: "admin", id: Number(session.user.adminId) },
+        actor: { tipo: "admin", id: auth.adminId },
       });
       return fila;
     });

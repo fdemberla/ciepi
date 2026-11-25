@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { query, withTransaction } from "@/lib/db";
-import { parseId } from "@/lib/adminAuth";
+import { parseId, requireArea } from "@/lib/adminAuth";
 import { safeErrorDetail } from "@/lib/apiError";
 import { getClientIp } from "@/lib/verificationUtils";
 import { cambiarEstado, leerHistorial, respuestaErrorTransicion } from "@/lib/estadosServer";
@@ -98,23 +98,18 @@ export async function GET(_request: NextRequest, { params }: Params) {
 // Body: { estado_inscripcion: número destino, estado_actual: número que vio la UI, motivo?: string }
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isAdmin) return noAutorizado();
+    // Rol leído de la BD (el del JWT puede estar desactualizado) y usuario activo.
+    const auth = await requireArea("capacitaciones");
+    if (!auth.ok) return auth.respuesta;
 
-    const rol = session.user.rolId;
+    const rol = auth.rol;
     if (!puedeGestionarInscripciones(rol)) {
       return NextResponse.json(
         { success: false, error: "Tu rol solo puede consultar las inscripciones, no cambiar su estado." },
         { status: 403 }
       );
     }
-    const adminId = Number(session.user.adminId);
-    if (!Number.isInteger(adminId) || adminId <= 0) {
-      return NextResponse.json(
-        { success: false, error: "Tu sesión no tiene un usuario administrador asociado." },
-        { status: 403 }
-      );
-    }
+    const adminId = auth.adminId;
 
     const inscripcionId = parseId((await params).id);
     if (!inscripcionId) {
@@ -152,7 +147,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
         de: actual,
         a: destino,
         accion: t.accion,
-        actor: { tipo: "admin", id: adminId, descripcion: session.user?.email ?? null },
+        actor: { tipo: "admin", id: adminId, descripcion: auth.email },
         motivo,
         override: t.override,
         ip: getClientIp(request),

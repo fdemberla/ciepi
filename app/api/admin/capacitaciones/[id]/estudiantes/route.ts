@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
+import { safeErrorDetail } from "@/lib/apiError";
 import {
   puedeGestionarInscripciones,
   transicionesInscripcion,
@@ -221,7 +222,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json(
       {
         error: "Error interno del servidor",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );

@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, withTransaction } from "@/lib/db";
-import { requireAdmin, parseId } from "@/lib/adminAuth";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
-import { DURACIONES_MENTORIA, validarDisponibilidad, claveFecha } from "@/lib/mentorias";
+import { requireAdmin, requireArea, parseId } from "@/lib/adminAuth";
+import {
+  DURACIONES_MENTORIA,
+  validarDisponibilidad,
+  claveFecha,
+  choqueDeAula,
+  type BloqueAulaAjeno,
+} from "@/lib/mentorias";
 import { MOTIVO_MENTOR_NO_DISPONIBLE } from "@/lib/estados/mentoriaReserva";
 import { respuestaErrorTransicion } from "@/lib/estadosServer";
 import {
@@ -77,9 +81,8 @@ export async function GET(_request: NextRequest, { params }: Params) {
  * por correo después del commit.
  */
 export async function PUT(request: NextRequest, { params }: Params) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
-  const session = await getServerSession(authOptions);
+  const auth = await requireArea("mentorias");
+  if (!auth.ok) return auth.respuesta;
   const id = parseId((await params).id);
   if (!id) return NextResponse.json({ success: false, error: "Profesor no válido." }, { status: 400 });
 
@@ -129,8 +132,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
         activo: Boolean(upd.rows[0].activo),
         cancelarReservas,
         motivo: motivoCancelacion,
-        actor: { tipo: "admin", id: session?.user?.adminId ?? null, descripcion: session?.user?.email ?? null },
-        rol: session?.user?.rolId,
+        actor: { tipo: "admin", id: auth.adminId, descripcion: auth.email },
+        rol: auth.rol,
       });
 
       if (areaIds.length > 0) {
@@ -149,6 +152,33 @@ export async function PUT(request: NextRequest, { params }: Params) {
           throw Object.assign(new Error(`Bloque ${i + 1}: el aula no pertenece a la sede elegida.`), { status: 400 });
         }
         if (d.sede_id == null) d.sede_id = aula.rows[0].sede_id;
+      }
+
+      // La misma aula no puede estar a la misma hora en el horario de dos mentores activos:
+      // cada mentor genera sus turnos por separado y ambas reservas quedarían confirmadas.
+      const aulaIds = [...new Set(disp.items.map((d) => d.aula_id).filter((a): a is number => a != null))].sort(
+        (a, b) => a - b
+      );
+      if (es_mentor && aulaIds.length > 0) {
+        // Serializa los guardados que tocan las mismas aulas (orden fijo: sin interbloqueos).
+        for (const aulaId of aulaIds) {
+          await q(`SELECT pg_advisory_xact_lock(hashtext('ciepi.mentoria_aula'), $1)`, [aulaId]);
+        }
+        const ajenos = await q(
+          `SELECT md.dia_semana, to_char(md.hora_inicio, 'HH24:MI') AS hora_inicio,
+                  to_char(md.hora_fin, 'HH24:MI') AS hora_fin, md.modalidad, md.sede_id, md.aula_id,
+                  to_char(md.vigente_desde, 'YYYY-MM-DD') AS vigente_desde,
+                  to_char(md.vigente_hasta, 'YYYY-MM-DD') AS vigente_hasta,
+                  TRIM(p.nombre || ' ' || COALESCE(p.apellido, '')) AS mentor
+           FROM ciepi.mentor_disponibilidad md
+           JOIN ciepi.profesores p ON p.id = md.profesor_id
+           WHERE md.profesor_id <> $1 AND md.modalidad = 'presencial' AND md.aula_id = ANY($2::int[])
+             AND p.es_mentor = true AND p.activo = true
+             AND (md.vigente_hasta IS NULL OR md.vigente_hasta >= (NOW() AT TIME ZONE 'America/Panama')::date)`,
+          [id, aulaIds]
+        );
+        const choque = choqueDeAula(disp.items, ajenos.rows as BloqueAulaAjeno[]);
+        if (choque) throw Object.assign(new Error(choque), { status: 409 });
       }
 
       await q(`DELETE FROM ciepi.mentor_areas WHERE profesor_id = $1`, [id]);

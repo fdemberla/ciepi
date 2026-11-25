@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
+import { requireArea, parseId } from "@/lib/adminAuth";
+import { safeErrorDetail } from "@/lib/apiError";
 
 interface Params {
   params: Promise<{
@@ -12,7 +12,10 @@ interface Params {
 // GET: Obtener un tipo de consulta específico
 export async function GET(request: NextRequest, { params }: Params) {
   try {
-    const { id } = await params;
+    const id = parseId((await params).id);
+    if (!id) {
+      return NextResponse.json({ error: "Tipo de consulta no válido" }, { status: 400 });
+    }
 
     const tipoQuery = `
       SELECT 
@@ -42,7 +45,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       {
         success: false,
         error: "Error al obtener tipo de consulta",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );
@@ -52,17 +55,14 @@ export async function GET(request: NextRequest, { params }: Params) {
 // PUT: Actualizar un tipo de consulta (solo admin)
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
-    // Verificar autenticación y permisos de admin
-    const session = await getServerSession(authOptions);
+    // Solo roles de configuración (rol leído de la BD, usuario activo).
+    const auth = await requireArea("configuracion");
+    if (!auth.ok) return auth.respuesta;
 
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 }
-      );
+    const id = parseId((await params).id);
+    if (!id) {
+      return NextResponse.json({ error: "Tipo de consulta no válido" }, { status: 400 });
     }
-
-    const { id } = await params;
     const body = await request.json();
     const { nombre, descripcion, activo } = body;
 
@@ -147,7 +147,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       {
         success: false,
         error: "Error al actualizar tipo de consulta",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );
@@ -157,17 +157,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
 // DELETE: Eliminar un tipo de consulta (solo admin)
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
-    // Verificar autenticación y permisos de admin
-    const session = await getServerSession(authOptions);
+    // Solo roles de configuración (rol leído de la BD, usuario activo).
+    const auth = await requireArea("configuracion");
+    if (!auth.ok) return auth.respuesta;
 
-    if (!session || !session.user?.isAdmin) {
-      return NextResponse.json(
-        { error: "No autorizado. Se requieren permisos de administrador." },
-        { status: 401 }
-      );
+    const id = parseId((await params).id);
+    if (!id) {
+      return NextResponse.json({ error: "Tipo de consulta no válido" }, { status: 400 });
     }
-
-    const { id } = await params;
 
     // Verificar si hay consultas usando este tipo
     const checkConsultasQuery = `
@@ -215,7 +212,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       {
         success: false,
         error: "Error al eliminar tipo de consulta",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );

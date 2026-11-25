@@ -1,11 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
+import { estadoEvento, rangoEvento } from "@/lib/eventoEstado";
 
 interface EventoCountdownProps {
-  fechaInicio: string;
-  fechaFin: string;
-  estado?: "pasado" | "en-curso" | "futuro";
+  fechaInicio: string | null;
+  fechaFin: string | null;
 }
 
 interface TimeRemaining {
@@ -35,19 +35,26 @@ const EventoCountdown: React.FC<EventoCountdownProps> = ({
 
     const calculateTimeRemaining = () => {
       const now = new Date();
-      const inicio = new Date(fechaInicio);
-      const fin = new Date(fechaFin);
+      // Misma regla que la API y la tarjeta (lib/eventoEstado.ts)
+      const estado = estadoEvento(fechaInicio, fechaFin, now);
 
-      // Determinar estado
-      if (now > fin) {
+      if (estado === "finalizado") {
         setTimeRemaining({ type: "pasado" });
         return;
       }
 
-      if (now >= inicio && now <= fin) {
+      if (estado === "en_curso") {
         setTimeRemaining({ type: "en-curso" });
         return;
       }
+
+      const rango = rangoEvento(fechaInicio, fechaFin);
+      if (!rango) {
+        // Sin fechas no hay cuenta atrás
+        setTimeRemaining(null);
+        return;
+      }
+      const inicio = rango.inicio;
 
       // Calcular tiempo faltante hasta inicio
       const diff = inicio.getTime() - now.getTime();

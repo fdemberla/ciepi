@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin, parseId } from "@/lib/adminAuth";
+import { requireArea, parseId } from "@/lib/adminAuth";
 import { SQL_RESERVA_OCUPA } from "@/lib/mentoriasServer";
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Agrega un periodo en que el mentor no atiende (vacaciones, licencia...). */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const denied = await requireAdmin();
-  if (denied) return denied;
+  const auth = await requireArea("mentorias");
+  if (!auth.ok) return auth.respuesta;
   const id = parseId((await params).id);
   if (!id) return NextResponse.json({ success: false, error: "Profesor no válido." }, { status: 400 });
 

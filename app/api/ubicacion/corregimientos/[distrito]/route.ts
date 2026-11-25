@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { safeErrorDetail } from "@/lib/apiError";
 import { query } from "@/lib/db";
 
 interface Params {
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json(
       {
         error: "Error al obtener corregimientos",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );

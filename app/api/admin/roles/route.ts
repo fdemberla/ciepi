@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
+import { requireArea } from "@/lib/adminAuth";
+import { safeErrorDetail } from "@/lib/apiError";
 
 // GET: Listar todos los roles
 export async function GET() {
@@ -59,7 +61,7 @@ export async function GET() {
       {
         success: false,
         error: "Error al obtener roles",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );
@@ -69,39 +71,9 @@ export async function GET() {
 // PUT: Actualizar un rol
 export async function PUT(request: NextRequest) {
   try {
-    // Verificar autenticación
-    const session = await getServerSession(authOptions);
-
-    if (!session || !session.user) {
-      return NextResponse.json(
-        { error: "No autorizado. Debe iniciar sesión." },
-        { status: 401 }
-      );
-    }
-
-    // Obtener el rol del usuario
-    const roleQuery = `
-      SELECT rol_id FROM ciepi.usuarios_administradores 
-      WHERE id = $1
-    `;
-    const roleResult = await query(roleQuery, [session.user.adminId]);
-
-    if (roleResult.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Usuario no encontrado" },
-        { status: 404 }
-      );
-    }
-
-    const userRole = roleResult.rows[0].rol_id;
-
-    // Solo roles 1 y 2 (admins) pueden hacer cambios
-    if (userRole !== 1 && userRole !== 2) {
-      return NextResponse.json(
-        { error: "No tienes permisos para modificar roles" },
-        { status: 403 }
-      );
-    }
+    // Solo roles 1 y 2 (admins) pueden hacer cambios (rol leído de la BD, usuario activo).
+    const auth = await requireArea("configuracion");
+    if (!auth.ok) return auth.respuesta;
 
     const body = await request.json();
     const { id, nombre, activo } = body;
@@ -145,7 +117,7 @@ export async function PUT(request: NextRequest) {
       {
         success: false,
         error: "Error al actualizar rol",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );
@@ -155,39 +127,9 @@ export async function PUT(request: NextRequest) {
 // POST: Crear nuevo rol
 export async function POST(request: NextRequest) {
   try {
-    // Verificar autenticación
-    const session = await getServerSession(authOptions);
-
-    if (!session || !session.user) {
-      return NextResponse.json(
-        { error: "No autorizado. Debe iniciar sesión." },
-        { status: 401 }
-      );
-    }
-
-    // Obtener el rol del usuario
-    const roleQuery = `
-      SELECT rol_id FROM ciepi.usuarios_administradores 
-      WHERE id = $1
-    `;
-    const roleResult = await query(roleQuery, [session.user.adminId]);
-
-    if (roleResult.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Usuario no encontrado" },
-        { status: 404 }
-      );
-    }
-
-    const userRole = roleResult.rows[0].rol_id;
-
-    // Solo roles 1 y 2 (admins) pueden crear roles
-    if (userRole !== 1 && userRole !== 2) {
-      return NextResponse.json(
-        { error: "No tienes permisos para crear roles" },
-        { status: 403 }
-      );
-    }
+    // Solo roles 1 y 2 (admins) pueden crear roles (rol leído de la BD, usuario activo).
+    const auth = await requireArea("configuracion");
+    if (!auth.ok) return auth.respuesta;
 
     const body = await request.json();
     const { nombre, activo } = body;
@@ -221,7 +163,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: "Error al crear rol",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
       { status: 500 }
     );
