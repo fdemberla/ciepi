@@ -124,3 +124,11 @@ CREATE INDEX IF NOT EXISTS idx_mentoria_reservas_inicio
     ON ciepi.mentoria_reservas (inicio);
 CREATE INDEX IF NOT EXISTS idx_mentoria_reservas_estado
     ON ciepi.mentoria_reservas (estado);
+
+-- 7. Recordatorio 24 h antes (fase 4): marca de envío para no repetirlo
+ALTER TABLE ciepi.mentoria_reservas
+    ADD COLUMN IF NOT EXISTS recordatorio_enviado_en TIMESTAMP WITH TIME ZONE;
+
+CREATE INDEX IF NOT EXISTS idx_mentoria_reservas_recordatorio
+    ON ciepi.mentoria_reservas (inicio)
+    WHERE estado = 'confirmada' AND recordatorio_enviado_en IS NULL;

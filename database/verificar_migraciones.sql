@@ -31,7 +31,9 @@ FROM (VALUES
      AND to_regclass('ciepi.mentor_bloqueos') IS NOT NULL
      AND to_regclass('ciepi.mentoria_reservas') IS NOT NULL
      AND EXISTS (SELECT 1 FROM information_schema.columns
-                 WHERE table_schema = 'ciepi' AND table_name = 'profesores' AND column_name = 'es_mentor'))
+                 WHERE table_schema = 'ciepi' AND table_name = 'profesores' AND column_name = 'es_mentor')
+     AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'ciepi' AND table_name = 'mentoria_reservas' AND column_name = 'recordatorio_enviado_en'))
 ) AS t(script, ok)
 ORDER BY script;
 

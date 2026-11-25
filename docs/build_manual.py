@@ -270,8 +270,8 @@ P("Este manual explica, paso a paso, cómo administrar el portal de CIEPI (Centr
   "consultas y dar acceso a nuevos administradores.")
 H2("Partes de la aplicación")
 table(["Parte", "Dirección", "Para quién"],
-      [["Sitio público", url("/") + ", " + url("/capacitaciones") + ", " + url("/eventos") + ", " + url("/blog") + ", " + url("/contacto"),
-        "Ciudadanos: consultan la oferta, se inscriben, leen el blog y envían consultas."],
+      [["Sitio público", url("/") + ", " + url("/capacitaciones") + ", " + url("/eventos") + ", " + url("/mentorias") + ", " + url("/blog") + ", " + url("/contacto"),
+        "Ciudadanos: consultan la oferta, se inscriben, reservan mentorías, leen el blog y envían consultas."],
        ["Portal de administración", url("/admin/..."),
         "Personal autorizado: gestiona todo el contenido. Requiere cuenta institucional de Microsoft."]],
       [3.6, 6.2, 6.15])
@@ -291,7 +291,7 @@ table(["Rol", "Pensado para", "Puede hacer"],
        ["Editor (3)", "Personal de contenidos de CIEPI", "Escribir artículos del blog y hacer la primera revisión. Gestionar capacitaciones, eventos y consultas."],
        ["Relaciones Públicas (4)", "Equipo de comunicación", "Aprobación final y publicación de artículos del blog. Gestionar capacitaciones, eventos y consultas."]],
       [4.2, 4.0, 7.75])
-note("info", "Capacitaciones, inscripciones, eventos, consultas, calendario, sedes, profesores y newsletter están "
+note("info", "Capacitaciones, inscripciones, mentorías, eventos, consultas, calendario, sedes, profesores y newsletter están "
      "disponibles para cualquier administrador, sea cual sea su rol. Solo Usuarios y Roles están reservados "
      "a los roles 1 y 2.")
 
@@ -319,6 +319,7 @@ table(["Opción del menú", "Dirección", "Uso"],
        ["Consultas", url("/admin/consultas"), "Consultas del formulario de contacto y sus tipos."],
        ["Gestión de Blog", url("/admin/blog"), "Artículos, revisión y publicación."],
        ["Newsletter", url("/admin/newsletter"), "Suscriptores y envío de boletines."],
+       ["Mentorías", url("/admin/mentorias"), "Reservas, agenda y configuración de mentores."],
        ["Usuarios", url("/admin/usuarios"), "Administradores del portal (roles 1 y 2)."],
        ["Roles", url("/admin/roles"), "Roles del sistema (roles 1 y 2)."]],
       [3.6, 4.8, 7.55])
@@ -436,7 +437,6 @@ note("tip", "Revise las fechas antes de guardar: el sistema no comprueba que el 
      "Si un horario tiene la hora de fin igual o anterior a la de inicio, se descarta sin aviso. "
      f"Registre sedes y profesores <b>antes</b> de abrir el formulario: los enlaces {ui('Gestionar sedes y aulas →')} "
      "y {ui('Gestionar profesores →')} salen del formulario y se pierde lo escrito.")
-fig("a_cap_creada", "La nueva capacitación aparece primera en el listado del portal.")
 H2("Cuándo se ve en el sitio público")
 bullets(["La capacitación queda <b>Activa</b> al crearla y aparece de inmediato en " + url("/capacitaciones") + ".",
          "Se muestra mientras esté activa y no haya pasado la fecha de fin de inscripción.",
@@ -677,8 +677,112 @@ bullets([f"{ui('Suscriptores')}: lista con filtro por estado y botón {ui('Expor
 # =============================================================== 13
 fig("a_news_suscriptores", "Pestaña «Suscriptores» con el botón «Exportar CSV».")
 fig("a_news_historial", "Pestaña «Historial de Envíos».")
+# =============================================================== Mentorías
+H1("Mentorías")
+P("Las personas pueden reservar en línea una sesión con un mentor de CIEPI. El equipo configura a los mentores "
+  "(áreas y horario semanal), y desde el portal gestiona las reservas: envía el enlace de las sesiones virtuales, "
+  "cancela si es necesario y registra si la sesión se realizó.")
+note("info", f"Todo se gestiona en {ui('Admin')} → {ui('Mentorías')} ({url('/admin/mentorias')}), con cuatro pestañas: "
+     f"{ui('Reservas')}, {ui('Agenda')}, {ui('Mentores')} y {ui('Áreas de mentoría')}. Los horarios siempre están en hora de Panamá.")
+
+H2("Estados de una reserva")
+table(["Estado", "Significa"],
+      [["Pendiente de confirmar", "La persona reservó y debe confirmar desde su correo en 15 minutos. Mientras tanto, el horario queda apartado."],
+       ["Expirada", "No confirmó a tiempo; el horario quedó libre otra vez."],
+       ["Confirmada", "La sesión está agendada. La persona y el mentor recibieron un correo con el evento de calendario."],
+       ["Realizada", "El equipo registró que la sesión se hizo."],
+       ["No asistió", "El equipo registró que la persona no se presentó."],
+       ["Cancelada por la persona", "La persona la canceló desde el enlace de su correo."],
+       ["Cancelada por CIEPI", "El equipo la canceló e informó el motivo por correo."]],
+      [4.6, 11.35])
+
+H2("Configurar un mentor")
+P("Los mentores son profesores ya registrados en " + ui("Profesores") + " (capítulo 4). Primero regístrelo allí, con su correo, "
+  "especialidad y biografía, que se muestran en su tarjeta pública.")
+steps([f"En {ui('Mentorías')}, abra la pestaña {ui('Mentores')} y pulse {ui('Configurar')} en el profesor.",
+       f"En {ui('Perfil de mentor')}, marque {ui('Ofrece mentorías')}, elija la {ui('Duración de cada mentoría')} y, si quiere, suba una foto.",
+       f"En {ui('Áreas que atiende')}, marque los temas del mentor. El público podrá filtrar por ellos.",
+       f"En {ui('Horario semanal')}, pulse {ui('Agregar bloque')} por cada franja: día, desde, hasta, modalidad y, si es presencial, sede y aula. Cada bloque se divide en turnos de la duración elegida.",
+       f"Pulse {ui('Guardar configuración')}.",
+       f"Revise la {ui('Vista previa de turnos')}: muestra exactamente los horarios que verá el público en los próximos 14 días."])
+fig("a_ment_mentores", "Pestaña «Mentores»: el botón «Configurar» abre la configuración del profesor.", 7)
+fig("a_ment_config_1", "Perfil de mentor y áreas que atiende.")
+fig("a_ment_config_horario", "Horario semanal: «Agregar bloque» (1) y «Guardar configuración» (2).")
+note("tip", "Si dos bloques del mismo día se cruzan, el sistema no deja guardar e indica cuáles se solapan. "
+     "Use la «Vigencia» de un bloque cuando un horario solo aplique por un periodo (por ejemplo, un trimestre).")
+H3("Fechas sin atención")
+P(f"Para vacaciones, licencias o feriados, use {ui('Fechas sin atención')}: indique desde, hasta (opcional) y motivo, y pulse "
+  f"{ui('Bloquear fechas')}. Se guarda al instante y esos días dejan de ofrecer turnos.")
+fig("a_ment_config_bloqueos", "Fechas sin atención del mentor.")
+note("warn", "Bloquear fechas no cancela las reservas que ya existan en esos días. Cancélelas desde la pestaña «Reservas» "
+     "para que las personas reciban el aviso.")
+
+H2("Áreas de mentoría")
+P(f"En la pestaña {ui('Áreas de mentoría')} se agregan, renombran o desactivan los temas. Un área desactivada deja de "
+  "ofrecerse al público, pero se conserva en el historial de reservas.")
+fig("a_ment_areas", "Pestaña «Áreas de mentoría».", 10)
+
+H2("Cómo reserva una persona")
+P("Útil para orientar a quien llame o escriba:")
+steps([f"Entra en {url('/mentorias')} (menú {ui('Mentorías')} o acceso rápido de la portada) y elige un mentor; puede filtrar por área y modalidad.",
+       "Elige un día y un horario.",
+       f"Completa nombre, correo, teléfono, área y lo que quiere trabajar; acepta la Política de Privacidad, completa la verificación de seguridad y pulsa {ui('Reservar mentoría')}.",
+       f"Recibe el correo {ui('Confirma tu reserva de mentoría — CIEPI')}. Debe abrirlo y pulsar {ui('Confirmar reserva')} <b>en 15 minutos</b>.",
+       "Al confirmar, recibe los detalles con un archivo para agregarla a su calendario, y un enlace para cancelarla si no puede asistir."])
+fig("m_catalogo", "Catálogo público de mentores con filtros por área y modalidad.")
+fig("m_perfil", "Perfil del mentor: elegir el día (1) y el horario (2).")
+fig("m_formulario_2", "Datos de la persona y botón «Reservar mentoría».")
+fig("m_confirmar", "Página que abre el enlace del correo: «Confirmar reserva».", 10)
+note("info", "Cada correo puede tener como máximo 2 mentorías activas a la vez, y solo se ofrecen turnos con al menos 24 horas "
+     "de anticipación.")
+
+H2("Gestionar las reservas")
+P(f"La pestaña {ui('Reservas')} es la bandeja de trabajo diaria. Tiene cuatro vistas:")
+table(["Vista", "Qué muestra", "Qué hacer"],
+      [["Próximas", "Mentorías confirmadas que aún no se realizan.", "Enviar el enlace de las virtuales («Falta el enlace»)."],
+       ["Por cerrar", "Sesiones cuya hora ya pasó.", "Marcar «Realizada» o «No asistió»."],
+       ["Esperando confirmación", "Reservas que la persona aún no confirmó.", "Nada: vencen solas a los 15 minutos."],
+       ["Historial", "Realizadas, inasistencias, canceladas y expiradas.", "Consulta."]],
+      [3.6, 6.3, 6.05])
+fig("a_ment_reservas", "Bandeja de reservas: pestaña «Reservas» (1) y botón «Gestionar» (2).")
+H3("Enviar el enlace de una sesión virtual")
+steps([f"Pulse {ui('Gestionar')} en la reserva.",
+       "Pegue el enlace de la reunión (Microsoft Teams u otro). Debe empezar por https://.",
+       f"Pulse {ui('Guardar y enviar a la persona')}. Se envía con copia al mentor y con el evento de calendario actualizado."])
+fig("a_ment_gestionar", "Ventana «Gestionar reserva» con el enlace de la reunión y las notas internas.")
+H3("Cancelar una reserva")
+P(f"Antes de la sesión, en {ui('Gestionar')}, pulse {ui('Cancelar reserva')}, escriba el motivo y pulse {ui('Confirmar cancelación')}. "
+  "La persona y el mentor reciben un correo con el motivo y el horario queda libre.")
+fig("a_ment_cancelar", "Cancelación con motivo, que se envía por correo a la persona.")
+H3("Cerrar una sesión")
+P(f"Desde la hora de inicio, la reserva aparece en {ui('Por cerrar')}. En {ui('Gestionar')}, pulse {ui('Marcar como realizada')} o "
+  f"{ui('Marcar inasistencia')}. Si se equivoca, puede cambiar de una a otra.")
+fig("a_ment_cerrar", "Cerrar una sesión: «Marcar como realizada» (1) o «Marcar inasistencia» (2).")
+note("info", f"Las {ui('Notas internas')} solo las ve el equipo de CIEPI. Al cancelar, el motivo se agrega a las notas automáticamente.")
+
+H2("Agenda")
+P(f"La pestaña {ui('Agenda')} muestra un calendario mensual con todas las mentorías, de colores según su estado. "
+  "Al hacer clic en una se abre la misma ventana de gestión.")
+fig("a_ment_agenda", "Agenda mensual de mentorías.", 13)
+
+H2("Correos automáticos")
+table(["Cuándo", "Quién lo recibe"],
+      [["La persona reserva", "La persona: enlace para confirmar (15 minutos)."],
+       ["La persona confirma", "La persona y el mentor (con evento de calendario). También CIEPI, si se configuró un correo de avisos."],
+       ["24 horas antes", "Recordatorio a la persona y al mentor. Si es virtual sin enlace, el mentor recibe un aviso."],
+       ["Se envía el enlace", "La persona, con copia al mentor."],
+       ["La persona cancela", "La persona, el mentor y CIEPI (si se configuró)."],
+       ["CIEPI cancela", "La persona y el mentor, con el motivo."]],
+      [4.2, 11.75])
+note("warn", "Los recordatorios de 24 horas dependen de una tarea programada en el servidor que corre cada hora. "
+     "Si dejan de llegar, avise al equipo técnico: el registro está en logs/recordatorios-mentorias.log.")
+
 H1("Preguntas frecuentes")
 faq = [
+    ("Un mentor no aparece en la página de mentorías.",
+     "Revise en Mentorías → Mentores que tenga marcado «Ofrece mentorías», que el profesor esté activo y que tenga horario semanal. Sin horario aparece, pero sin turnos."),
+    ("Una persona dice que no le llegó el correo para confirmar la reserva.",
+     "Que revise el correo no deseado. Si pasaron 15 minutos, la reserva expiró: debe reservar de nuevo."),
     ("Una persona nueva no puede entrar al portal.",
      "Compruebe en Usuarios que su correo está registrado, escrito en minúsculas y exactamente igual al de Microsoft, y que su estado es Activo."),
     ("Desactivé a un usuario, pero sigue dentro.",
@@ -709,7 +813,8 @@ table(["Área", "Limitación", "Cómo proceder"],
        ["Blog", "La revisión detallada no muestra el contenido; los comentarios no son visibles para el autor.", "Ver capítulo 10."],
        ["Consultas", "La respuesta no se envía por correo.", "Responder desde el correo institucional."],
        ["Newsletter", "Envío sin confirmación.", "Revisar el boletín antes de enviarlo."],
-       ["Sedes", "No se pueden editar; eliminar borra en cascada.", "Eliminar y volver a crear con cuidado."]],
+       ["Sedes", "No se pueden editar; eliminar borra en cascada.", "Eliminar y volver a crear con cuidado."],
+       ["Mentorías", "El enlace de Teams no se crea solo; bloquear fechas no cancela reservas existentes.", "Pegar el enlace en «Gestionar»; cancelar a mano las reservas afectadas."]],
       [2.9, 7.2, 5.85])
 
 doc.multiBuild(story)

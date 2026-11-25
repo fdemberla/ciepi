@@ -83,3 +83,16 @@ Revisión hecha al preparar el manual de administración (`docs/Manual_Administr
   - Descripción incorrecta de CIEPI en `app/blog/page.tsx:122` y en el pie del detalle del blog.
   - README de plantilla.
 - **Primer administrador:** no hay script que lo cree.
+
+## Despliegue de mentorías (fases 1 a 4)
+
+1. **Base de datos.** Ejecutar `database/create_mentorias.sql` en producción, igual que los demás scripts. Se puede repetir sin problema. Después, `database/verificar_migraciones.sql` debe mostrar el punto 7 como «aplicado».
+2. **Variables en el `.env` del servidor:**
+   - `MENTORIAS_NOTIFY_EMAIL` (opcional): correo de CIEPI que recibe copia de las reservas.
+   - `CRON_SECRET` (obligatorio para los recordatorios): un valor aleatorio de al menos 24 caracteres. Se genera con:
+     `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+3. **Tarea programada.** En el servidor, en PowerShell como administrador y una sola vez:
+   `schtasks /Create /TN "CIEPI Recordatorios Mentorias" /SC HOURLY /RU SYSTEM /TR "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Apps\ciepi\scripts\recordatorios-mentorias.ps1"`
+   - Si la app no escucha en el puerto 3000, agregar `-Url http://localhost:<puerto>` al final de `/TR`.
+   - Para probarla a mano, ejecutar el mismo comando de PowerShell. El resultado queda en `logs\recordatorios-mentorias.log`.
+4. **Configuración en el portal.** En Admin → Mentorías → Mentores, activar a los mentores y cargar su horario.

@@ -234,3 +234,43 @@ export async function enviarEnlaceReunion(r: ReservaCompleta) {
     attachments: [icsAdjunto(r)],
   });
 }
+
+/** 6) Recordatorio 24 h antes: a la persona y al mentor. */
+export async function enviarRecordatorio(r: ReservaCompleta) {
+  const enlaceHtml =
+    r.modalidad === "virtual"
+      ? r.enlace_reunion
+        ? `<p><strong>Enlace de la reunión:</strong> <a href="${escapeHtml(r.enlace_reunion)}">${escapeHtml(r.enlace_reunion)}</a></p>`
+        : `<p>El enlace de la reunión te llegará por correo antes de la sesión.</p>`
+      : "";
+  const enlaceTexto =
+    r.modalidad === "virtual"
+      ? r.enlace_reunion
+        ? `Enlace de la reunión: ${r.enlace_reunion}\n`
+        : "El enlace de la reunión te llegará por correo antes de la sesión.\n"
+      : "";
+  await sendEmail({
+    to: r.correo,
+    subject: "Recordatorio: tu mentoría es mañana — CIEPI",
+    text: `Hola ${r.nombre},\n\nTe recordamos tu mentoría:\n${detalleTexto(r)}\n${enlaceTexto}\nSi no puedes asistir, cancélala con el enlace "Ver o cancelar mi reserva" del correo de confirmación para liberar el horario.`,
+    html: plantilla(
+      "Tu mentoría es mañana",
+      `<p>Hola ${escapeHtml(r.nombre)},</p><p>Te recordamos tu mentoría:</p>${detalleHtml(r)}${enlaceHtml}
+       <p style="font-size:13px;color:#6b7280;">Si no puedes asistir, cancélala con el enlace «Ver o cancelar mi reserva» del correo de confirmación, para que otra persona pueda usar el horario.</p>`
+    ),
+  });
+  if (r.mentor_correo) {
+    const falta = r.modalidad === "virtual" && !r.enlace_reunion;
+    await sendEmail({
+      to: r.mentor_correo,
+      subject: `Recordatorio: mentoría ${formatoFechaHoraPanama(r.inicio)}`,
+      text: `Recordatorio de mentoría.\n${detalleTexto(r)}\nSolicitante: ${r.nombre} (${r.correo})\nTema: ${r.tema ?? "-"}${falta ? "\n\nATENCIÓN: aún no se ha enviado el enlace de la reunión." : ""}`,
+      html: plantilla(
+        "Recordatorio de mentoría",
+        `${detalleHtml(r)}<p><strong>Solicitante:</strong> ${escapeHtml(r.nombre)} (${escapeHtml(r.correo)})</p>
+         <p><strong>Tema:</strong><br>${escapeHtml(r.tema ?? "-").replace(/\n/g, "<br>")}</p>
+         ${falta ? `<p style="color:#b45309;"><strong>Atención:</strong> aún no se ha enviado el enlace de la reunión. Agrégalo desde el portal (Admin → Mentorías).</p>` : ""}`
+      ),
+    }).catch((e) => console.error("Error enviando recordatorio al mentor:", e));
+  }
+}
