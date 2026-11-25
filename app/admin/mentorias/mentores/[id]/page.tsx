@@ -69,14 +69,14 @@ const bloqueNuevo = (): Bloque => ({
 
 function Card({ title, icon, children, help }: { title: string; icon: string; children: React.ReactNode; help?: string }) {
   return (
-    <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200/80 dark:border-gray-700 p-6 py-6 md:py-6 lg:py-6">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200/80 dark:border-gray-700 p-6">
       <h2 className="flex items-center gap-2 text-xl font-bold text-primary dark:text-white">
         <Icon icon={icon} aria-hidden="true" />
         {title}
       </h2>
       {help && <p className="text-sm text-dark_grey dark:text-gray-400 mt-1">{help}</p>}
       <div className="mt-5">{children}</div>
-    </section>
+    </div>
   );
 }
 

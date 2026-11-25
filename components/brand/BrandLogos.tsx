@@ -7,6 +7,8 @@ interface BrandLogosProps {
   height?: number;
   /** Muestra el nombre completo de CIEPI bajo la sigla. */
   showFullName?: boolean;
+  /** Clases de visibilidad del nombre completo (por defecto, desde pantallas pequeñas). */
+  fullNameClassName?: string;
 }
 
 /**
@@ -23,6 +25,7 @@ export default function BrandLogos({
   variant = "light",
   height = 34,
   showFullName = true,
+  fullNameClassName = "hidden sm:block",
 }: BrandLogosProps) {
   const dark = variant === "dark";
   const inadehSrc = withBasePath(
@@ -56,7 +59,7 @@ export default function BrandLogos({
         </span>
         {showFullName && (
           <span
-            className={`hidden sm:block uppercase font-semibold tracking-wide ${
+            className={`${fullNameClassName} whitespace-nowrap uppercase font-semibold tracking-wide ${
               dark ? "text-white/80" : "text-dark_grey"
             }`}
             style={{ fontSize: Math.max(8, height * 0.24), marginTop: 2 }}

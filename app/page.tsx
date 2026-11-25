@@ -157,7 +157,7 @@ export default async function Home() {
             { href: "/eventos", label: "Calendario de actividades", icon: "solar:calendar-linear", color: "primary" },
             { href: "/capacitaciones", label: "Capacitaciones", icon: "solar:diploma-linear", color: "secondary" },
             { href: "#boletin", label: "Boletín informativo", icon: "solar:letter-linear", color: "brand-green" },
-            { href: "/contacto", label: "Contacto y consultas", icon: "solar:chat-round-line-linear", color: "primary" },
+            { href: "/mentorias", label: "Reserva de mentorías", icon: "solar:users-group-two-rounded-linear", color: "primary" },
           ]}
         />
       </div>

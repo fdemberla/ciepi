@@ -112,7 +112,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link href="/" aria-label="CIEPI — Inicio" className="flex items-center">
-            <BrandLogos height={sticky ? 30 : 34} />
+            <BrandLogos height={sticky ? 30 : 34} fullNameClassName="hidden sm:block lg:hidden xl:block" />
           </Link>
 
           {/* Navigation Links */}

@@ -69,6 +69,18 @@ export const navigationConfig: NavSection[] = [
         },
       },
       {
+        name: "Mentorías",
+        href: "/mentorias",
+        icon: "solar:users-group-two-rounded-linear",
+        visible: {
+          public: true,
+          authenticated: true,
+          admin: true,
+          mobile: true,
+          desktop: true,
+        },
+      },
+      {
         name: "Blog",
         href: "/blog",
         icon: "solar:document-text-linear",
