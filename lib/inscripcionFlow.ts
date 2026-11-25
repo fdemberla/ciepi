@@ -22,6 +22,8 @@ export type InscripcionFlowState =
   | {
       step: "form";
       busy: boolean;
+      cedula: string;
+      isExistingStudent: boolean;
       isCheckingEmail: boolean;
       metodoValidacion: "biometrica" | "manual";
       birthDateConfirmed: boolean;
@@ -34,7 +36,17 @@ export type InscripcionFlowAction =
   | { type: "BIRTHDATE_VERIFIED"; biometriaEnabled: boolean }
   | { type: "START_BIOMETRIA" }
   | { type: "SELECT_MANUAL" }
-  | { type: "BIOMETRIA_RETURN" }
+  /**
+   * Al cargar la página con una sesión de identidad verificada en el servidor
+   * (p. ej. al volver del Hub biométrico). Solo se acepta desde el paso inicial.
+   */
+  | {
+      type: "SESION_RESTAURADA";
+      cedula: string;
+      isExistingStudent: boolean;
+      paso: "metodo" | "form";
+      metodo: "biometrica" | "manual";
+    }
   | { type: "SET_CHECKING_EMAIL"; checking: boolean }
   | { type: "BACK_TO_CEDULA" }
   | { type: "BACK_TO_METODO" }
@@ -80,6 +92,8 @@ export function inscripcionFlowReducer(
       return {
         step: "form",
         busy: false,
+        cedula: state.cedula,
+        isExistingStudent: state.isExistingStudent,
         isCheckingEmail: false,
         metodoValidacion: "manual",
         birthDateConfirmed: true,
@@ -100,18 +114,33 @@ export function inscripcionFlowReducer(
       return {
         step: "form",
         busy: false,
+        cedula: state.cedula,
+        isExistingStudent: state.isExistingStudent,
         isCheckingEmail: false,
         metodoValidacion: "manual",
         birthDateConfirmed: true,
         error: null,
       };
 
-    case "BIOMETRIA_RETURN":
+    case "SESION_RESTAURADA":
+      if (state.step !== "cedula" || state.busy) return state;
+      if (action.paso === "metodo") {
+        return {
+          step: "metodo",
+          busy: false,
+          isInitiatingBiometria: false,
+          cedula: action.cedula,
+          isExistingStudent: action.isExistingStudent,
+          error: null,
+        };
+      }
       return {
         step: "form",
         busy: false,
+        cedula: action.cedula,
+        isExistingStudent: action.isExistingStudent,
         isCheckingEmail: false,
-        metodoValidacion: "biometrica",
+        metodoValidacion: action.metodo,
         birthDateConfirmed: true,
         error: null,
       };
@@ -131,27 +160,17 @@ export function inscripcionFlowReducer(
       };
 
     case "BACK_TO_METODO":
-      if (state.step === "form") {
-        return {
-          step: "metodo",
-          busy: false,
-          isInitiatingBiometria: false,
-          cedula: "",
-          isExistingStudent: false,
-          error: null,
-        };
-      }
-      if (state.step === "confirmar_nacimiento") {
-        return {
-          step: "metodo",
-          busy: false,
-          isInitiatingBiometria: false,
-          cedula: state.cedula,
-          isExistingStudent: state.isExistingStudent,
-          error: null,
-        };
-      }
-      return state;
+      // Solo desde el formulario: la identidad ya está verificada en el servidor.
+      // (Antes también desde "confirmar_nacimiento", lo que saltaba la fecha de nacimiento.)
+      if (state.step !== "form" || state.busy) return state;
+      return {
+        step: "metodo",
+        busy: false,
+        isInitiatingBiometria: false,
+        cedula: state.cedula,
+        isExistingStudent: state.isExistingStudent,
+        error: null,
+      };
 
     case "FAIL":
       if (state.step === "metodo") {

@@ -1,249 +1,250 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  validateVerificationToken,
-  markTokenAsUsed,
-  getTokenInfo,
-} from "@/lib/verificationToken";
+import { safeErrorDetail } from "@/lib/apiError";
+import { withTransaction } from "@/lib/db";
+import { hashToken, buscarPorToken, type FilaVerificacionCompleta } from "@/lib/verificationToken";
 import { getClientIp } from "@/lib/verificationUtils";
-import { query } from "@/lib/db";
+import { validarCanje } from "@/lib/estados/verificacionCorreo";
+import { InscripcionState } from "@/lib/inscripcionStates";
+import type { BiometriaServidor, DatosPersona } from "@/lib/inscripcionSesion";
 
 interface Params {
-  params: Promise<{
-    token: string;
-  }>;
+  params: Promise<{ token: string }>;
 }
 
+interface MetadataInscripcion {
+  capacitacion_id?: number | string;
+  metodo_validacion?: "biometrica" | "manual";
+  biometria?: BiometriaServidor | null;
+  contacto?: { correo: string; telefono: string | null };
+  ubicacion?: {
+    provincia_id: number | null;
+    distrito_id: number | null;
+    corregimiento_id: number | null;
+    calle: string | null;
+  };
+  persona?: DatosPersona | null;
+}
+
+class ErrorCanje extends Error {
+  constructor(public status: number, public code: string, message: string) {
+    super(message);
+  }
+}
+
+type Q = Parameters<Parameters<typeof withTransaction>[0]>[0];
+
 /**
- * Obtiene (o crea si no existe) el ID del estado "Pendiente de validación"
- * en ciepi.inscripciones_estados para las inscripciones manuales/presenciales.
+ * Aplica la inscripción dentro de la transacción: crea o actualiza al estudiante con
+ * los datos ya verificados, guarda la ubicación y crea la inscripción.
  */
-async function getPendienteValidacionEstadoId(): Promise<number> {
-  const res = await query(
-    `SELECT id FROM ciepi.inscripciones_estados WHERE LOWER(nombre) LIKE 'pendiente%' ORDER BY id LIMIT 1`
-  );
-  if (res.rows.length > 0) {
-    return res.rows[0].id as number;
+async function aplicarInscripcion(q: Q, fila: FilaVerificacionCompleta, ip: string | null) {
+  const meta = fila.metadata as MetadataInscripcion;
+  const capacitacionId = parseInt(String(meta.capacitacion_id ?? ""), 10);
+  if (!Number.isInteger(capacitacionId)) {
+    throw new ErrorCanje(400, "INVALID_TOKEN", "El enlace no corresponde a una inscripción válida.");
+  }
+  const bio = meta.metodo_validacion === "biometrica" && meta.biometria?.valido ? meta.biometria : null;
+  const telefono = meta.contacto?.telefono ?? null;
+
+  // 1. Estudiante
+  let estudianteId = fila.id_estudiante;
+  try {
+    if (estudianteId) {
+      await q(
+        `UPDATE ciepi.estudiantes
+            SET correo = $2, telefono = COALESCE($3, telefono), correo_verificado = true,
+                biometria_verificada = biometria_verificada OR $4,
+                biometria_id_auditoria = COALESCE($5, biometria_id_auditoria),
+                biometria_fecha = CASE WHEN $4 THEN CURRENT_TIMESTAMP ELSE biometria_fecha END
+          WHERE id = $1`,
+        [estudianteId, fila.correo, telefono, Boolean(bio), bio?.id_auditoria ?? null]
+      );
+    } else {
+      const p = meta.persona;
+      if (!p) throw new ErrorCanje(400, "INVALID_TOKEN", "Faltan los datos de la persona en la solicitud.");
+      const existente = await q(`SELECT id FROM ciepi.estudiantes WHERE cedula = $1`, [p.cedula]);
+      if (existente.rows.length > 0) {
+        // Se registró por otra vía mientras tanto: se usa ese registro.
+        estudianteId = existente.rows[0].id as number;
+        await q(
+          `UPDATE ciepi.estudiantes SET correo = $2, telefono = COALESCE($3, telefono), correo_verificado = true
+            WHERE id = $1`,
+          [estudianteId, fila.correo, telefono]
+        );
+      } else {
+        const ins = await q(
+          `INSERT INTO ciepi.estudiantes (
+             cedula, nombres, apellidos, nombre_cedula, sexo, estado_civil, fecha_nacimiento,
+             correo, telefono, correo_verificado, biometria_verificada, biometria_id_auditoria, biometria_fecha
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12)
+           RETURNING id`,
+          [
+            p.cedula,
+            p.nombres,
+            p.apellidos,
+            p.nombre_cedula,
+            p.sexo,
+            p.estado_civil,
+            p.fecha_nacimiento,
+            fila.correo,
+            telefono,
+            Boolean(bio),
+            bio?.id_auditoria ?? null,
+            bio ? new Date() : null,
+          ]
+        );
+        estudianteId = ins.rows[0].id as number;
+      }
+    }
+  } catch (err) {
+    if ((err as { code?: string }).code === "23505") {
+      throw new ErrorCanje(
+        409,
+        "EMAIL_TAKEN",
+        "Ese correo ya está registrado por otra persona. Vuelve a inscribirte con otro correo."
+      );
+    }
+    throw err;
   }
 
-  const insertRes = await query(
-    `INSERT INTO ciepi.inscripciones_estados (id, nombre, descripcion)
-     SELECT COALESCE(MAX(id), 0) + 1, $1, $2
-     FROM ciepi.inscripciones_estados
-     RETURNING id`,
+  // 2. Ubicación
+  const u = meta.ubicacion;
+  if (u) {
+    const upd = await q(
+      `UPDATE ciepi.estudiantes_ubicacion
+          SET provincia_id = $2, distrito_id = $3, corregimiento_id = $4, calle = $5
+        WHERE id_usuario = $1`,
+      [estudianteId, u.provincia_id, u.distrito_id, u.corregimiento_id, u.calle]
+    );
+    if (upd.rowCount === 0) {
+      await q(
+        `INSERT INTO ciepi.estudiantes_ubicacion (id_usuario, provincia_id, distrito_id, corregimiento_id, calle)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [estudianteId, u.provincia_id, u.distrito_id, u.corregimiento_id, u.calle]
+      );
+    }
+  }
+
+  // 3. Inscripción (biométrica → Nueva; manual → Pendiente de validación)
+  const estadoInicial = bio ? InscripcionState.NUEVA : InscripcionState.PENDIENTE_VALIDACION;
+  const nueva = await q(
+    `INSERT INTO ciepi.inscripciones (
+       id_usuario, id_capacitacion, estado_inscripcion,
+       biometria_verificada, biometria_id_auditoria, biometria_score,
+       biometria_liveness, biometria_estado, biometria_fecha
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     ON CONFLICT (id_usuario, id_capacitacion) DO NOTHING
+     RETURNING id, estado_inscripcion`,
     [
-      "Pendiente de validación",
-      "Inscripción con validación manual o presencial pendiente de revisión por un administrador",
+      estudianteId,
+      capacitacionId,
+      estadoInicial,
+      Boolean(bio),
+      bio?.id_auditoria ?? null,
+      bio?.score_similitud ?? null,
+      bio?.liveness_score ?? null,
+      bio ? bio.estado : "PENDIENTE_VALIDACION_MANUAL",
+      bio ? new Date() : null,
     ]
   );
-  return insertRes.rows[0].id as number;
+  let inscripcion = nueva.rows[0] as { id: number; estado_inscripcion: number } | undefined;
+  let yaExistia = false;
+  if (!inscripcion) {
+    yaExistia = true;
+    const ex = await q(
+      `SELECT id, estado_inscripcion FROM ciepi.inscripciones WHERE id_usuario = $1 AND id_capacitacion = $2`,
+      [estudianteId, capacitacionId]
+    );
+    inscripcion = ex.rows[0];
+  }
+
+  const cap = await q(
+    `SELECT nombre, fecha_inicio_capacitacion FROM ciepi.capacitaciones WHERE id = $1`,
+    [capacitacionId]
+  );
+  const est = await q(`SELECT nombres, apellidos FROM ciepi.estudiantes WHERE id = $1`, [estudianteId]);
+
+  const resultado = {
+    estudiante: { id: estudianteId, nombres: est.rows[0]?.nombres, apellidos: est.rows[0]?.apellidos, correo: fila.correo },
+    inscripcion_id: inscripcion?.id ?? null,
+    estado_inscripcion: inscripcion?.estado_inscripcion ?? null,
+    metodo_validacion: bio ? "biometrica" : "manual",
+    capacitacion: cap.rows[0] ?? null,
+    message: yaExistia
+      ? "Ya estabas inscrito en esta capacitación."
+      : bio
+        ? "Inscripción creada exitosamente"
+        : "Inscripción registrada como pendiente de validación por un administrador",
+  };
+
+  // 4. Cerrar el enlace (verificado) guardando el resultado para clics repetidos.
+  const cierre = await q(
+    `UPDATE ciepi.verificacion_correo
+        SET estado = 'verificado', usado = true, fecha_uso = $2, ip_uso = $3,
+            id_estudiante = $4, resultado = $5
+      WHERE id = $1 AND estado = 'pendiente'`,
+    [fila.id, new Date(), ip, estudianteId, JSON.stringify(resultado)]
+  );
+  if (cierre.rowCount === 0) {
+    throw new ErrorCanje(409, "TOKEN_ALREADY_USED", "Este enlace ya fue usado.");
+  }
+  return resultado;
+}
+
+function respuestaExito(fila: FilaVerificacionCompleta, resultado: Record<string, unknown>) {
+  return NextResponse.json({
+    success: true,
+    message: "Correo verificado exitosamente",
+    data: { tipo: fila.tipo, correo: fila.correo, ...resultado },
+  });
 }
 
 /**
  * POST /api/verificacion/validar/[token]
- * Valida un token cuando el usuario hace clic en el link del correo
+ * Canje del enlace del correo. Todo ocurre en UNA transacción con la fila bloqueada:
+ * si algo falla, el enlace sigue pendiente y se puede volver a intentar. Un segundo
+ * clic sobre un enlace ya verificado devuelve el mismo resultado (idempotente).
  */
 export async function POST(request: NextRequest, { params }: Params) {
   try {
     const { token } = await params;
-
-    if (!token) {
+    if (!token || !/^[a-f0-9]{64}$/.test(token)) {
       return NextResponse.json(
-        { error: "Token no proporcionado" },
-        { status: 400 }
+        { error: "El enlace de verificación no existe", code: "TOKEN_NOT_FOUND" },
+        { status: 404 }
       );
     }
+    const ip = getClientIp(request);
 
-    // Validar el token
-    const validation = await validateVerificationToken(token);
+    const salida = await withTransaction(async (q) => {
+      const res = await q(
+        `SELECT id, id_estudiante, cedula, correo, tipo, metadata, estado, reenvios, resultado,
+                fecha_creacion, fecha_expiracion
+           FROM ciepi.verificacion_correo WHERE token = $1 FOR UPDATE`,
+        [hashToken(token)]
+      );
+      const fila = res.rows[0] as FilaVerificacionCompleta | undefined;
+      if (!fila) throw new ErrorCanje(404, "TOKEN_NOT_FOUND", "El enlace de verificación no existe");
 
-    if (!validation.valid) {
-      let errorMessage = "Token inválido";
-      let errorCode = "INVALID_TOKEN";
-
-      if (validation.expired) {
-        errorMessage = "El enlace de verificación ha expirado";
-        errorCode = "TOKEN_EXPIRED";
-      } else if (validation.used) {
-        errorMessage = "Este enlace ya fue usado";
-        errorCode = "TOKEN_ALREADY_USED";
-      } else if (validation.not_found) {
-        errorMessage = "El enlace de verificación no existe";
-        errorCode = "TOKEN_NOT_FOUND";
+      if (fila.estado === "verificado") {
+        return { fila, resultado: fila.resultado ?? {} };
       }
-
-      return NextResponse.json(
-        {
-          error: errorMessage,
-          code: errorCode,
-        },
-        { status: 400 }
-      );
-    }
-
-    // Obtener IP del cliente
-    const clientIp = getClientIp(request);
-
-    // Marcar token como usado
-    const marked = await markTokenAsUsed(token, clientIp || undefined);
-
-    if (!marked) {
-      return NextResponse.json(
-        { error: "Error al marcar el token como usado" },
-        { status: 500 }
-      );
-    }
-
-    // Obtener información completa del token
-    const tokenInfo = await getTokenInfo(token);
-
-    if (!tokenInfo) {
-      return NextResponse.json(
-        { error: "Error al obtener información del token" },
-        { status: 500 }
-      );
-    }
-
-    // Marcar el correo como verificado en la tabla de estudiantes
-    await query(
-      `UPDATE ciepi.estudiantes
-       SET correo_verificado = true
-       WHERE id = $1`,
-      [tokenInfo.id_estudiante]
-    );
-
-    // Procesar según el tipo de verificación
-    let additionalData = {};
-
-    if (tokenInfo.tipo === "inscripcion") {
-      const metadata = tokenInfo.metadata as {
-        capacitacion_id?: number;
-        metodo_validacion?: "biometrica" | "manual";
-        biometria?: {
-          valido?: boolean;
-          id_auditoria?: string;
-          score_similitud?: number;
-          liveness_score?: number;
-          estado?: string;
-        } | null;
-      };
-
-      if (metadata.capacitacion_id) {
-        const esBiometrica = Boolean(
-          metadata.biometria?.valido && metadata.metodo_validacion !== "manual"
-        );
-
-        // Si es validación manual/presencial, el estado de inscripción queda como "Pendiente de validación"
-        const estadoInicialId = esBiometrica
-          ? 1
-          : await getPendienteValidacionEstadoId();
-
-        // Obtener información de la capacitación para mostrar en la pantalla de confirmación
-        const capRes = await query(
-          `SELECT nombre, fecha_inicio_capacitacion FROM ciepi.capacitaciones WHERE id = $1`,
-          [metadata.capacitacion_id]
-        );
-        const capacitacionInfo =
-          capRes.rows.length > 0 ? capRes.rows[0] : undefined;
-
-        // Verificar si ya existe la inscripción
-        const existingInscripcion = await query(
-          `SELECT id, estado_inscripcion
-           FROM ciepi.inscripciones
-           WHERE id_usuario = $1 AND id_capacitacion = $2`,
-          [tokenInfo.id_estudiante, metadata.capacitacion_id]
-        );
-
-        if (existingInscripcion.rows.length > 0) {
-          if (esBiometrica && metadata.biometria) {
-            await query(
-              `UPDATE ciepi.inscripciones
-               SET biometria_verificada = true,
-                   biometria_id_auditoria = $1,
-                   biometria_score = $2,
-                   biometria_liveness = $3,
-                   biometria_estado = $4,
-                   biometria_fecha = CURRENT_TIMESTAMP
-               WHERE id = $5`,
-              [
-                metadata.biometria.id_auditoria || null,
-                metadata.biometria.score_similitud || null,
-                metadata.biometria.liveness_score || null,
-                metadata.biometria.estado || null,
-                existingInscripcion.rows[0].id,
-              ]
-            );
-          }
-
-          additionalData = {
-            inscripcion_id: existingInscripcion.rows[0].id,
-            estado_inscripcion: existingInscripcion.rows[0].estado_inscripcion,
-            metodo_validacion: esBiometrica ? "biometrica" : "manual",
-            capacitacion: capacitacionInfo,
-            message: "Inscripción ya existente actualizada",
-          };
-        } else {
-          // Crear la inscripción con auditoría biométrica o como Pendiente de validación (manual)
-          const bio = metadata.biometria;
-          const inscripcionResult = await query(
-            `INSERT INTO ciepi.inscripciones (
-              id_usuario, id_capacitacion, estado_inscripcion,
-              biometria_verificada, biometria_id_auditoria, biometria_score,
-              biometria_liveness, biometria_estado, biometria_fecha
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING id, estado_inscripcion, fecha_inscripcion`,
-            [
-              tokenInfo.id_estudiante,
-              metadata.capacitacion_id,
-              estadoInicialId,
-              esBiometrica,
-              esBiometrica ? bio?.id_auditoria || null : null,
-              esBiometrica ? bio?.score_similitud || null : null,
-              esBiometrica ? bio?.liveness_score || null : null,
-              esBiometrica
-                ? bio?.estado || "APROBADO"
-                : "PENDIENTE_VALIDACION_MANUAL",
-              esBiometrica ? new Date() : null,
-            ]
-          );
-
-          additionalData = {
-            inscripcion_id: inscripcionResult.rows[0].id,
-            estado_inscripcion: inscripcionResult.rows[0].estado_inscripcion,
-            metodo_validacion: esBiometrica ? "biometrica" : "manual",
-            fecha_inscripcion: inscripcionResult.rows[0].fecha_inscripcion,
-            capacitacion: capacitacionInfo,
-            message: esBiometrica
-              ? "Inscripción creada exitosamente"
-              : "Inscripción registrada como pendiente de validación por un administrador",
-          };
-        }
+      const canje = validarCanje(fila, new Date());
+      if (!canje.permitido) throw new ErrorCanje(canje.status, canje.codigo, canje.mensaje);
+      if (fila.tipo !== "inscripcion") {
+        throw new ErrorCanje(400, "INVALID_TOKEN", "Tipo de verificación no soportado.");
       }
-    }
+      return { fila, resultado: await aplicarInscripcion(q, fila, ip) };
+    });
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Correo verificado exitosamente",
-        data: {
-          estudiante: {
-            id: tokenInfo.id_estudiante,
-            nombres: tokenInfo.nombres,
-            apellidos: tokenInfo.apellidos,
-            correo: tokenInfo.correo,
-          },
-          tipo: tokenInfo.tipo,
-          ...additionalData,
-        },
-      },
-      { status: 200 }
-    );
+    return respuestaExito(salida.fila, salida.resultado);
   } catch (error) {
+    if (error instanceof ErrorCanje) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     console.error("Error al validar token:", error);
     return NextResponse.json(
-      {
-        error: "Error al validar el token",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Error al validar el enlace. Intenta de nuevo.", details: safeErrorDetail(error) },
       { status: 500 }
     );
   }
@@ -251,59 +252,28 @@ export async function POST(request: NextRequest, { params }: Params) {
 
 /**
  * GET /api/verificacion/validar/[token]
- * Obtiene información del token sin validarlo (para mostrar info antes de validar)
+ * Información mínima del enlace (sin datos de contacto ni metadata).
  */
-export async function GET(request: NextRequest, { params }: Params) {
+export async function GET(_request: NextRequest, { params }: Params) {
   try {
     const { token } = await params;
-
-    if (!token) {
-      return NextResponse.json(
-        { error: "Token no proporcionado" },
-        { status: 400 }
-      );
+    const fila = await buscarPorToken(token);
+    if (!fila) {
+      return NextResponse.json({ error: "Token no encontrado" }, { status: 404 });
     }
-
-    // Obtener información del token
-    const tokenInfo = await getTokenInfo(token);
-
-    if (!tokenInfo) {
-      return NextResponse.json(
-        { error: "Token no encontrado" },
-        { status: 404 }
-      );
-    }
-
-    // Verificar si está expirado
-    const now = new Date();
-    const expiration = new Date(tokenInfo.fecha_expiracion);
-    const expirado = now > expiration;
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: {
-          estudiante: {
-            nombres: tokenInfo.nombres,
-            apellidos: tokenInfo.apellidos,
-            correo: tokenInfo.correo,
-          },
-          tipo: tokenInfo.tipo,
-          usado: tokenInfo.usado,
-          expirado,
-          fecha_expiracion: tokenInfo.fecha_expiracion,
-          metadata: tokenInfo.metadata,
-        },
+    const canje = validarCanje(fila, new Date());
+    return NextResponse.json({
+      success: true,
+      data: {
+        tipo: fila.tipo,
+        estado: fila.estado === "verificado" ? "verificado" : canje.permitido ? "pendiente" : canje.codigo,
+        fecha_expiracion: fila.fecha_expiracion,
       },
-      { status: 200 }
-    );
+    });
   } catch (error) {
     console.error("Error al obtener información del token:", error);
     return NextResponse.json(
-      {
-        error: "Error al obtener información del token",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Error al obtener información del token", details: safeErrorDetail(error) },
       { status: 500 }
     );
   }

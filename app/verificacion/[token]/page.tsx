@@ -87,6 +87,10 @@ export default function VerificarCorreoPage() {
             setEstado("expired");
             setMensaje(data.error || "El enlace ha expirado");
             toast.error("El enlace de verificación ha expirado");
+          } else if (data.code === "TOKEN_INVALIDATED") {
+            setEstado("error");
+            setMensaje(data.error || "Este enlace fue reemplazado por uno más reciente");
+            toast.error("Este enlace fue reemplazado por uno más reciente");
           } else if (data.code === "TOKEN_ALREADY_USED") {
             setEstado("used");
             setMensaje(data.error || "Este enlace ya fue usado");
@@ -125,8 +129,8 @@ export default function VerificarCorreoPage() {
 
       if (data.success) {
         toast.success("Correo reenviado exitosamente");
-        // Redirigir a la página de espera con el nuevo token
-        router.push(`/verificacion/esperando/${data.data.token}`);
+        // Página de espera de la misma solicitud (nuevo identificador de consulta)
+        router.push(`/verificacion/esperando/${data.data.consulta}`);
       } else {
         toast.error(data.error || "Error al reenviar el correo");
       }

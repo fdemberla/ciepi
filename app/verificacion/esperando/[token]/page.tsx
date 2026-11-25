@@ -5,16 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 interface TokenStatus {
-  existe: boolean;
-  usado: boolean;
-  expirado: boolean;
-  estado: "pendiente" | "verificado" | "expirado";
+  estado: "pendiente" | "verificado" | "expirado" | "invalidado";
 }
 
 export default function EsperandoVerificacionPage() {
   const params = useParams();
   const router = useRouter();
-  const token = params.token as string;
+  // Identificador de consulta de la solicitud (no es el enlace del correo).
+  const consulta = params.token as string;
 
   const [estado, setEstado] = useState<TokenStatus["estado"]>("pendiente");
   const [tiempoTranscurrido, setTiempoTranscurrido] = useState(0);
@@ -34,14 +32,13 @@ export default function EsperandoVerificacionPage() {
       try {
         const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
         const response = await fetch(
-          `${basePath}/api/verificacion/estado/${token}`,
+          `${basePath}/api/verificacion/estado/${consulta}`,
           { signal },
         );
 
         if (!response.ok) {
           if (response.status === 404) {
-            setEstado("expirado");
-            toast.error("Token no encontrado");
+            setEstado("invalidado");
             return;
           }
           throw new Error("Error al verificar estado");
@@ -59,6 +56,8 @@ export default function EsperandoVerificacionPage() {
         } else if (data.data.estado === "expirado") {
           setEstado("expirado");
           toast.error("El enlace de verificación ha expirado");
+        } else if (data.data.estado === "invalidado") {
+          setEstado("invalidado");
         }
       } catch (error) {
         if ((error as { name?: string })?.name === "AbortError") {
@@ -67,7 +66,7 @@ export default function EsperandoVerificacionPage() {
         console.error("Error al verificar estado:", error);
       }
     },
-    [token, router],
+    [consulta, router],
   );
 
   // Polling cada 3 segundos (con AbortController en cleanup)
@@ -108,17 +107,17 @@ export default function EsperandoVerificacionPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ consulta }),
       });
 
       const data = await response.json();
 
       if (data.success) {
+        // Misma solicitud, nuevo enlace: la página sigue igual y vuelve a esperar.
         toast.success("Correo reenviado exitosamente");
         setIntentosReenvio((prev) => prev + 1);
         setTiempoTranscurrido(0);
-        // Actualizar con el nuevo token
-        router.replace(`/verificacion/esperando/${data.data.token}`);
+        setEstado("pendiente");
       } else {
         toast.error(data.error || "Error al reenviar el correo");
       }
@@ -342,6 +341,25 @@ export default function EsperandoVerificacionPage() {
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-4">
                 Redirigiendo automáticamente...
               </p>
+            </div>
+          )}
+
+          {/* Estado: Invalidado (reemplazado por una solicitud más reciente) */}
+          {estado === "invalidado" && (
+            <div className="text-center">
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-4">
+                Solicitud reemplazada
+              </h1>
+              <p className="text-lg text-slate-700 dark:text-slate-300 mb-6">
+                Esta solicitud ya no es válida: hiciste una inscripción más reciente
+                al mismo curso. Usa el último correo que recibiste.
+              </p>
+              <button
+                onClick={() => router.push("/capacitaciones")}
+                className="px-6 py-3 bg-primary text-white font-semibold rounded-lg"
+              >
+                Ver capacitaciones
+              </button>
             </div>
           )}
 

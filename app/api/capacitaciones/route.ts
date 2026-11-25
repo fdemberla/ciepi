@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { safeErrorDetail } from "@/lib/apiError";
+import { HOY_PANAMA_SQL } from "@/lib/inscripcionVentana";
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,9 +55,9 @@ export async function GET(request: NextRequest) {
     const conditions: string[] = [];
 
     // Por defecto, solo mostrar capacitaciones con inscripción vigente
-    // (fecha_final_inscripcion es NULL o mayor que NOW)
+    // (el último día de inscripción cuenta completo, en hora de Panamá)
     conditions.push(
-      `(fecha_final_inscripcion IS NULL OR fecha_final_inscripcion >= NOW())`
+      `(fecha_final_inscripcion IS NULL OR fecha_final_inscripcion >= ${HOY_PANAMA_SQL})`
     );
 
     // Filter by activo if parameter is provided

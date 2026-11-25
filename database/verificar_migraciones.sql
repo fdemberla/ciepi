@@ -33,7 +33,17 @@ FROM (VALUES
      AND EXISTS (SELECT 1 FROM information_schema.columns
                  WHERE table_schema = 'ciepi' AND table_name = 'profesores' AND column_name = 'es_mentor')
      AND EXISTS (SELECT 1 FROM information_schema.columns
-                 WHERE table_schema = 'ciepi' AND table_name = 'mentoria_reservas' AND column_name = 'recordatorio_enviado_en'))
+                 WHERE table_schema = 'ciepi' AND table_name = 'mentoria_reservas' AND column_name = 'recordatorio_enviado_en')),
+  ('8. add_biometria_columnas.sql',
+     EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_schema = 'ciepi' AND table_name = 'inscripciones' AND column_name = 'biometria_score')
+     AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'ciepi' AND table_name = 'estudiantes' AND column_name = 'biometria_verificada')),
+  ('9. fase1_seguridad_inscripcion.sql',
+     to_regclass('ciepi.inscripcion_sesiones') IS NOT NULL
+     AND to_regclass('ciepi.uq_inscripciones_usuario_capacitacion') IS NOT NULL
+     AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'ciepi' AND table_name = 'verificacion_correo' AND column_name = 'consulta_hash'))
 ) AS t(script, ok)
 ORDER BY script;
 

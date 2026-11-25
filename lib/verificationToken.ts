@@ -1,240 +1,154 @@
-import { randomBytes, createHash } from "crypto";
-import { query } from "./db";
+import { query, withTransaction } from "./db";
+import { generarSecreto, hashSecreto } from "./inscripcionSesion";
+import {
+  DURACION_ENLACE_MINUTOS,
+  estadoEfectivo,
+  validarReenvio,
+  type EstadoVerificacion,
+  type EstadoVerificacionGuardado,
+  type ResultadoReenvio,
+} from "./estados/verificacionCorreo";
 
 /**
- * Genera un token seguro y único para verificación de correo
- * @returns Token aleatorio de 64 caracteres hexadecimales
+ * Enlaces de verificación de correo (ciepi.verificacion_correo).
+ *
+ * Cada solicitud tiene DOS secretos distintos:
+ *  - token: va SOLO en el correo; quien lo tiene demuestra acceso al buzón.
+ *  - consulta: lo recibe el navegador para la página de espera (consultar estado y
+ *    pedir reenvío). No sirve para verificar.
+ * En la base solo se guardan sus hashes SHA-256.
  */
-function generateSecureToken(): string {
-  return randomBytes(32).toString("hex");
-}
 
-function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
+export { hashSecreto as hashToken };
 
-/**
- * Interfaz para crear un token de verificación
- */
+export type TipoVerificacion = "inscripcion";
+
 export interface CreateVerificationTokenParams {
-  id_estudiante: number;
+  id_estudiante: number | null;
+  cedula: string;
   correo: string;
-  tipo: "inscripcion" | "recuperacion" | "cambio_correo";
-  metadata?: Record<string, unknown>;
-  duracion_minutos?: number;
-  ip?: string;
+  tipo: TipoVerificacion;
+  metadata: Record<string, unknown> & { capacitacion_id?: number | string };
+  ip?: string | null;
 }
 
-/**
- * Crea un token de verificación en la base de datos
- * @param params Parámetros para crear el token
- * @returns Token generado y datos del registro
- */
-export async function createVerificationToken(
-  params: CreateVerificationTokenParams
-) {
-  const {
-    id_estudiante,
-    correo,
-    tipo,
-    metadata = {},
-    duracion_minutos = 15,
-    ip = null,
-  } = params;
-
-  const token = generateSecureToken();
-  const tokenHash = hashToken(token);
-  const fecha_expiracion = new Date();
-  fecha_expiracion.setMinutes(fecha_expiracion.getMinutes() + duracion_minutos);
-
-  const result = await query(
-    `INSERT INTO ciepi.verificacion_correo (
-      id_estudiante, token, correo, tipo, metadata, 
-      fecha_expiracion, ip_creacion
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-    RETURNING id, fecha_expiracion`,
-    [
-      id_estudiante,
-      tokenHash,
-      correo,
-      tipo,
-      JSON.stringify(metadata),
-      fecha_expiracion,
-      ip,
-    ]
-  );
-
-  return {
-    token,
-    id: result.rows[0].id,
-    fecha_expiracion: result.rows[0].fecha_expiracion,
-  };
+export interface FilaVerificacionCompleta {
+  id: number;
+  id_estudiante: number | null;
+  cedula: string | null;
+  correo: string;
+  tipo: string;
+  metadata: Record<string, unknown>;
+  estado: EstadoVerificacionGuardado;
+  reenvios: number;
+  resultado: Record<string, unknown> | null;
+  fecha_creacion: Date;
+  fecha_expiracion: Date;
 }
 
-/**
- * Interfaz para el resultado de validación de token
- */
-export interface ValidateTokenResult {
-  valid: boolean;
-  used?: boolean;
-  expired?: boolean;
-  not_found?: boolean;
-  data?: {
-    id: number;
-    id_estudiante: number;
-    correo: string;
-    tipo: string;
-    metadata: Record<string, unknown>;
-    fecha_creacion: Date;
-    fecha_expiracion: Date;
-  };
+// Las columnas de fecha son "timestamp without time zone": se escriben y comparan
+// siempre desde Node (como el resto de la app) para no mezclar zonas horarias.
+function expiracionDesde(ahora: Date): Date {
+  return new Date(ahora.getTime() + DURACION_ENLACE_MINUTOS * 60_000);
 }
 
+const COLUMNAS = `id, id_estudiante, cedula, correo, tipo, metadata, estado, reenvios, resultado,
+                  fecha_creacion, fecha_expiracion`;
+
 /**
- * Valida un token de verificación
- * @param token Token a validar
- * @returns Resultado de la validación
+ * Crea la solicitud de verificación. Invalida las solicitudes pendientes de la misma
+ * cédula PARA LA MISMA capacitación (no las de otros cursos).
  */
-export async function validateVerificationToken(
-  token: string
-): Promise<ValidateTokenResult> {
-  const tokenHash = hashToken(token);
+export async function createVerificationToken(params: CreateVerificationTokenParams) {
+  const token = generarSecreto();
+  const consulta = generarSecreto();
+  const ahora = new Date();
+  const capacitacionId = params.metadata.capacitacion_id != null ? String(params.metadata.capacitacion_id) : null;
 
-  const result = await query(
-    `SELECT id, id_estudiante, correo, tipo, metadata, usado,
-            fecha_creacion, fecha_expiracion
-     FROM ciepi.verificacion_correo
-     WHERE token = $1`,
-    [tokenHash]
-  );
+  const fila = await withTransaction(async (q) => {
+    await q(
+      `UPDATE ciepi.verificacion_correo
+          SET estado = 'invalidado', usado = true
+        WHERE cedula = $1 AND tipo = $2 AND estado = 'pendiente'
+          AND metadata->>'capacitacion_id' IS NOT DISTINCT FROM $3`,
+      [params.cedula, params.tipo, capacitacionId]
+    );
+    const res = await q(
+      `INSERT INTO ciepi.verificacion_correo
+         (id_estudiante, cedula, token, consulta_hash, correo, tipo, metadata,
+          estado, usado, fecha_creacion, fecha_expiracion, ip_creacion)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pendiente', false, $8, $9, $10)
+       RETURNING id, fecha_expiracion`,
+      [
+        params.id_estudiante,
+        params.cedula,
+        hashSecreto(token),
+        hashSecreto(consulta),
+        params.correo,
+        params.tipo,
+        JSON.stringify(params.metadata),
+        ahora,
+        expiracionDesde(ahora),
+        params.ip ?? null,
+      ]
+    );
+    return res.rows[0] as { id: number; fecha_expiracion: Date };
+  });
 
-  if (result.rows.length === 0) {
-    return { valid: false, not_found: true };
-  }
-
-  const tokenData = result.rows[0];
-
-  // Verificar si ya fue usado
-  if (tokenData.usado) {
-    return { valid: false, used: true };
-  }
-
-  // Verificar si expiró
-  const now = new Date();
-  const expiration = new Date(tokenData.fecha_expiracion);
-  if (now > expiration) {
-    return { valid: false, expired: true };
-  }
-
-  return {
-    valid: true,
-    data: {
-      id: tokenData.id,
-      id_estudiante: tokenData.id_estudiante,
-      correo: tokenData.correo,
-      tipo: tokenData.tipo,
-      metadata: tokenData.metadata,
-      fecha_creacion: tokenData.fecha_creacion,
-      fecha_expiracion: tokenData.fecha_expiracion,
-    },
-  };
+  return { token, consulta, id: fila.id, fecha_expiracion: fila.fecha_expiracion };
 }
 
+async function buscarPor(columna: "token" | "consulta_hash", secreto: string): Promise<FilaVerificacionCompleta | null> {
+  if (!/^[a-f0-9]{64}$/.test(secreto)) return null;
+  const res = await query(`SELECT ${COLUMNAS} FROM ciepi.verificacion_correo WHERE ${columna} = $1`, [
+    hashSecreto(secreto),
+  ]);
+  return (res.rows[0] as FilaVerificacionCompleta | undefined) ?? null;
+}
+
+export const buscarPorToken = (token: string) => buscarPor("token", token);
+export const buscarPorConsulta = (consulta: string) => buscarPor("consulta_hash", consulta);
+
+/** Estado para la página de espera. */
+export async function estadoPorConsulta(
+  consulta: string
+): Promise<{ estado: EstadoVerificacion; reenvios: number; correo: string } | null> {
+  const fila = await buscarPorConsulta(consulta);
+  if (!fila) return null;
+  return { estado: estadoEfectivo(fila, new Date()), reenvios: fila.reenvios, correo: fila.correo };
+}
+
+export type ResultadoReenvioToken =
+  | { ok: true; token: string; consulta: string | null; fila: FilaVerificacionCompleta; fecha_expiracion: Date }
+  | { ok: false; status: number; mensaje: string };
+
 /**
- * Marca un token como usado
- * @param token Token a marcar como usado
- * @param ip Dirección IP desde donde se usó (opcional)
- * @returns True si se marcó correctamente
+ * Reenvía sobre la MISMA fila: nuevo token, nueva expiración, reenvios + 1.
+ * El enlace anterior deja de servir. Si se pide con el token del correo (enlace
+ * vencido), también se genera una consulta nueva para la página de espera.
  */
-export async function markTokenAsUsed(
-  token: string,
-  ip?: string
-): Promise<boolean> {
-  const tokenHash = hashToken(token);
-  const result = await query(
+export async function reenviarVerificacion(
+  por: { consulta: string } | { token: string }
+): Promise<ResultadoReenvioToken> {
+  const fila = "consulta" in por ? await buscarPorConsulta(por.consulta) : await buscarPorToken(por.token);
+  if (!fila) return { ok: false, status: 404, mensaje: "Solicitud de verificación no encontrada." };
+
+  const ahora = new Date();
+  const decision: ResultadoReenvio = validarReenvio(fila, ahora);
+  if (!decision.permitido) return { ok: false, status: decision.status, mensaje: decision.mensaje };
+
+  const token = generarSecreto();
+  const consulta = "token" in por ? generarSecreto() : null;
+  const res = await query(
     `UPDATE ciepi.verificacion_correo
-     SET usado = true, fecha_uso = CURRENT_TIMESTAMP, ip_uso = $2
-     WHERE token = $1 AND usado = false
-     RETURNING id`,
-    [tokenHash, ip || null]
+        SET token = $3, reenvios = reenvios + 1, fecha_creacion = $6,
+            fecha_expiracion = $4, consulta_hash = COALESCE($5, consulta_hash)
+      WHERE id = $1 AND estado = 'pendiente' AND reenvios = $2
+      RETURNING fecha_expiracion`,
+    [fila.id, fila.reenvios, hashSecreto(token), expiracionDesde(ahora), consulta ? hashSecreto(consulta) : null, ahora]
   );
-
-  return result.rows.length > 0;
-}
-
-/**
- * Verifica el estado de un token (para polling)
- * @param token Token a verificar
- * @returns Estado del token
- */
-export async function checkTokenStatus(token: string): Promise<{
-  exists: boolean;
-  usado: boolean;
-  expirado: boolean;
-}> {
-  const tokenHash = hashToken(token);
-  const result = await query(
-    `SELECT usado, fecha_expiracion
-     FROM ciepi.verificacion_correo
-     WHERE token = $1`,
-    [tokenHash]
-  );
-
-  if (result.rows.length === 0) {
-    return { exists: false, usado: false, expirado: false };
+  if (res.rows.length === 0) {
+    return { ok: false, status: 409, mensaje: "La solicitud cambió mientras se reenviaba. Recarga la página." };
   }
-
-  const tokenData = result.rows[0];
-  const now = new Date();
-  const expiration = new Date(tokenData.fecha_expiracion);
-
-  return {
-    exists: true,
-    usado: tokenData.usado,
-    expirado: now > expiration,
-  };
-}
-
-/**
- * Invalida todos los tokens anteriores de un estudiante para un tipo específico
- * Útil para asegurar que solo el token más reciente sea válido
- * @param id_estudiante ID del estudiante
- * @param tipo Tipo de token
- */
-export async function invalidatePreviousTokens(
-  id_estudiante: number,
-  tipo: string
-): Promise<void> {
-  await query(
-    `UPDATE ciepi.verificacion_correo
-     SET usado = true
-     WHERE id_estudiante = $1 AND tipo = $2 AND usado = false`,
-    [id_estudiante, tipo]
-  );
-}
-
-
-
-/**
- * Obtiene información de un token por su valor
- * @param token Token a buscar
- * @returns Información del token o null si no existe
- */
-export async function getTokenInfo(token: string) {
-  const tokenHash = hashToken(token);
-  const result = await query(
-    `SELECT v.id, v.id_estudiante, v.correo, v.tipo, v.metadata,
-            v.usado, v.fecha_creacion, v.fecha_expiracion, v.fecha_uso,
-            e.nombres, e.apellidos, e.cedula
-     FROM ciepi.verificacion_correo v
-     INNER JOIN ciepi.estudiantes e ON v.id_estudiante = e.id
-     WHERE v.token = $1`,
-    [tokenHash]
-  );
-
-  if (result.rows.length === 0) {
-    return null;
-  }
-
-  return result.rows[0];
+  return { ok: true, token, consulta, fila, fecha_expiracion: res.rows[0].fecha_expiracion };
 }

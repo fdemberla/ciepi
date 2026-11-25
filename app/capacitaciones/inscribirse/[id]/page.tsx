@@ -45,6 +45,18 @@ interface EstudianteData {
   telefono?: string;
 }
 
+interface VistaSesion {
+  cedula: string;
+  exists: boolean;
+  estudiante: EstudianteData;
+  ubicacion: {
+    provincia_id: number | null;
+    distrito_id: number | null;
+    corregimiento_id: number | null;
+  } | null;
+  biometria: BiometriaResult | null;
+}
+
 export default function InscribirsePage() {
   const params = useParams();
   const router = useRouter();
@@ -102,40 +114,56 @@ export default function InscribirsePage() {
   useEffect(() => {
     fetchCapacitacion();
     fetchProvincias();
-
-    if (!biometriaEnabled) {
-      return;
-    }
-
-    // Comprobar si el usuario retorna con validación biométrica aprobada
-    const storedBio = getStoredBiometriaResult();
-    if (storedBio && storedBio.valido && storedBio.cedula) {
-      setBiometriaResult(storedBio);
-      setCedula(storedBio.cedula);
-      dispatchFlow({ type: "BIOMETRIA_RETURN" });
-      return;
-    }
-
-    // Si retorna desde el callback biométrico optando por modo manual o volver a opciones
-    if (typeof window !== "undefined") {
-      const searchParams = new URLSearchParams(window.location.search);
-      const modoParam = searchParams.get("modo");
-      const savedCedula = sessionStorage.getItem(BIOMETRIA_STORAGE_KEYS.CEDULA);
-      if (savedCedula) {
-        setCedula(savedCedula);
-        if (modoParam === "manual") {
-          dispatchFlow({
-            type: "CEDULA_FOUND",
-            cedula: savedCedula,
-            isExistingStudent: false,
-          });
-        } else {
-          cargarDatosEstudiante(savedCedula);
-        }
-      }
-    }
+    restaurarSesion();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [capacitacionId]);
+
+  /** Aplica los datos que devuelve el servidor tras verificar la identidad. */
+  const aplicarVistaSesion = async (vista: VistaSesion) => {
+    setEstudianteData(vista.estudiante);
+    setIsExistingStudent(Boolean(vista.exists));
+    setCedula(vista.cedula);
+    const u = vista.ubicacion;
+    if (u) {
+      setSelectedProvinciaId(u.provincia_id);
+      setSelectedDistritoId(u.distrito_id);
+      setSelectedCorregimientoId(u.corregimiento_id);
+      if (u.provincia_id) await fetchDistritos(String(u.provincia_id));
+      if (u.distrito_id) await fetchCorregimientos(String(u.distrito_id));
+    }
+  };
+
+  /**
+   * Si el servidor tiene una sesión de identidad verificada para esta capacitación
+   * (p. ej. al volver del Hub biométrico o al recargar), retoma el asistente.
+   * La biometría la decide el servidor; sessionStorage solo guarda datos de pantalla.
+   */
+  const restaurarSesion = async () => {
+    try {
+      const res = await fetch(withBasePath(`/api/capacitaciones/inscribirse/${capacitacionId}`));
+      const data = await res.json();
+      if (!data.activa) {
+        const savedCedula =
+          typeof window !== "undefined" ? sessionStorage.getItem(BIOMETRIA_STORAGE_KEYS.CEDULA) : null;
+        if (savedCedula) setCedula(savedCedula);
+        clearBiometriaResult();
+        return;
+      }
+      await aplicarVistaSesion(data);
+      const modoManual = new URLSearchParams(window.location.search).get("modo") === "manual";
+      const conBiometria = Boolean(data.biometria?.valido) && !modoManual;
+      setBiometriaResult(conBiometria ? getStoredBiometriaResult() ?? data.biometria : null);
+      dispatchFlow({
+        type: "SESION_RESTAURADA",
+        cedula: data.cedula,
+        isExistingStudent: Boolean(data.exists),
+        paso: conBiometria || modoManual || !biometriaEnabled ? "form" : "metodo",
+        metodo: conBiometria ? "biometrica" : "manual",
+      });
+    } catch (error) {
+      console.error("No se pudo restaurar la inscripción:", error);
+    }
+  };
 
   const fetchCapacitacion = async () => {
     try {
@@ -204,35 +232,6 @@ export default function InscribirsePage() {
     }
   };
 
-  const fetchStudentLocation = async (studentId: number, cedulaValue: string) => {
-    try {
-      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-      const response = await fetch(
-        `${basePath}/api/estudiante/ubicacion/${studentId}?cedula=${encodeURIComponent(cedulaValue)}`
-      );
-      const data = await response.json();
-      if (data.success && data.data) {
-        const location = data.data;
-        setSelectedProvinciaId(location.provincia_id);
-        setSelectedDistritoId(location.distrito_id);
-        setSelectedCorregimientoId(location.corregimiento_id);
-
-        // Load districts and corregimientos if they exist
-        if (location.provincia_id) {
-          await fetchDistritos(String(location.provincia_id));
-        }
-        if (location.distrito_id) {
-          await fetchCorregimientos(String(location.distrito_id));
-        }
-
-        return location;
-      }
-    } catch (error) {
-      console.error("Error fetching student location:", error);
-    }
-    return null;
-  };
-
   // Function to get initial values preserving current form data
   const getInitialValues = () => {
     const baseValues = estudianteData
@@ -267,7 +266,9 @@ export default function InscribirsePage() {
       }
 
       const response = await fetch(
-        withBasePath(`/api/verificar/${encodeURIComponent(cedulaValue)}`),
+        withBasePath(
+          `/api/verificar/${encodeURIComponent(cedulaValue)}?capacitacion=${encodeURIComponent(capacitacionId)}`,
+        ),
         { headers },
       );
       const data = await response.json();
@@ -414,15 +415,14 @@ export default function InscribirsePage() {
         toast.error(msg);
         setBirthDateInput("");
         dispatchFlow({ type: "FAIL", error: msg });
+        if (response.status === 401 || response.status === 429) {
+          // Sesión vencida o bloqueada: hay que empezar de nuevo.
+          dispatchFlow({ type: "BACK_TO_CEDULA" });
+        }
         return;
       }
-
-      const record = data.exists ? data.estudiante : data.external_data;
-      setEstudianteData(record);
-      setIsExistingStudent(Boolean(data.exists));
-      if (data.exists && record?.id) {
-        await fetchStudentLocation(record.id, record.cedula);
-      }
+      const record = data.estudiante as EstudianteData;
+      await aplicarVistaSesion(data);
 
       const nombreCompleto =
         record?.nombre_cedula ||
@@ -540,19 +540,7 @@ export default function InscribirsePage() {
         acepto_politica: aceptoPolitica,
         // Método de validación elegido ("biometrica" | "manual")
         metodo_validacion: esBiometricaValida ? "biometrica" : "manual",
-        // Auditoría Biométrica (Tribunal Electoral / INADEH)
-        biometria:
-          esBiometricaValida && biometriaResult
-            ? {
-                valido: biometriaResult.valido,
-                id_auditoria: biometriaResult.id_auditoria,
-                score_similitud: biometriaResult.score_similitud,
-                liveness_score: biometriaResult.liveness_score,
-                estado: biometriaResult.estado,
-                access_token: biometriaResult.access_token,
-                metodo_autenticacion: biometriaResult.metodo_autenticacion,
-              }
-            : null,
+        // La biometría NO se envía: el servidor usa la que validó con el Hub.
       };
 
       const response = await fetch(
@@ -567,6 +555,14 @@ export default function InscribirsePage() {
       );
 
       const result = await response.json();
+
+      if (response.status === 401) {
+        toast.error(result.error || "Tu sesión expiró. Vuelve a ingresar tu cédula.");
+        clearBiometriaResult();
+        setBiometriaResult(null);
+        dispatchFlow({ type: "BACK_TO_CEDULA" });
+        return;
+      }
 
       if (!response.ok) {
         // Manejar errores específicos de duplicación
@@ -591,14 +587,16 @@ export default function InscribirsePage() {
       // Verificar si requiere verificación de correo
       if (result.verification_required) {
         clearBiometriaResult();
-        toast.success(
+        if (result.correo_enviado === false) {
+          toast.error(result.message, { duration: 8000 });
+        } else toast.success(
           esBiometricaValida
             ? "Correo de verificación enviado. Por favor revisa tu email."
             : "Correo enviado. Al verificar tu correo, tu inscripción quedará como Pendiente hasta que un administrador la valide.",
           { duration: 6000 }
         );
         setTimeout(() => {
-          router.push(`/verificacion/esperando/${result.token}`);
+          router.push(`/verificacion/esperando/${result.consulta}`);
         }, 1500);
       } else {
         clearBiometriaResult();

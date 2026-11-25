@@ -3,6 +3,17 @@ import { query } from "@/lib/db";
 import { safeErrorDetail } from "@/lib/apiError";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { getClientIp } from "@/lib/verificationUtils";
+import {
+  borrarCookieSesion,
+  cedulaBloqueadaPorIntentos,
+  crearSesion,
+  obtenerSesion,
+  ponerCookieSesion,
+  superaLimiteSesionesIp,
+  vistaSesion,
+  type DatosPersona,
+} from "@/lib/inscripcionSesion";
+import { normalizarCedula, trasFalloFecha } from "@/lib/estados/inscripcionSesion";
 
 interface Params {
   params: Promise<{
@@ -10,21 +21,8 @@ interface Params {
   }>;
 }
 
-interface LookupResult {
-  exists: boolean;
-  record: {
-    id?: number;
-    cedula: string;
-    nombres: string;
-    apellidos: string;
-    nombre_cedula: string;
-    estado_civil: string | null;
-    fecha_nacimiento: string | null;
-    correo?: string | null;
-    telefono?: string | null;
-    sexo: string | null;
-  };
-}
+
+type LookupResult = { exists: boolean; record: DatosPersona };
 
 function normalizeBirthDate(raw: string): string | null {
   const trimmed = raw.trim();
@@ -104,33 +102,38 @@ async function lookupCedulaRecord(cedula: string): Promise<LookupResult | null> 
   };
 }
 
+const MSG_DEMASIADOS_INTENTOS =
+  "Demasiados intentos. Por seguridad, espera unas horas o acércate a una sede del INADEH.";
+
 /**
- * Paso 1: Verifica si la cédula existe (con protección Turnstile).
- * NUNCA expone datos personales del Tribunal Electoral ni de ciepi.estudiantes.
+ * Paso 1: consulta la cédula (requiere Turnstile y tiene límite por IP).
+ * Abre una sesión de inscripción en el servidor y devuelve solo si la cédula existe.
+ * NUNCA expone datos personales en este paso.
  */
 export async function GET(request: NextRequest, { params }: Params) {
   try {
     const { cedula } = await params;
     const cleanCedula = cedula?.trim();
-    if (!cleanCedula) {
-      return NextResponse.json(
-        { error: "Cédula es requerida" },
-        { status: 400 },
-      );
+    if (!cleanCedula || cleanCedula.length > 30) {
+      return NextResponse.json({ error: "Cédula es requerida" }, { status: 400 });
     }
 
+    const ip = getClientIp(request);
     const turnstileToken =
       request.headers.get("x-turnstile-token") ||
       request.nextUrl.searchParams.get("turnstileToken");
-
-    const turnstileCheck = await verifyTurnstileToken(
-      turnstileToken,
-      getClientIp(request),
-    );
+    const turnstileCheck = await verifyTurnstileToken(turnstileToken, ip);
     if (!turnstileCheck.success) {
       return NextResponse.json(
         { error: turnstileCheck.error || "Verificación de seguridad fallida" },
         { status: 403 },
+      );
+    }
+
+    if (await superaLimiteSesionesIp(ip)) {
+      return NextResponse.json(
+        { error: "Demasiadas consultas desde esta conexión. Intenta de nuevo en una hora." },
+        { status: 429 },
       );
     }
 
@@ -145,43 +148,58 @@ export async function GET(request: NextRequest, { params }: Params) {
       );
     }
 
-    return NextResponse.json({
+    const capParam = parseInt(request.nextUrl.searchParams.get("capacitacion") || "", 10);
+    const token = await crearSesion({
+      cedula: lookup.record.cedula,
+      idCapacitacion: Number.isInteger(capParam) && capParam > 0 ? capParam : null,
+      idEstudiante: lookup.exists && lookup.record.id ? lookup.record.id : null,
+      datosPersona: lookup.record,
+      ip,
+    });
+
+    const res = NextResponse.json({
       found: true,
       exists: lookup.exists,
       cedula: lookup.record.cedula,
     });
+    ponerCookieSesion(res, token);
+    return res;
   } catch (error) {
     console.error("Error in GET /api/verificar/[cedula]:", error);
     return NextResponse.json(
-      {
-        error: "Error al verificar la cédula",
-        details: safeErrorDetail(error),
-      },
+      { error: "Error al verificar la cédula", details: safeErrorDetail(error) },
       { status: 500 },
     );
   }
 }
 
 /**
- * Paso 2: Confirma la fecha de nacimiento contra el registro en servidor.
- * Solo si coincide, devuelve el nombre y los datos para continuar la inscripción.
+ * Paso 2: confirma la fecha de nacimiento contra los datos guardados en la sesión.
+ * Máximo de intentos por sesión y por cédula; no vuelve a consultar el Tribunal Electoral.
  */
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
     const { cedula } = await params;
-    const cleanCedula = cedula?.trim();
-    if (!cleanCedula) {
+    const sesion = await obtenerSesion(request);
+    if (!sesion || normalizarCedula(sesion.cedula) !== normalizarCedula(cedula)) {
       return NextResponse.json(
-        { error: "Cédula es requerida" },
-        { status: 400 },
+        { error: "La consulta expiró. Vuelve a ingresar tu cédula.", code: "SESION_INVALIDA" },
+        { status: 401 },
       );
     }
 
-    const body = await request.json();
-    const rawBirthDate =
-      typeof body.fechaNacimiento === "string" ? body.fechaNacimiento : "";
-    const normalizedInput = normalizeBirthDate(rawBirthDate);
+    if (sesion.estado === "identidad_verificada") {
+      return NextResponse.json({ verified: true, ...(await vistaSesion(sesion)) });
+    }
+    if (sesion.estado !== "cedula_verificada" || (await cedulaBloqueadaPorIntentos(sesion.cedula))) {
+      const res = NextResponse.json({ verified: false, error: MSG_DEMASIADOS_INTENTOS }, { status: 429 });
+      borrarCookieSesion(res);
+      return res;
+    }
 
+    const body = await request.json().catch(() => ({}));
+    const rawBirthDate = typeof body.fechaNacimiento === "string" ? body.fechaNacimiento : "";
+    const normalizedInput = normalizeBirthDate(rawBirthDate);
     if (!normalizedInput) {
       return NextResponse.json(
         { error: "Formato de fecha inválido. Use DD/MM/YYYY." },
@@ -189,102 +207,78 @@ export async function PUT(request: NextRequest, { params }: Params) {
       );
     }
 
-    const lookup = await lookupCedulaRecord(cleanCedula);
-    if (!lookup) {
-      return NextResponse.json(
-        { error: "Cédula no encontrada en el sistema nacional" },
-        { status: 404 },
+    const esperada = sesion.datos_persona.fecha_nacimiento;
+    if (!esperada || esperada !== normalizedInput) {
+      const { intentos, estado } = trasFalloFecha(sesion.intentos_fecha);
+      await query(
+        `UPDATE ciepi.inscripcion_sesiones SET intentos_fecha = $2, estado = $3
+          WHERE id = $1 AND estado = 'cedula_verificada'`,
+        [sesion.id, intentos, estado],
       );
-    }
-
-    if (
-      !lookup.record.fecha_nacimiento ||
-      lookup.record.fecha_nacimiento !== normalizedInput
-    ) {
-      return NextResponse.json(
+      const bloqueada = estado === "bloqueada";
+      const res = NextResponse.json(
         {
           verified: false,
-          error:
-            "La fecha de nacimiento ingresada no coincide con nuestros registros.",
+          error: bloqueada
+            ? MSG_DEMASIADOS_INTENTOS
+            : "La fecha de nacimiento ingresada no coincide con nuestros registros.",
         },
-        { status: 403 },
+        { status: bloqueada ? 429 : 403 },
       );
+      if (bloqueada) borrarCookieSesion(res);
+      return res;
     }
 
-    if (lookup.exists) {
-      return NextResponse.json({
-        verified: true,
-        exists: true,
-        estudiante: lookup.record,
-      });
-    }
-
+    await query(
+      `UPDATE ciepi.inscripcion_sesiones SET estado = 'identidad_verificada'
+        WHERE id = $1 AND estado = 'cedula_verificada'`,
+      [sesion.id],
+    );
     return NextResponse.json({
       verified: true,
-      exists: false,
-      external_data: lookup.record,
+      ...(await vistaSesion({ ...sesion, estado: "identidad_verificada" })),
     });
   } catch (error) {
     console.error("Error in PUT /api/verificar/[cedula]:", error);
     return NextResponse.json(
-      {
-        error: "Error al confirmar la fecha de nacimiento",
-        details: safeErrorDetail(error),
-      },
+      { error: "Error al confirmar la fecha de nacimiento", details: safeErrorDetail(error) },
       { status: 500 },
     );
   }
 }
 
 /**
- * Verifica si un correo electrónico ya está registrado en el sistema.
+ * Verifica si un correo ya está registrado. Solo con una sesión de identidad verificada,
+ * para que no sirva para averiguar qué correos están registrados.
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { correo, cedula_actual } = body;
+    const sesion = await obtenerSesion(request);
+    if (!sesion || sesion.estado !== "identidad_verificada") {
+      return NextResponse.json({ error: "Sesión de inscripción no válida" }, { status: 401 });
+    }
 
+    const body = await request.json().catch(() => ({}));
+    const correo = typeof body.correo === "string" ? body.correo.trim() : "";
     if (!correo) {
-      return NextResponse.json(
-        { error: "Correo es requerido" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Correo es requerido" }, { status: 400 });
     }
 
-    let queryText = `SELECT id, cedula, nombres, apellidos
-                     FROM ciepi.estudiantes
-                     WHERE correo = $1`;
-    const queryParams: (string | null)[] = [correo];
+    const result = await query(
+      `SELECT 1 FROM ciepi.estudiantes
+        WHERE LOWER(correo) = LOWER($1) AND id IS DISTINCT FROM $2`,
+      [correo, sesion.id_estudiante],
+    );
 
-    if (cedula_actual) {
-      queryText += ` AND cedula != $2`;
-      queryParams.push(cedula_actual);
-    }
-
-    const result = await query(queryText, queryParams);
-
-    if (result.rows.length > 0) {
-      return NextResponse.json({
-        available: false,
-        message: "Este correo electrónico ya está registrado",
-        existing_user: {
-          nombres: "",
-          apellidos: "",
-        },
-      });
-    }
-
-    return NextResponse.json({
-      available: true,
-      message: "Correo disponible",
-    });
+    return NextResponse.json(
+      result.rows.length > 0
+        ? { available: false, message: "Este correo electrónico ya está registrado" }
+        : { available: true, message: "Correo disponible" },
+    );
   } catch (error) {
     console.error("Error checking email availability:", error);
     return NextResponse.json(
-      {
-        error: "Error al verificar disponibilidad del correo",
-        details: safeErrorDetail(error),
-      },
+      { error: "Error al verificar disponibilidad del correo", details: safeErrorDetail(error) },
       { status: 500 },
     );
   }

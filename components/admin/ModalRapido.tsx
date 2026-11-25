@@ -31,12 +31,23 @@ export default function ModalRapido({
   const [error, setError] = useState<string | null>(null);
   const panel = useRef<HTMLDivElement>(null);
 
+  // El padre crea onCerrar en cada render (con cada letra): se guarda en una ref
+  // para que los efectos no se repitan y el foco no salte al primer campo.
+  const cerrarRef = useRef(onCerrar);
+  const guardandoRef = useRef(guardando);
+  cerrarRef.current = onCerrar;
+  guardandoRef.current = guardando;
+
+  // Foco en el primer campo solo al abrir.
   useEffect(() => {
     panel.current?.querySelector<HTMLElement>("input, select, textarea")?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !guardando && onCerrar();
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !guardandoRef.current && cerrarRef.current();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCerrar, guardando]);
+  }, []);
 
   const guardar = async () => {
     setGuardando(true);

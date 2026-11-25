@@ -83,7 +83,11 @@ describe("inscripcionFlowReducer", () => {
     expect(ignored).toEqual(INITIAL_INSCRIPCION_FLOW_STATE);
 
     const formState = inscripcionFlowReducer(INITIAL_INSCRIPCION_FLOW_STATE, {
-      type: "BIOMETRIA_RETURN",
+      type: "SESION_RESTAURADA",
+      cedula: "8-123-456",
+      isExistingStudent: true,
+      paso: "form",
+      metodo: "biometrica",
     });
     const checking = inscripcionFlowReducer(formState, {
       type: "SET_CHECKING_EMAIL",
@@ -92,5 +96,63 @@ describe("inscripcionFlowReducer", () => {
     if (checking.step === "form") {
       expect(checking.isCheckingEmail).toBe(true);
     }
+  });
+
+  it("SESION_RESTAURADA keeps the cédula and is only accepted from the initial step", () => {
+    const restored = inscripcionFlowReducer(INITIAL_INSCRIPCION_FLOW_STATE, {
+      type: "SESION_RESTAURADA",
+      cedula: "8-1-1",
+      isExistingStudent: false,
+      paso: "form",
+      metodo: "biometrica",
+    });
+    expect(restored).toMatchObject({ step: "form", cedula: "8-1-1", metodoValidacion: "biometrica" });
+
+    // Ignored once the wizard has moved on (no jumping to the form from other steps).
+    const confirmar = inscripcionFlowReducer(INITIAL_INSCRIPCION_FLOW_STATE, {
+      type: "CEDULA_FOUND",
+      cedula: "8-1-1",
+      isExistingStudent: false,
+    });
+    expect(
+      inscripcionFlowReducer(confirmar, {
+        type: "SESION_RESTAURADA",
+        cedula: "8-1-1",
+        isExistingStudent: false,
+        paso: "form",
+        metodo: "biometrica",
+      }),
+    ).toBe(confirmar);
+
+    const toMetodo = inscripcionFlowReducer(INITIAL_INSCRIPCION_FLOW_STATE, {
+      type: "SESION_RESTAURADA",
+      cedula: "8-1-1",
+      isExistingStudent: true,
+      paso: "metodo",
+      metodo: "manual",
+    });
+    expect(toMetodo).toMatchObject({ step: "metodo", cedula: "8-1-1", isExistingStudent: true });
+  });
+
+  it("BACK_TO_METODO keeps the cédula and cannot skip the birth-date step", () => {
+    const form = inscripcionFlowReducer(INITIAL_INSCRIPCION_FLOW_STATE, {
+      type: "SESION_RESTAURADA",
+      cedula: "8-2-2",
+      isExistingStudent: true,
+      paso: "form",
+      metodo: "manual",
+    });
+    expect(inscripcionFlowReducer(form, { type: "BACK_TO_METODO" })).toMatchObject({
+      step: "metodo",
+      cedula: "8-2-2",
+      isExistingStudent: true,
+    });
+
+    const confirmar = inscripcionFlowReducer(INITIAL_INSCRIPCION_FLOW_STATE, {
+      type: "CEDULA_FOUND",
+      cedula: "8-2-2",
+      isExistingStudent: true,
+    });
+    expect(inscripcionFlowReducer(confirmar, { type: "BACK_TO_METODO" })).toBe(confirmar);
   });
 });

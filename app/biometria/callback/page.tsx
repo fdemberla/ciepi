@@ -98,7 +98,6 @@ function BiometriaCallbackContent() {
             id_auditoria: data.id_auditoria,
             score_similitud: data.score_similitud,
             liveness_score: data.liveness_score,
-            access_token: data.access_token,
             metodo_autenticacion: data.metodo_autenticacion,
             timestamp: new Date().toISOString(),
           };

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { safeErrorDetail } from "@/lib/apiError";
+import { obtenerSesion } from "@/lib/inscripcionSesion";
 
 interface Params {
   params: Promise<{
@@ -28,30 +29,9 @@ export async function GET(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Require cedula as identity verification (IDOR protection)
-    const cedulaParam = request.nextUrl.searchParams.get("cedula");
-    if (!cedulaParam || !cedulaParam.trim()) {
-      return NextResponse.json(
-        { error: "Se requiere cédula para acceder a este recurso" },
-        { status: 400 }
-      );
-    }
-
-    // Verify student exists and cedula matches (ownership verification)
-    const estudianteResult = await query(
-      "SELECT id, cedula FROM ciepi.estudiantes WHERE id = $1",
-      [estudianteId]
-    );
-
-    if (estudianteResult.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Estudiante no encontrado" },
-        { status: 404 }
-      );
-    }
-
-    // IDOR protection: cedula must match the stored student cedula
-    if (estudianteResult.rows[0].cedula !== cedulaParam.trim()) {
+    // Solo la persona que verificó su identidad (sesión de inscripción del servidor).
+    const sesion = await obtenerSesion(request);
+    if (!sesion || sesion.estado !== "identidad_verificada" || sesion.id_estudiante !== estudianteId) {
       return NextResponse.json(
         { error: "Datos de verificación no coinciden" },
         { status: 403 }
