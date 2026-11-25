@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const directory = (formData.get("directory") as string) || "general";
 
     // Validate directory against allowlist to prevent path traversal
-    const ALLOWED_DIRECTORIES = ["banners", "blogs", "attachments", "general"];
+    const ALLOWED_DIRECTORIES = ["banners", "blogs", "attachments", "general", "mentores"];
     if (!ALLOWED_DIRECTORIES.includes(directory)) {
       return NextResponse.json(
         { error: "Directorio no permitido" },

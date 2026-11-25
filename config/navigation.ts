@@ -120,6 +120,16 @@ export const navigationConfig: NavSection[] = [
         },
       },
       {
+        name: "Mentorías",
+        href: "/admin/mentorias",
+        icon: "solar:users-group-two-rounded-linear",
+        visible: {
+          admin: true,
+          mobile: true,
+          desktop: true,
+        },
+      },
+      {
         name: "Sedes y Aulas",
         href: "/admin/sedes",
         icon: "solar:buildings-2-linear",

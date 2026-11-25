@@ -29,3 +29,25 @@ export async function query(
     client.release();
   }
 }
+
+/**
+ * Ejecuta varias consultas en una transacción: si `fn` lanza un error se hace
+ * ROLLBACK de todo. Usar para operaciones que deben guardarse completas o no
+ * guardarse (p. ej. reemplazar el horario de un mentor).
+ */
+export async function withTransaction<T>(
+  fn: (q: (text: string, params?: unknown[]) => Promise<QueryResult>) => Promise<T>
+): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await fn((text, params) => client.query(text, params));
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}

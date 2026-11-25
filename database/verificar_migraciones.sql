@@ -24,7 +24,14 @@ FROM (VALUES
      to_regclass('ciepi.newsletter_suscriptores') IS NOT NULL
      AND to_regclass('ciepi.newsletter_envios') IS NOT NULL),
   ('6. migrate_quitar_basepath_ciepi.sql',
-     NOT EXISTS (SELECT 1 FROM ciepi.blogs WHERE imagen_banner LIKE '/ciepi/%'))
+     NOT EXISTS (SELECT 1 FROM ciepi.blogs WHERE imagen_banner LIKE '/ciepi/%')),
+  ('7. create_mentorias.sql',
+     to_regclass('ciepi.mentoria_areas') IS NOT NULL
+     AND to_regclass('ciepi.mentor_disponibilidad') IS NOT NULL
+     AND to_regclass('ciepi.mentor_bloqueos') IS NOT NULL
+     AND to_regclass('ciepi.mentoria_reservas') IS NOT NULL
+     AND EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'ciepi' AND table_name = 'profesores' AND column_name = 'es_mentor'))
 ) AS t(script, ok)
 ORDER BY script;
 
