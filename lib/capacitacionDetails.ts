@@ -173,3 +173,18 @@ export function formatModalidadLabel(
       return "";
   }
 }
+
+/**
+ * Bloque que agrega el botón "Agregar día": el día siguiente al último bloque
+ * (lunes → martes → … → sábado → domingo) con las mismas horas. Si no hay
+ * bloques, empieza el lunes de 18:00 a 20:00.
+ */
+export function siguienteHorario(horarios: HorarioInput[]): HorarioInput {
+  const ultimo = horarios[horarios.length - 1];
+  if (!ultimo) return { dia_semana: 1, hora_inicio: "18:00", hora_fin: "20:00" };
+  return {
+    dia_semana: (Number(ultimo.dia_semana) + 1) % 7,
+    hora_inicio: ultimo.hora_inicio,
+    hora_fin: ultimo.hora_fin,
+  };
+}

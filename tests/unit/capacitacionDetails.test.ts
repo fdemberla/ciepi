@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseCapacitacionExtraFields,
   formatModalidadLabel,
+  siguienteHorario,
 } from "@/lib/capacitacionDetails";
 
 describe("capacitacionDetails helpers", () => {
@@ -51,5 +52,21 @@ describe("capacitacionDetails helpers", () => {
     expect(formatModalidadLabel("virtual")).toBe("Virtual");
     expect(formatModalidadLabel("hibrida")).toBe("Híbrida");
     expect(formatModalidadLabel(null)).toBe("");
+  });
+});
+
+describe("siguienteHorario", () => {
+  it("empieza el lunes de 18:00 a 20:00", () => {
+    expect(siguienteHorario([])).toEqual({ dia_semana: 1, hora_inicio: "18:00", hora_fin: "20:00" });
+  });
+  it("agrega el día siguiente con las mismas horas", () => {
+    expect(siguienteHorario([{ dia_semana: 1, hora_inicio: "08:00", hora_fin: "12:00" }])).toEqual({
+      dia_semana: 2,
+      hora_inicio: "08:00",
+      hora_fin: "12:00",
+    });
+  });
+  it("después del sábado sigue el domingo", () => {
+    expect(siguienteHorario([{ dia_semana: 6, hora_inicio: "09:00", hora_fin: "10:00" }]).dia_semana).toBe(0);
   });
 });

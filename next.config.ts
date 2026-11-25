@@ -8,6 +8,18 @@ const basePath = rawBasePath ? `/${rawBasePath}` : "";
 const nextConfig: NextConfig = {
   ...(basePath ? { basePath } : {}),
   trailingSlash: true,
+  // Archivos subidos después del build: Next no los sirve desde public/, así que
+  // si no los encuentra, los entrega app/api/archivos (ver ese archivo).
+  async rewrites() {
+    return {
+      beforeFiles: [],
+      afterFiles: [],
+      fallback: ["banners", "attachments", "uploads"].map((carpeta) => ({
+        source: `/${carpeta}/:ruta*`,
+        destination: `/api/archivos/${carpeta}/:ruta*`,
+      })),
+    };
+  },
   async headers() {
     return [
       {

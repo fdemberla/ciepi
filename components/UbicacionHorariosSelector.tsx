@@ -5,7 +5,32 @@ import Link from "next/link";
 import { Icon } from "@iconify/react";
 import { withBasePath } from "@/lib/basePath";
 import { DIAS_SEMANA_LARGOS } from "@/lib/calendarUtils";
-import type { HorarioInput } from "@/lib/capacitacionDetails";
+import { siguienteHorario, type HorarioInput } from "@/lib/capacitacionDetails";
+import ModalRapido, { CampoModal, CAMPO_MODAL } from "@/components/admin/ModalRapido";
+
+type ModalUbicacion = null | "sede" | "edificio" | "aula";
+const TIPOS_AULA = [
+  ["aula", "Aula"],
+  ["laboratorio", "Laboratorio"],
+  ["taller", "Taller"],
+  ["auditorio", "Auditorio"],
+  ["virtual", "Virtual"],
+] as const;
+
+/** Botón pequeño "+ Nueva …" junto a cada lista. */
+function BotonNuevo({ texto, onClick, disabled }: { texto: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="text-xs font-semibold text-primary hover:underline disabled:opacity-40 disabled:no-underline inline-flex items-center gap-0.5"
+    >
+      <Icon icon="solar:add-circle-linear" aria-hidden="true" />
+      {texto}
+    </button>
+  );
+}
 
 interface AulaItem {
   id: number;
@@ -50,34 +75,68 @@ export default function UbicacionHorariosSelector({
 }: UbicacionHorariosSelectorProps) {
   const [sedes, setSedes] = useState<SedeItem[]>([]);
   const [loadingSedes, setLoadingSedes] = useState(true);
+  const [modal, setModal] = useState<ModalUbicacion>(null);
+  const [nuevo, setNuevo] = useState({ nombre: "", codigo: "", direccion: "", capacidad: "", tipo: "aula" });
+
+  const cargarSedes = async () => {
+    try {
+      const res = await fetch(withBasePath("/api/admin/sedes"));
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSedes((data.data || []).filter((s: SedeItem) => s.activo));
+      }
+    } catch (err) {
+      console.error("Error cargando sedes:", err);
+    } finally {
+      setLoadingSedes(false);
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch(withBasePath("/api/admin/sedes"));
-        const data = await res.json();
-        if (res.ok && data.success) {
-          setSedes((data.data || []).filter((s: SedeItem) => s.activo));
-        }
-      } catch (err) {
-        console.error("Error cargando sedes:", err);
-      } finally {
-        setLoadingSedes(false);
-      }
-    };
-    load();
+    cargarSedes();
   }, []);
+
+  const abrirModal = (tipo: ModalUbicacion) => {
+    setNuevo({ nombre: "", codigo: "", direccion: "", capacidad: "", tipo: "aula" });
+    setModal(tipo);
+  };
+
+  /** Crea la sede, edificio o aula, recarga la lista y la deja seleccionada. */
+  const guardarNuevo = async (): Promise<string | null> => {
+    if (!nuevo.nombre.trim()) return "Escribe el nombre.";
+    const peticiones = {
+      sede: { url: "/api/admin/sedes", body: { nombre: nuevo.nombre, codigo: nuevo.codigo, direccion: nuevo.direccion } },
+      edificio: { url: "/api/admin/edificios", body: { sede_id: ubicacion.sedeId, nombre: nuevo.nombre } },
+      aula: {
+        url: "/api/admin/aulas",
+        body: { edificio_id: ubicacion.edificioId, nombre: nuevo.nombre, capacidad: nuevo.capacidad || null, tipo: nuevo.tipo },
+      },
+    };
+    const peticion = peticiones[modal!];
+    const res = await fetch(withBasePath(peticion.url), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(peticion.body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) return data.error || "No se pudo crear.";
+    const id = data.data.id as number;
+    await cargarSedes();
+    if (modal === "sede") onUbicacionChange({ sedeId: id, edificioId: null, aulaId: null });
+    if (modal === "edificio") onUbicacionChange({ ...ubicacion, edificioId: id, aulaId: null });
+    if (modal === "aula") onUbicacionChange({ ...ubicacion, aulaId: id });
+    setModal(null);
+    return null;
+  };
 
   const selectedSede = sedes.find((s) => s.id === ubicacion.sedeId);
   const edificios = (selectedSede?.edificios || []).filter((e) => e.activo);
   const selectedEdificio = edificios.find((e) => e.id === ubicacion.edificioId);
   const aulas = (selectedEdificio?.aulas || []).filter((a) => a.activo);
 
+  // Cada día nuevo es el siguiente al último, con las mismas horas.
   const addHorario = () => {
-    onHorariosChange([
-      ...horarios,
-      { dia_semana: 1, hora_inicio: "18:00", hora_fin: "20:00" },
-    ]);
+    onHorariosChange([...horarios, siguienteHorario(horarios)]);
   };
 
   const updateHorario = (index: number, patch: Partial<HorarioInput>) => {
@@ -105,9 +164,11 @@ export default function UbicacionHorariosSelector({
           </div>
           <Link
             href="/admin/sedes"
+            target="_blank"
+            rel="noopener"
             className="text-xs text-primary hover:underline font-semibold"
           >
-            Gestionar sedes y aulas &rarr;
+            Gestionar sedes y aulas (nueva pestaña) &rarr;
           </Link>
         </div>
 
@@ -118,7 +179,10 @@ export default function UbicacionHorariosSelector({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-semibold mb-1">Sede</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold">Sede</label>
+                <BotonNuevo texto="Nueva sede" onClick={() => abrirModal("sede")} />
+              </div>
               <select
                 value={ubicacion.sedeId ?? ""}
                 onChange={(e) => {
@@ -141,9 +205,10 @@ export default function UbicacionHorariosSelector({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold mb-1">
-                Edificio
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold">Edificio</label>
+                <BotonNuevo texto="Nuevo edificio" onClick={() => abrirModal("edificio")} disabled={!ubicacion.sedeId} />
+              </div>
               <select
                 value={ubicacion.edificioId ?? ""}
                 disabled={!ubicacion.sedeId}
@@ -167,7 +232,10 @@ export default function UbicacionHorariosSelector({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold mb-1">Aula</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold">Aula</label>
+                <BotonNuevo texto="Nueva aula" onClick={() => abrirModal("aula")} disabled={!ubicacion.edificioId} />
+              </div>
               <select
                 value={ubicacion.aulaId ?? ""}
                 disabled={!ubicacion.edificioId}
@@ -191,7 +259,64 @@ export default function UbicacionHorariosSelector({
             </div>
           </div>
         )}
+        {sedes.length === 0 && !loadingSedes && (
+          <p className="text-xs text-dark_grey dark:text-gray-400 mt-2">
+            No hay sedes registradas: créala con «Nueva sede».
+          </p>
+        )}
       </div>
+
+      {modal && (
+        <ModalRapido
+          titulo={modal === "sede" ? "Nueva sede" : modal === "edificio" ? "Nuevo edificio" : "Nueva aula"}
+          descripcion={
+            modal === "edificio"
+              ? `En la sede ${selectedSede?.nombre ?? ""}`
+              : modal === "aula"
+                ? `En ${selectedSede?.nombre ?? ""} · ${selectedEdificio?.nombre ?? ""}`
+                : "Quedará seleccionada en esta capacitación."
+          }
+          textoGuardar="Crear y seleccionar"
+          onGuardar={guardarNuevo}
+          onCerrar={() => setModal(null)}
+        >
+          <CampoModal etiqueta="Nombre *">
+            <input
+              value={nuevo.nombre}
+              maxLength={150}
+              onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })}
+              placeholder={modal === "sede" ? "Ej. Sede Central Tocumen" : modal === "edificio" ? "Ej. Edificio A" : "Ej. Salón 101"}
+              className={CAMPO_MODAL}
+            />
+          </CampoModal>
+          {modal === "sede" && (
+            <>
+              <CampoModal etiqueta="Código (opcional)">
+                <input value={nuevo.codigo} maxLength={30} onChange={(e) => setNuevo({ ...nuevo, codigo: e.target.value })} placeholder="Ej. TOC" className={CAMPO_MODAL} />
+              </CampoModal>
+              <CampoModal etiqueta="Dirección (opcional)">
+                <input value={nuevo.direccion} onChange={(e) => setNuevo({ ...nuevo, direccion: e.target.value })} className={CAMPO_MODAL} />
+              </CampoModal>
+            </>
+          )}
+          {modal === "aula" && (
+            <div className="grid grid-cols-2 gap-3">
+              <CampoModal etiqueta="Cupos (opcional)">
+                <input type="number" min={1} value={nuevo.capacidad} onChange={(e) => setNuevo({ ...nuevo, capacidad: e.target.value })} className={CAMPO_MODAL} />
+              </CampoModal>
+              <CampoModal etiqueta="Tipo">
+                <select value={nuevo.tipo} onChange={(e) => setNuevo({ ...nuevo, tipo: e.target.value })} className={CAMPO_MODAL}>
+                  {TIPOS_AULA.map(([v, l]) => (
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+              </CampoModal>
+            </div>
+          )}
+        </ModalRapido>
+      )}
 
       {/* Structured Weekly Schedule for Calendar */}
       <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
