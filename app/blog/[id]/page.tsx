@@ -6,42 +6,16 @@ import Link from "next/link";
 import SlateRenderer from "@/components/SlateRenderer";
 import { JsonLdScript } from "@/components/JsonLdScript";
 import { sanitizeForJsonLd } from "@/lib/security";
+import { getPublishedBlog, type PublishedBlog } from "@/lib/blogPublic";
+import { assetUrl } from "@/lib/basePath";
 
-interface Blog {
-  id: string;
-  titulo: string;
-  imagen_banner: string | null;
-  palabras_clave: string[];
-  contenido: unknown;
-  creado_en: string;
-  autor_nombre: string;
-  autor_email: string;
-}
+// Se consulta la base de datos directamente: antes se hacía un fetch HTTP a la
+// propia API con una URL de producción ficticia ("yourdomain.com").
+export const dynamic = "force-dynamic";
 
-interface BlogResponse {
-  success: boolean;
-  data: Blog;
-}
-
-async function getBlog(id: string): Promise<Blog | null> {
+async function getBlog(id: string): Promise<PublishedBlog | null> {
   try {
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : process.env.NODE_ENV === "production"
-        ? "https://yourdomain.com"
-        : "http://localhost:3000";
-
-    const response = await fetch(`${baseUrl}${basePath}/api/blog/${id}`, {
-      next: { revalidate: 3600 }, // Revalidate every hour
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const result: BlogResponse = await response.json();
-    return result.success ? result.data : null;
+    return await getPublishedBlog(id);
   } catch (error) {
     console.error("Error fetching blog:", error);
     return null;
@@ -98,13 +72,13 @@ export async function generateMetadata({
       type: "article",
       publishedTime: blog.creado_en,
       authors: [blog.autor_nombre],
-      images: blog.imagen_banner ? [blog.imagen_banner] : undefined,
+      images: blog.imagen_banner ? [assetUrl(blog.imagen_banner)] : undefined,
     },
     twitter: {
       card: "summary_large_image",
       title: blog.titulo,
       description,
-      images: blog.imagen_banner ? [blog.imagen_banner] : undefined,
+      images: blog.imagen_banner ? [assetUrl(blog.imagen_banner)] : undefined,
     },
   };
 }
@@ -193,7 +167,7 @@ export default async function BlogPostPage({
           {blog.imagen_banner && (
             <div className="relative w-full h-64 md:h-96 rounded-xl overflow-hidden mb-8 shadow-lg">
               <img
-                src={blog.imagen_banner}
+                src={assetUrl(blog.imagen_banner)}
                 alt={blog.titulo}
                 className="object-cover w-full h-full"
               />
@@ -246,7 +220,7 @@ export default async function BlogPostPage({
             "@context": "https://schema.org",
             "@type": "BlogPosting",
             headline: blog.titulo,
-            image: blog.imagen_banner ? [blog.imagen_banner] : undefined,
+            image: blog.imagen_banner ? [assetUrl(blog.imagen_banner)] : undefined,
             datePublished: blog.creado_en,
             author: {
               "@type": "Person",

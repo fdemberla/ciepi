@@ -9,7 +9,7 @@ import {
   canEditBlog,
   canDeleteBlog,
   canChangeToState,
-} from "@/lib/permissions-client";
+} from "@/lib/permissions";
 import type { ColumnDef } from "@tanstack/react-table";
 
 interface Blog {

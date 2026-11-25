@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
+import { assetUrl } from "@/lib/basePath";
 
 interface Blog {
   id: string;
@@ -143,10 +144,16 @@ export default function BlogPage() {
               />
               {searchTerm && (
                 <button
+                  type="button"
                   onClick={() => setSearchTerm("")}
+                  aria-label="Limpiar búsqueda"
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-dark_grey dark:text-gray-400 hover:text-midnight_text dark:hover:text-white"
                 >
-                  <Icon icon="solar:close-circle-bold" className="w-4 h-4" />
+                  <Icon
+                    icon="solar:close-circle-bold"
+                    className="w-4 h-4"
+                    aria-hidden="true"
+                  />
                 </button>
               )}
             </div>
@@ -245,7 +252,7 @@ export default function BlogPage() {
                 <div className="relative h-48 bg-gray-200 dark:bg-gray-700">
                   {blog.imagen_banner ? (
                     <img
-                      src={blog.imagen_banner}
+                      src={assetUrl(blog.imagen_banner)}
                       alt={blog.titulo}
                       className="object-cover w-full h-full"
                     />

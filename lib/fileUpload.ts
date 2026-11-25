@@ -52,23 +52,3 @@ export async function saveFile(
     throw new Error(`Failed to save file: ${error}`);
   }
 }
-
-/**
- * Save multiple files to the public directory
- * @param files - Array of File objects
- * @param folder - Subfolder within public
- * @returns Array of relative paths
- */
-export async function saveFiles(
-  files: File[],
-  folder: "banners" | "attachments"
-): Promise<string[]> {
-  const savedPaths: string[] = [];
-
-  for (const file of files) {
-    const filePath = await saveFile(file, folder);
-    savedPaths.push(filePath);
-  }
-
-  return savedPaths;
-}

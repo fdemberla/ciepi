@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import { Icon } from "@iconify/react";
 import AdminProtection from "@/components/AdminProtection";
+import { assetUrl } from "@/lib/basePath";
 
 interface Blog {
   id: string;
@@ -259,12 +260,15 @@ export default function AprobarBlogPage() {
           {/* Header */}
           <div className="flex items-center gap-4 mb-8">
             <button
+              type="button"
               onClick={() => router.push("/admin/blog")}
+              aria-label="Volver al listado de blogs"
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
               <Icon
                 icon="solar:arrow-left-linear"
                 className="w-6 h-6 text-midnight_text dark:text-white"
+                aria-hidden="true"
               />
             </button>
             <div className="flex-1">
@@ -327,7 +331,7 @@ export default function AprobarBlogPage() {
                 </h3>
                 <div className="relative w-full h-48 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700">
                   <img
-                    src={blog.imagen_banner}
+                    src={assetUrl(blog.imagen_banner)}
                     alt={blog.titulo}
                     className="object-cover w-full h-full"
                   />

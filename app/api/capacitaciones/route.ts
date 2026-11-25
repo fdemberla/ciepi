@@ -11,21 +11,43 @@ export async function GET(request: NextRequest) {
 
     let queryText = `
       SELECT 
-        id,
-        banner,
-        nombre,
-        descripcion,
-        cantidad_horas,
-        cantidad_participantes,
-        archivo_adjunto,
-        fecha_inicio_inscripcion,
-        fecha_final_inscripcion,
-        fecha_inicio_capacitacion,
-        fecha_final_capacitacion,
-        activo,
-        fecha_creacion,
-        fecha_actualizacion
-      FROM ciepi.capacitaciones
+        c.id,
+        c.banner,
+        c.nombre,
+        c.descripcion,
+        c.cantidad_horas,
+        c.cantidad_participantes,
+        c.archivo_adjunto,
+        c.fecha_inicio_inscripcion,
+        c.fecha_final_inscripcion,
+        c.fecha_inicio_capacitacion,
+        c.fecha_final_capacitacion,
+        c.horario,
+        c.modalidad,
+        c.sede,
+        c.edificio,
+        c.salon,
+        c.activo,
+        c.fecha_creacion,
+        c.fecha_actualizacion,
+        COALESCE(
+          (
+            SELECT json_agg(
+              json_build_object(
+                'id', p.id,
+                'nombre', p.nombre,
+                'apellido', p.apellido,
+                'especialidad', p.especialidad
+              )
+              ORDER BY p.apellido, p.nombre
+            )
+            FROM ciepi.capacitacion_profesores cp
+            JOIN ciepi.profesores p ON p.id = cp.profesor_id
+            WHERE cp.capacitacion_id = c.id AND p.activo = true
+          ),
+          '[]'::json
+        ) AS profesores
+      FROM ciepi.capacitaciones c
     `;
 
     const params: unknown[] = [];

@@ -1,6 +1,12 @@
 "use client";
-import Image from "next/image";
 import { Icon } from "@iconify/react";
+import { formatModalidadLabel } from "@/lib/capacitacionDetails";
+
+interface ProfesorResumen {
+  id: number;
+  nombre: string;
+  apellido: string;
+}
 
 interface Capacitacion {
   id: number;
@@ -12,6 +18,11 @@ interface Capacitacion {
   fecha_final_inscripcion: string | null;
   fecha_inicio_capacitacion: string | null;
   fecha_final_capacitacion: string | null;
+  horario?: string | null;
+  modalidad?: string | null;
+  sede?: string | null;
+  salon?: string | null;
+  profesores?: ProfesorResumen[];
 }
 
 interface CapacitacionCardProps {
@@ -43,7 +54,7 @@ const CapacitacionCard = ({
           <img
             src={`${basePath}${capacitacion.banner}`}
             alt={capacitacion.nombre}
-            className="object-cover group-hover:scale-110 transition-transform duration-300"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
           />
         </div>
       ) : (
@@ -91,6 +102,67 @@ const CapacitacionCard = ({
               </span>
             </div>
           )}
+
+          {capacitacion.modalidad && (
+            <div className="flex items-center text-sm text-dark_grey dark:text-gray-400">
+              <div className="w-8 h-8 rounded-full bg-slateGray dark:bg-gray-700 flex items-center justify-center mr-3">
+                <Icon
+                  icon="solar:laptop-linear"
+                  className="w-5 h-5 text-primary dark:text-blue-100"
+                />
+              </div>
+              <span className="font-medium">
+                Modalidad: {formatModalidadLabel(capacitacion.modalidad)}
+              </span>
+            </div>
+          )}
+
+          {capacitacion.horario && (
+            <div className="flex items-center text-sm text-dark_grey dark:text-gray-400">
+              <div className="w-8 h-8 rounded-full bg-slateGray dark:bg-gray-700 flex items-center justify-center mr-3">
+                <Icon
+                  icon="solar:calendar-date-linear"
+                  className="w-5 h-5 text-primary dark:text-blue-100"
+                />
+              </div>
+              <span className="font-medium line-clamp-1">
+                {capacitacion.horario}
+              </span>
+            </div>
+          )}
+
+          {(capacitacion.sede || capacitacion.salon) && (
+            <div className="flex items-center text-sm text-dark_grey dark:text-gray-400">
+              <div className="w-8 h-8 rounded-full bg-slateGray dark:bg-gray-700 flex items-center justify-center mr-3">
+                <Icon
+                  icon="solar:map-point-linear"
+                  className="w-5 h-5 text-primary dark:text-blue-100"
+                />
+              </div>
+              <span className="font-medium line-clamp-1">
+                {[capacitacion.sede, capacitacion.salon]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </div>
+          )}
+
+          {Array.isArray(capacitacion.profesores) &&
+            capacitacion.profesores.length > 0 && (
+              <div className="flex items-center text-sm text-dark_grey dark:text-gray-400">
+                <div className="w-8 h-8 rounded-full bg-slateGray dark:bg-gray-700 flex items-center justify-center mr-3">
+                  <Icon
+                    icon="solar:user-id-linear"
+                    className="w-5 h-5 text-primary dark:text-blue-100"
+                  />
+                </div>
+                <span className="font-medium line-clamp-1">
+                  {capacitacion.profesores
+                    .map((p) => `${p.nombre} ${p.apellido}`)
+                    .join(", ")}
+                </span>
+              </div>
+            )}
         </div>
 
         {/* Dates Section */}

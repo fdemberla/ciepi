@@ -4,6 +4,7 @@ import { useRouter, useParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import Form from "@/components/Form";
 import type { FormFieldConfig } from "@/components/Form.types";
+import { toDateTimeLocalInput } from "@/lib/dateInput";
 
 interface Evento {
   id: number;
@@ -50,17 +51,11 @@ const EditarEventoPage = () => {
       const eventoData = data.data;
       setEvento(eventoData);
 
-      // Convertir fechas al formato datetime-local
-      const formatDateForInput = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toISOString().slice(0, 16);
-      };
-
       setInitialValues({
         nombre: eventoData.nombre || "",
         descripcion: eventoData.descripcion || "",
-        fecha_inicio: formatDateForInput(eventoData.fecha_inicio),
-        fecha_fin: formatDateForInput(eventoData.fecha_fin),
+        fecha_inicio: toDateTimeLocalInput(eventoData.fecha_inicio),
+        fecha_fin: toDateTimeLocalInput(eventoData.fecha_fin),
         ubicacion: eventoData.ubicacion || "",
       });
     } catch (err) {

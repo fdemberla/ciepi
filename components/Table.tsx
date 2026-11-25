@@ -140,21 +140,27 @@ export default function Table<T>({
                       <th
                         key={header.id}
                         className="text-left py-4 px-6 font-semibold text-midnight_text dark:text-white"
+                        aria-sort={
+                          !header.column.getCanSort()
+                            ? undefined
+                            : header.column.getIsSorted() === "asc"
+                              ? "ascending"
+                              : header.column.getIsSorted() === "desc"
+                                ? "descending"
+                                : "none"
+                        }
                       >
-                        {header.isPlaceholder ? null : (
-                          <div
-                            className={`flex items-center gap-2 ${
-                              header.column.getCanSort()
-                                ? "cursor-pointer select-none hover:text-primary transition-colors"
-                                : ""
-                            }`}
+                        {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                          <button
+                            type="button"
+                            className="flex items-center gap-2 cursor-pointer select-none text-left font-semibold text-midnight_text dark:text-white hover:text-primary dark:hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded px-1 -mx-1"
                             onClick={header.column.getToggleSortingHandler()}
                           >
                             {flexRender(
                               header.column.columnDef.header,
                               header.getContext(),
                             )}
-                            {enableSorting && header.column.getCanSort() && (
+                            {enableSorting && (
                               <Icon
                                 icon={
                                   header.column.getIsSorted() === "asc"
@@ -168,7 +174,15 @@ export default function Table<T>({
                                     ? "rotate-180"
                                     : ""
                                 }`}
+                                aria-hidden="true"
                               />
+                            )}
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext(),
                             )}
                           </div>
                         )}
@@ -228,21 +242,25 @@ export default function Table<T>({
                   <button
                     onClick={() => table.setPageIndex(0)}
                     disabled={!table.getCanPreviousPage()}
+                    aria-label="Ir a la primera página"
                     className="h-9 w-9 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:bg-slateGray dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <Icon
                       icon="solar:double-alt-arrow-left-linear"
                       className="w-4 h-4"
+                      aria-hidden="true"
                     />
                   </button>
                   <button
                     onClick={() => table.previousPage()}
                     disabled={!table.getCanPreviousPage()}
+                    aria-label="Página anterior"
                     className="h-9 w-9 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:bg-slateGray dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <Icon
                       icon="solar:alt-arrow-left-linear"
                       className="w-4 h-4"
+                      aria-hidden="true"
                     />
                   </button>
 
@@ -257,21 +275,25 @@ export default function Table<T>({
                   <button
                     onClick={() => table.nextPage()}
                     disabled={!table.getCanNextPage()}
+                    aria-label="Página siguiente"
                     className="h-9 w-9 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:bg-slateGray dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <Icon
                       icon="solar:alt-arrow-right-linear"
                       className="w-4 h-4"
+                      aria-hidden="true"
                     />
                   </button>
                   <button
                     onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                     disabled={!table.getCanNextPage()}
+                    aria-label="Ir a la última página"
                     className="h-9 w-9 flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-600 text-midnight_text dark:text-white hover:bg-slateGray dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <Icon
                       icon="solar:double-alt-arrow-right-linear"
                       className="w-4 h-4"
+                      aria-hidden="true"
                     />
                   </button>
                 </div>

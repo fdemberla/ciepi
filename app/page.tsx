@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="bg-white dark:bg-gray-900 overflow-hidden">
+    <div className="bg-white dark:bg-gray-900 overflow-hidden">
       {/* ============================================================
           HERO
       ============================================================ */}
@@ -376,6 +376,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Pool, PoolClient, QueryResult } from "pg";
+import { Pool, QueryResult } from "pg";
 
 const pool = new Pool({
   host: process.env.POSTGRES_HOST,
@@ -17,10 +17,6 @@ pool.on("error", (err: Error) => {
   console.error("PostgreSQL pool error:", err);
 });
 
-export async function getPostgresConnection(): Promise<PoolClient> {
-  return await pool.connect();
-}
-
 export async function query(
   text: string,
   params?: unknown[]
@@ -33,9 +29,3 @@ export async function query(
     client.release();
   }
 }
-
-export async function closePostgresConnection(): Promise<void> {
-  await pool.end();
-}
-
-export { pool };

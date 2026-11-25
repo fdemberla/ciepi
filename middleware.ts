@@ -1,12 +1,5 @@
 import { withAuth } from "next-auth/middleware";
-
-const rawBasePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-const basePath = rawBasePath ? `/${rawBasePath.replace(/^\/+|\/+$/g, "")}` : "";
-
-const withBasePath = (pathname: string) => {
-  const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  return `${basePath}${normalizedPath}`;
-};
+import { withBasePath } from "@/lib/basePath";
 
 const loginPath = withBasePath("/admin/login");
 const loginPathWithSlash = loginPath.endsWith("/")
@@ -51,12 +44,10 @@ export default withAuth(function middleware() {}, {
     },
   },
   pages: {
-    signIn: "/ciepi/admin/login",
+    signIn: loginPath,
   },
 });
 
-// Next.js requires matcher to be statically analyzable at compile time
-// We hardcode the basePath here to match next.config.ts
 export const config = {
-  matcher: ["/ciepi/admin/:path*", "/ciepi/api/admin/:path*"],
+  matcher: ["/admin/:path*", "/api/admin/:path*"],
 };

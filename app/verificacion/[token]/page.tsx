@@ -21,6 +21,7 @@ interface VerificationResult {
     tipo: string;
     inscripcion_id?: number;
     estado_inscripcion?: number;
+    metodo_validacion?: "biometrica" | "manual";
     capacitacion?: {
       nombre: string;
       fecha_inicio_capacitacion: string;
@@ -37,6 +38,9 @@ export default function VerificarCorreoPage() {
     "loading" | "success" | "error" | "expired" | "used"
   >("loading");
   const [mensaje, setMensaje] = useState<string>("");
+  const [metodoValidacion, setMetodoValidacion] = useState<
+    "biometrica" | "manual" | null
+  >(null);
   const [estudianteData, setEstudianteData] = useState<EstudianteData | null>(
     null
   );
@@ -69,7 +73,14 @@ export default function VerificarCorreoPage() {
           if (data.data?.capacitacion) {
             setCapacitacionData(data.data.capacitacion);
           }
-          toast.success("¡Correo verificado e inscripción confirmada!");
+          if (data.data?.metodo_validacion) {
+            setMetodoValidacion(data.data.metodo_validacion);
+          }
+          toast.success(
+            data.data?.metodo_validacion === "manual"
+              ? "¡Correo verificado! Inscripción pendiente de validación por un administrador."
+              : "¡Correo verificado e inscripción confirmada!"
+          );
         } else {
           // Manejar diferentes tipos de error
           if (data.code === "TOKEN_EXPIRED") {
@@ -164,12 +175,37 @@ export default function VerificarCorreoPage() {
 
               {/* Main Heading */}
               <h1 className="text-3xl sm:text-4xl font-bold text-success mb-3">
-                ¡Inscripción Confirmada!
+                {metodoValidacion === "manual"
+                  ? "¡Correo Verificado!"
+                  : "¡Inscripción Confirmada!"}
               </h1>
 
-              <p className="text-lg text-midnight_text dark:text-white mb-8">
+              <p className="text-lg text-midnight_text dark:text-white mb-6">
                 Tu correo ha sido verificado exitosamente
               </p>
+
+              {/* Aviso de inscripción pendiente si eligió validación manual */}
+              {metodoValidacion === "manual" && (
+                <div className="bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-700 rounded-2xl p-5 mb-6 text-left">
+                  <div className="flex items-start gap-3">
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-500 text-white font-bold text-sm flex-shrink-0 mt-0.5">
+                      !
+                    </span>
+                    <div>
+                      <h4 className="font-bold text-amber-950 dark:text-amber-200 text-base mb-1">
+                        Estado de Inscripción: Pendiente de Validación
+                      </h4>
+                      <p className="text-sm text-amber-900 dark:text-amber-300">
+                        Dado que seleccionaste validación presencial/manual de
+                        identidad, tu solicitud de inscripción ha quedado en
+                        estado{" "}
+                        <strong>&ldquo;Pendiente de validación&rdquo;</strong>{" "}
+                        hasta que un administrador la revise y valide.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Student Info Card */}
               {estudianteData && (
@@ -243,20 +279,22 @@ export default function VerificarCorreoPage() {
                         {capacitacionData.nombre}
                       </span>
                     </div>
-                    <div className="flex items-start gap-2">
-                      <span className="font-semibold text-midnight_text dark:text-white min-w-[100px]">
-                        Fecha Inicio:
-                      </span>
-                      <span className="text-midnight_text dark:text-gray-300">
-                        {new Date(
-                          capacitacionData.fecha_inicio_capacitacion
-                        ).toLocaleDateString("es-ES", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })}
-                      </span>
-                    </div>
+                    {capacitacionData.fecha_inicio_capacitacion && (
+                      <div className="flex items-start gap-2">
+                        <span className="font-semibold text-midnight_text dark:text-white min-w-[100px]">
+                          Fecha Inicio:
+                        </span>
+                        <span className="text-midnight_text dark:text-gray-300">
+                          {new Date(
+                            capacitacionData.fecha_inicio_capacitacion
+                          ).toLocaleDateString("es-ES", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

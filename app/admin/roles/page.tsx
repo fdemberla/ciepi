@@ -40,7 +40,7 @@ export default function RolesPage() {
   // Proteger la ruta - solo roles 1 y 2
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.push("/login");
+      router.push("/admin/login");
     } else if (status === "authenticated") {
       const userRole = session?.user?.rolId;
       if (userRole !== 1 && userRole !== 2) {
@@ -410,12 +410,15 @@ export default function RolesPage() {
                     Editar Rol
                   </h3>
                   <button
+                    type="button"
                     onClick={() => setShowEditModal(false)}
+                    aria-label="Cerrar modal"
                     className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                   >
                     <Icon
                       icon="solar:close-circle-linear"
                       className="w-6 h-6"
+                      aria-hidden="true"
                     />
                   </button>
                 </div>
@@ -481,12 +484,15 @@ export default function RolesPage() {
                     Nuevo Rol
                   </h3>
                   <button
+                    type="button"
                     onClick={() => setShowCreateModal(false)}
+                    aria-label="Cerrar modal"
                     className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                   >
                     <Icon
                       icon="solar:close-circle-linear"
                       className="w-6 h-6"
+                      aria-hidden="true"
                     />
                   </button>
                 </div>

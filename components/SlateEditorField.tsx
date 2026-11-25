@@ -457,19 +457,23 @@ const SlateEditorField: React.FC<SlateEditorFieldProps> = ({
                 autoFocus
               />
               <button
+                type="button"
                 onClick={handleAddLink}
+                aria-label="Confirmar enlace"
                 className="px-2 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
               >
-                <Icon icon="solar:check-linear" className="w-4 h-4" />
+                <Icon icon="solar:check-linear" className="w-4 h-4" aria-hidden="true" />
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setShowLinkInput(false);
                   setLinkUrl("");
                 }}
+                aria-label="Cancelar enlace"
                 className="px-2 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600"
               >
-                <Icon icon="solar:close-linear" className="w-4 h-4" />
+                <Icon icon="solar:close-linear" className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
           </div>

@@ -4,12 +4,22 @@ import { useParams, useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
 import SlateRenderer from "@/components/SlateRenderer";
 import { FileDownloadLink } from "@/components/FileDownloadLink";
+import { getBasePath } from "@/lib/basePath";
+import { formatModalidadLabel } from "@/lib/capacitacionDetails";
+
+interface ProfesorDetalle {
+  id: number;
+  nombre: string;
+  apellido: string;
+  especialidad: string | null;
+  biografia: string | null;
+}
 
 interface Capacitacion {
   id: number;
   banner: string | null;
   nombre: string;
-  descripcion: any | null;
+  descripcion: string | Record<string, unknown>[] | null;
   cantidad_horas: number | null;
   cantidad_participantes: number | null;
   archivo_adjunto: string | null;
@@ -17,6 +27,12 @@ interface Capacitacion {
   fecha_final_inscripcion: string | null;
   fecha_inicio_capacitacion: string | null;
   fecha_final_capacitacion: string | null;
+  horario: string | null;
+  modalidad: string | null;
+  sede: string | null;
+  edificio: string | null;
+  salon: string | null;
+  profesores?: ProfesorDetalle[];
   activo: boolean;
   fecha_creacion: string;
   fecha_actualizacion: string;
@@ -148,7 +164,7 @@ const CapacitacionDetailPage = () => {
           {cap.banner ? (
             <div className="relative h-80 sm:h-96 w-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
               <img
-                src={`${process.env.NEXT_PUBLIC_BASE_PATH}${cap.banner}`}
+                src={`${getBasePath()}${cap.banner}`}
                 alt={cap.nombre || "Capacitación"}
                 className="object-cover w-full h-full"
               />
@@ -223,7 +239,7 @@ const CapacitacionDetailPage = () => {
             </div>
 
             {/* Description */}
-            {cap.descripcion && (
+            {Boolean(cap.descripcion) && (
               <div className="mb-10">
                 <h2 className="text-3xl font-bold text-midnight_text dark:text-white mb-6 flex items-center gap-3">
                   <Icon
@@ -308,6 +324,88 @@ const CapacitacionDetailPage = () => {
                 </div>
               </div>
             </div>
+
+            {/* Horario, Modalidad y Ubicación */}
+            {(cap.modalidad || cap.horario || cap.sede || cap.edificio || cap.salon) && (
+              <div className="mb-10">
+                <h2 className="text-3xl font-bold text-midnight_text dark:text-white mb-6 flex items-center gap-3">
+                  <Icon
+                    icon="solar:map-point-linear"
+                    className="w-8 h-8 text-primary"
+                  />
+                  Horario, Modalidad y Ubicación
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {cap.modalidad && (
+                    <div className="bg-slateGray dark:bg-gray-700 rounded-2xl p-6">
+                      <p className="text-sm text-dark_grey dark:text-gray-400 font-medium mb-1">
+                        Modalidad
+                      </p>
+                      <p className="text-lg font-bold text-midnight_text dark:text-white">
+                        {formatModalidadLabel(cap.modalidad)}
+                      </p>
+                    </div>
+                  )}
+                  {cap.horario && (
+                    <div className="bg-slateGray dark:bg-gray-700 rounded-2xl p-6">
+                      <p className="text-sm text-dark_grey dark:text-gray-400 font-medium mb-1">
+                        Horario
+                      </p>
+                      <p className="text-lg font-bold text-midnight_text dark:text-white">
+                        {cap.horario}
+                      </p>
+                    </div>
+                  )}
+                  {(cap.sede || cap.edificio || cap.salon) && (
+                    <div className="bg-slateGray dark:bg-gray-700 rounded-2xl p-6">
+                      <p className="text-sm text-dark_grey dark:text-gray-400 font-medium mb-1">
+                        Ubicación
+                      </p>
+                      <div className="text-sm font-semibold text-midnight_text dark:text-white space-y-0.5">
+                        {cap.sede && <p>Sede: {cap.sede}</p>}
+                        {cap.edificio && <p>Edificio: {cap.edificio}</p>}
+                        {cap.salon && <p>Salón: {cap.salon}</p>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Profesores */}
+            {Array.isArray(cap.profesores) && cap.profesores.length > 0 && (
+              <div className="mb-10">
+                <h2 className="text-3xl font-bold text-midnight_text dark:text-white mb-6 flex items-center gap-3">
+                  <Icon
+                    icon="solar:user-id-linear"
+                    className="w-8 h-8 text-primary"
+                  />
+                  Instructores
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {cap.profesores.map((prof) => (
+                    <div
+                      key={prof.id}
+                      className="bg-slateGray dark:bg-gray-700 rounded-2xl p-6 border border-gray-200 dark:border-gray-600"
+                    >
+                      <h3 className="text-lg font-bold text-midnight_text dark:text-white">
+                        {prof.nombre} {prof.apellido}
+                      </h3>
+                      {prof.especialidad && (
+                        <p className="text-sm text-primary font-semibold mt-0.5">
+                          {prof.especialidad}
+                        </p>
+                      )}
+                      {prof.biografia && (
+                        <p className="text-sm text-dark_grey dark:text-gray-300 mt-2 leading-relaxed">
+                          {prof.biografia}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Archivo Adjunto */}
             {cap.archivo_adjunto && (

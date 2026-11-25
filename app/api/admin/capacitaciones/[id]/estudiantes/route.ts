@@ -50,6 +50,12 @@ export async function GET(request: NextRequest, { params }: Params) {
         i.estado_inscripcion,
         i.fecha_inscripcion,
         i.fecha_ultima_actualizacion,
+        i.biometria_verificada,
+        i.biometria_id_auditoria,
+        i.biometria_score,
+        i.biometria_liveness,
+        i.biometria_estado,
+        i.biometria_fecha,
         e.id as estudiante_id,
         e.cedula,
         e.nombres,
@@ -94,6 +100,14 @@ export async function GET(request: NextRequest, { params }: Params) {
         },
         fecha_inscripcion: row.fecha_inscripcion,
         fecha_ultima_actualizacion: row.fecha_ultima_actualizacion,
+        biometria: {
+          verificada: Boolean(row.biometria_verificada),
+          id_auditoria: row.biometria_id_auditoria,
+          score: row.biometria_score,
+          liveness: row.biometria_liveness,
+          estado: row.biometria_estado,
+          fecha: row.biometria_fecha,
+        },
       },
       estudiante: {
         id: row.estudiante_id,
@@ -183,6 +197,12 @@ export async function GET(request: NextRequest, { params }: Params) {
           ).length,
           sin_correo_verificado: estudiantes.filter(
             (e) => !e.estudiante.correo_verificado
+          ).length,
+          con_biometria_verificada: estudiantes.filter(
+            (e) => e.inscripcion.biometria.verificada
+          ).length,
+          sin_biometria_verificada: estudiantes.filter(
+            (e) => !e.inscripcion.biometria.verificada
           ).length,
         },
       },

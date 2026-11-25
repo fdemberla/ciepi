@@ -1,6 +1,7 @@
 import type { NextAuthOptions } from "next-auth";
 import AzureADProvider from "next-auth/providers/azure-ad";
 import { query } from "@/lib/db";
+import { withBasePath } from "@/lib/basePath";
 
 
 // Function to check if user is in admin table
@@ -48,7 +49,7 @@ export const authOptions: NextAuthOptions = {
       }),
       // Override the automatically generated URLs to include /api/auth
       callbackUrl: `${process.env.NEXTAUTH_URL}/api/auth/callback/azure-ad`,
-    } as any,
+    } as unknown as NextAuthOptions["providers"][number],
   ],
   session: { strategy: "jwt" },
   // Add debug logging to see what URLs NextAuth is using
@@ -128,7 +129,7 @@ export const authOptions: NextAuthOptions = {
         url.startsWith(`${baseUrl}/api/auth/signin/`) ||
         url === baseUrl
       ) {
-        const redirectTo = "/ciepi/admin/capacitaciones";
+        const redirectTo = withBasePath("/admin/capacitaciones");
         return redirectTo;
       }
 
@@ -144,7 +145,7 @@ export const authOptions: NextAuthOptions = {
     },
   },
   pages: {
-    signIn: "/ciepi/admin/login",
-    error: "/ciepi/admin/login", // Redirect to login on error
+    signIn: withBasePath("/admin/login"),
+    error: withBasePath("/admin/login"), // Redirect to login on error
   },
 };

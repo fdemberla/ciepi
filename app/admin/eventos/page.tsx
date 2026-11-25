@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { Icon } from "@iconify/react";
+import Table from "@/components/Table";
+import type { ColumnDef } from "@tanstack/react-table";
 
 interface Evento {
   id: number;
@@ -102,6 +103,69 @@ const EventosPage = () => {
     }
   };
 
+  const columns: ColumnDef<Evento>[] = [
+    {
+      accessorKey: "nombre",
+      header: "Nombre",
+      cell: ({ row }) => (
+        <span className="font-semibold text-midnight_text dark:text-white">
+          {row.original.nombre}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "ubicacion",
+      header: "Ubicación",
+      cell: ({ row }) => (
+        <span className="text-sm text-dark_grey dark:text-gray-400">
+          {row.original.ubicacion || "-"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "fecha_inicio",
+      header: "Inicio",
+      cell: ({ row }) => (
+        <span className="text-sm text-dark_grey dark:text-gray-400">
+          {formatDate(row.original.fecha_inicio)}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "fecha_fin",
+      header: "Fin",
+      cell: ({ row }) => (
+        <span className="text-sm text-dark_grey dark:text-gray-400">
+          {formatDate(row.original.fecha_fin)}
+        </span>
+      ),
+    },
+    {
+      id: "acciones",
+      header: "Acciones",
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center gap-2">
+          <button
+            onClick={() => handleEditar(row.original.id)}
+            className="p-2 text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded-lg transition-colors"
+            title="Editar"
+            aria-label={`Editar evento ${row.original.nombre}`}
+          >
+            <Icon icon="solar:pen-linear" className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => handleDeleteClick(row.original)}
+            className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+            title="Eliminar"
+            aria-label={`Eliminar evento ${row.original.nombre}`}
+          >
+            <Icon icon="solar:trash-bin-2-linear" className="w-5 h-5" />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center">
@@ -146,106 +210,14 @@ const EventosPage = () => {
           </div>
         )}
 
-        {/* Events Table */}
-        {eventos.length === 0 ? (
-          <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-3xl shadow-lg">
-            <Icon
-              icon="solar:calendar-linear"
-              className="text-dark_grey dark:text-gray-400 text-8xl mx-auto mb-6 opacity-30"
-            />
-            <h3 className="text-2xl font-bold text-midnight_text dark:text-white mb-3">
-              No hay eventos registrados
-            </h3>
-            <p className="text-dark_grey dark:text-gray-400 text-lg mb-8">
-              Crea tu primer evento para comenzar
-            </p>
-            <button
-              onClick={handleCrear}
-              className="inline-flex items-center gap-2 px-8 py-4 bg-primary text-white rounded-full hover:bg-primary/90 transition-all duration-300 shadow-lg font-semibold"
-            >
-              <Icon icon="solar:add-circle-linear" className="w-6 h-6" />
-              Crear Evento
-            </button>
-          </div>
-        ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-slateGray dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                    <th className="px-6 py-4 text-left text-sm font-bold text-midnight_text dark:text-white">
-                      Nombre
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-midnight_text dark:text-white">
-                      Ubicación
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-midnight_text dark:text-white">
-                      Inicio
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-bold text-midnight_text dark:text-white">
-                      Fin
-                    </th>
-                    <th className="px-6 py-4 text-center text-sm font-bold text-midnight_text dark:text-white">
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {eventos.map((evento, index) => (
-                    <tr
-                      key={evento.id}
-                      className={`border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
-                        index % 2 === 0
-                          ? "bg-white dark:bg-gray-800"
-                          : "bg-gray-50 dark:bg-gray-800/50"
-                      }`}
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div>
-                            <p className="font-semibold text-midnight_text dark:text-white">
-                              {evento.nombre}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-dark_grey dark:text-gray-400">
-                        {evento.ubicacion || "-"}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-dark_grey dark:text-gray-400">
-                        {formatDate(evento.fecha_inicio)}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-dark_grey dark:text-gray-400">
-                        {formatDate(evento.fecha_fin)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleEditar(evento.id)}
-                            className="p-2 text-primary hover:bg-primary/10 dark:hover:bg-primary/20 rounded-lg transition-colors"
-                            title="Editar"
-                          >
-                            <Icon icon="solar:pen-linear" className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteClick(evento)}
-                            className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                            title="Eliminar"
-                          >
-                            <Icon
-                              icon="solar:trash-bin-2-linear"
-                              className="w-5 h-5"
-                            />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        {/* Events Table using standard Table component */}
+        <Table
+          data={eventos}
+          columns={columns}
+          enableSorting
+          enablePagination
+          searchPlaceholder="Buscar eventos..."
+        />
       </div>
 
       {/* Delete Confirmation Modal */}

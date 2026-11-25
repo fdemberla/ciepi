@@ -7,7 +7,7 @@ import { Descendant } from "slate";
 import { useSession } from "next-auth/react";
 import SlateEditorField from "@/components/SlateEditorField";
 import type { FormFieldConfig } from "@/components/Form.types";
-import { canEditBlog, getAllowedStatesForRole } from "@/lib/permissions-client";
+import { canEditBlog, getAllowedStatesForRole } from "@/lib/permissions";
 
 // Componente de palabras clave
 interface KeywordsInputProps {
@@ -591,12 +591,15 @@ export default function BlogEditor({ mode, blog, onCancel }: BlogEditorProps) {
                     Cambiar estado del blog
                   </h3>
                   <button
+                    type="button"
                     onClick={() => setShowStateModal(false)}
+                    aria-label="Cerrar modal"
                     className="text-dark_grey dark:text-gray-400 hover:text-midnight_text dark:hover:text-white transition-colors"
                   >
                     <Icon
                       icon="solar:close-circle-linear"
                       className="w-6 h-6"
+                      aria-hidden="true"
                     />
                   </button>
                 </div>

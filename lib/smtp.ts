@@ -8,7 +8,7 @@ let transporter: Transporter | null = null;
  * Crea y retorna una instancia del transporter SMTP
  * Reutiliza la conexión existente si ya está creada
  */
-export function getSmtpTransporter(): Transporter {
+function getSmtpTransporter(): Transporter {
   if (transporter) {
     return transporter;
   }
@@ -101,30 +101,5 @@ export async function sendEmail(options: SendEmailOptions) {
   } catch (error) {
     console.error("Error al enviar correo:", error);
     throw error;
-  }
-}
-
-/**
- * Verifica la conexión SMTP
- * @returns Promise que resuelve true si la conexión es exitosa
- */
-export async function verifySmtpConnection(): Promise<boolean> {
-  try {
-    const transporter = getSmtpTransporter();
-    await transporter.verify();
-    return true;
-  } catch (error) {
-    console.error("Error al verificar conexión SMTP:", error);
-    return false;
-  }
-}
-
-/**
- * Cierra la conexión SMTP
- */
-export function closeSmtpConnection(): void {
-  if (transporter) {
-    transporter.close();
-    transporter = null;
   }
 }

@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { Icon } from "@iconify/react";
 import type { FormFieldOrSection } from "@/components/Form.types";
 import Form from "@/components/Form";
+import PrivacyConsentCheckbox from "@/components/PrivacyConsentCheckbox";
 
 const Page = () => {
   const router = useRouter();
@@ -19,6 +20,7 @@ const Page = () => {
     [],
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [aceptoPolitica, setAceptoPolitica] = useState(false);
 
   useEffect(() => {
     fetchOpciones();
@@ -29,7 +31,7 @@ const Page = () => {
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
       const [tiposRes, sedesRes, areasRes] = await Promise.all([
-        fetch(`${basePath}/api/admin/tipos-consultas`),
+        fetch(`${basePath}/api/tipos-consultas`),
         fetch(`${basePath}/api/sedes`),
         fetch(`${basePath}/api/areas`),
       ]);
@@ -152,6 +154,13 @@ const Page = () => {
   ];
 
   const handleSubmit = async (data: Record<string, unknown>) => {
+    if (!aceptoPolitica) {
+      toast.error(
+        "Debes aceptar la Política de Privacidad para enviar tu consulta.",
+      );
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -161,7 +170,7 @@ const Page = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, aceptoPolitica }),
       });
 
       if (!response.ok) {
@@ -339,7 +348,15 @@ const Page = () => {
               requireCaptcha={true}
               siteKey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
               isSubmitting={isSubmitting}
-            />
+            >
+              <PrivacyConsentCheckbox
+                id="contacto-privacidad"
+                checked={aceptoPolitica}
+                onChange={setAceptoPolitica}
+                disabled={isSubmitting}
+                purpose="para atender, responder y dar seguimiento a mi consulta o solicitud de información"
+              />
+            </Form>
           </div>
         </div>
       </div>

@@ -70,9 +70,9 @@ const AdminLogin = () => {
               />
             </svg>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-midnight_text dark:text-white">
+          <h1 className="mt-6 text-center text-3xl font-bold tracking-tight text-midnight_text dark:text-white">
             Portal de Administración
-          </h2>
+          </h1>
           <p className="mt-2 text-center text-base text-dark_grey dark:text-gray-400">
             Autenticación con Microsoft
           </p>

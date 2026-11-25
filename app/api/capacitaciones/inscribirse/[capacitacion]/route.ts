@@ -18,7 +18,13 @@ export async function POST(request: NextRequest, { params }: Params) {
     await params; // Await params to satisfy the Promise requirement
     const body = await request.json();
 
-    const { estudiante, ubicacion, capacitacion_id } = body;
+    const {
+      estudiante,
+      ubicacion,
+      capacitacion_id,
+      biometria,
+      metodo_validacion,
+    } = body;
 
     if (!estudiante || !ubicacion || !capacitacion_id) {
       return NextResponse.json(
@@ -30,6 +36,14 @@ export async function POST(request: NextRequest, { params }: Params) {
         { status: 400 }
       );
     }
+
+    const esBiometricaValida = Boolean(
+      biometria?.valido && biometria?.id_auditoria
+    );
+    const metodoEfectivo: "biometrica" | "manual" =
+      esBiometricaValida && metodo_validacion !== "manual"
+        ? "biometrica"
+        : "manual";
 
     // Verificar que la capacitación existe y está activa
     const capacitacionResult = await query(
@@ -113,7 +127,6 @@ export async function POST(request: NextRequest, { params }: Params) {
         );
 
         if (correoCheck.rows.length > 0) {
-          //   const otherUser = correoCheck.rows[0];
           return NextResponse.json(
             {
               error: "Correo duplicado",
@@ -140,6 +153,18 @@ export async function POST(request: NextRequest, { params }: Params) {
           estudianteId,
         ]
       );
+
+      // Si se completó validación biométrica, registrar auditoría
+      if (esBiometricaValida) {
+        await query(
+          `UPDATE ciepi.estudiantes 
+           SET biometria_verificada = true, 
+               biometria_id_auditoria = $1, 
+               biometria_fecha = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [biometria.id_auditoria, estudianteId]
+        );
+      }
 
       // Actualizar ubicación si existe, o crear nueva
       const existingUbicacion = await query(
@@ -211,8 +236,9 @@ export async function POST(request: NextRequest, { params }: Params) {
         const insertEstudianteResult = await query(
           `INSERT INTO ciepi.estudiantes (
             cedula, nombres, apellidos, nombre_cedula, sexo,
-            estado_civil, fecha_nacimiento, correo, telefono, correo_verificado
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false)
+            estado_civil, fecha_nacimiento, correo, telefono, correo_verificado,
+            biometria_verificada, biometria_id_auditoria, biometria_fecha
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, $10, $11, $12)
           RETURNING id`,
           [
             estudiante.cedula,
@@ -224,6 +250,9 @@ export async function POST(request: NextRequest, { params }: Params) {
             estudiante.fecha_nacimiento || null,
             estudiante.correo || null,
             estudiante.telefono || null,
+            esBiometricaValida,
+            esBiometricaValida ? biometria?.id_auditoria || null : null,
+            esBiometricaValida ? new Date() : null,
           ]
         );
 
@@ -286,13 +315,11 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Verificar si el correo ya está verificado
+    // Obtener información del estudiante
     const estudianteInfo = await query(
-      "SELECT correo_verificado, nombres, apellidos, correo FROM ciepi.estudiantes WHERE id = $1",
+      "SELECT nombres, apellidos, correo FROM ciepi.estudiantes WHERE id = $1",
       [estudianteId]
     );
-
-    const correoVerificado = estudianteInfo.rows[0].correo_verificado;
 
     // Verificar si ya está inscrito en esta capacitación
     const existingInscripcion = await query(
@@ -308,7 +335,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    // Si el correo NO está verificado, enviar correo de verificación
     // Invalidar tokens anteriores del mismo tipo
     await invalidatePreviousTokens(estudianteId, "inscripcion");
 
@@ -320,7 +346,20 @@ export async function POST(request: NextRequest, { params }: Params) {
       id_estudiante: estudianteId,
       correo: estudianteInfo.rows[0].correo,
       tipo: "inscripcion",
-      metadata: { capacitacion_id: capacitacion_id },
+      metadata: {
+        capacitacion_id: capacitacion_id,
+        metodo_validacion: metodoEfectivo,
+        biometria: esBiometricaValida
+          ? {
+              valido: true,
+              id_auditoria: biometria.id_auditoria,
+              score_similitud: biometria.score_similitud,
+              liveness_score: biometria.liveness_score,
+              estado: biometria.estado,
+              metodo_autenticacion: biometria.metodo_autenticacion,
+            }
+          : null,
+      },
       duracion_minutos,
       ip: clientIp || undefined,
     });
@@ -343,6 +382,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         success: true,
         message: "Correo de verificación enviado. Por favor revisa tu email.",
         verification_required: true,
+        metodo_validacion: metodoEfectivo,
         token,
         estudiante_id: estudianteId,
         data: {

@@ -50,14 +50,14 @@ export default function UnauthorizedPage() {
 
           <div className="flex flex-col gap-3">
             <Link
-              href="/ciepi/"
+              href="/"
               className="bg-primary text-white px-6 py-3 rounded-full hover:bg-primary/90 transition-all duration-300 font-medium shadow-lg hover:shadow-xl"
             >
               Volver al Inicio
             </Link>
             {!session && (
               <Link
-                href="/ciepi/admin/login"
+                href="/admin/login"
                 className="bg-gray-200 dark:bg-gray-700 text-midnight_text dark:text-white px-6 py-3 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 transition-all duration-300 font-medium"
               >
                 Iniciar Sesión

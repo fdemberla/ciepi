@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
 import { saveFile } from "@/lib/fileUpload";
 import { safeErrorDetail } from "@/lib/apiError";
+import { parseCapacitacionExtraFields } from "@/lib/capacitacionDetails";
 
 export async function POST(request: NextRequest) {
   try {
@@ -97,6 +98,26 @@ export async function POST(request: NextRequest) {
     const fechaFinalCapacitacion =
       (formData.get("fechaFinalCapacitacion") as string) || null;
 
+    const extraParsed = parseCapacitacionExtraFields(formData);
+    if (!extraParsed.ok) {
+      return NextResponse.json(
+        { success: false, error: extraParsed.error },
+        { status: 400 }
+      );
+    }
+    const {
+      horario,
+      modalidad,
+      sede,
+      edificio,
+      salon,
+      sedeId,
+      edificioId,
+      aulaId,
+      profesorIds,
+      horarios,
+    } = extraParsed.data;
+
     // Insert into database
     const insertQuery = `
       INSERT INTO ciepi.capacitaciones (
@@ -110,8 +131,16 @@ export async function POST(request: NextRequest) {
         fecha_final_inscripcion,
         fecha_inicio_capacitacion,
         fecha_final_capacitacion,
+        horario,
+        modalidad,
+        sede,
+        edificio,
+        salon,
+        sede_id,
+        edificio_id,
+        aula_id,
         activo
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
       RETURNING *
     `;
 
@@ -126,12 +155,38 @@ export async function POST(request: NextRequest) {
       fechaFinalInscripcion,
       fechaInicioCapacitacion,
       fechaFinalCapacitacion,
+      horario,
+      modalidad,
+      sede,
+      edificio,
+      salon,
+      sedeId,
+      edificioId,
+      aulaId,
       true, // activo by default
     ];
 
     console.log("📊 Executing INSERT query");
 
     const result = await query(insertQuery, values);
+    const createdId = result.rows[0].id;
+
+    if (profesorIds.length > 0) {
+      await query(
+        `INSERT INTO ciepi.capacitacion_profesores (capacitacion_id, profesor_id)
+         SELECT $1, unnest($2::int[])
+         ON CONFLICT DO NOTHING`,
+        [createdId, profesorIds]
+      );
+    }
+
+    for (const h of horarios) {
+      await query(
+        `INSERT INTO ciepi.capacitacion_horarios (capacitacion_id, dia_semana, hora_inicio, hora_fin)
+         VALUES ($1, $2, $3, $4)`,
+        [createdId, h.dia_semana, h.hora_inicio, h.hora_fin]
+      );
+    }
 
     console.log("✅ Capacitación created successfully:", result.rows[0].id);
 

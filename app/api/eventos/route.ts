@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     // Contar total
     const countResult = await query(
-      "SELECT COUNT(*) as total FROM eventos",
+      "SELECT COUNT(*) as total FROM ciepi.eventos",
       []
     );
     const total = parseInt(countResult.rows?.[0]?.total || "0");

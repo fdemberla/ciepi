@@ -1,11 +1,12 @@
-"use client";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
+import NewsletterForm from "./NewsletterForm";
 
 const Footer = () => {
   return (
     <footer className="bg-slateGray dark:bg-gray-800 py-16 mt-auto border-t-2 border-t-primary/20 border-b-0 border-l-0 border-r-0 border border-gray-200 dark:border-gray-700">
       <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4">
+        <NewsletterForm />
         <div className="grid grid-cols-1 gap-y-12 gap-x-8 sm:grid-cols-2 lg:grid-cols-12">
           {/* Logo y Redes Sociales */}
           <div className="col-span-1 sm:col-span-2 lg:col-span-4">
@@ -29,18 +30,21 @@ const Footer = () => {
             <div className="flex items-center gap-3">
               <Link
                 href="#"
+                aria-label="Facebook de CIEPI"
                 className="w-10 h-10 rounded-full bg-white dark:bg-gray-700 hover:bg-primary/10 dark:hover:bg-primary/20 text-dark_grey dark:text-gray-300 hover:text-primary flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 <Icon icon="tabler:brand-facebook" className="text-xl" />
               </Link>
               <Link
                 href="#"
+                aria-label="Twitter de CIEPI"
                 className="w-10 h-10 rounded-full bg-white dark:bg-gray-700 hover:bg-primary/10 dark:hover:bg-primary/20 text-dark_grey dark:text-gray-300 hover:text-primary flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 <Icon icon="tabler:brand-twitter" className="text-xl" />
               </Link>
               <Link
                 href="#"
+                aria-label="Instagram de CIEPI"
                 className="w-10 h-10 rounded-full bg-white dark:bg-gray-700 hover:bg-primary/10 dark:hover:bg-primary/20 text-dark_grey dark:text-gray-300 hover:text-primary flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md"
               >
                 <Icon icon="tabler:brand-instagram" className="text-xl" />
@@ -88,6 +92,18 @@ const Footer = () => {
                     className="text-primary group-hover:translate-x-1 transition-transform"
                   />
                   Contacto
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/privacidad"
+                  className="text-dark_grey dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors text-sm font-medium flex items-center gap-2 group"
+                >
+                  <Icon
+                    icon="solar:alt-arrow-right-linear"
+                    className="text-primary group-hover:translate-x-1 transition-transform"
+                  />
+                  Política de Privacidad
                 </Link>
               </li>
             </ul>
@@ -173,9 +189,16 @@ const Footer = () => {
             &copy; {new Date().getFullYear()} CIEPI &mdash; Centro de Innovación
             y Emprendimiento Productivo
           </p>
-          <p className="text-xs text-dark_grey dark:text-gray-500">
-            INADEH &mdash; República de Panamá
-          </p>
+          <div className="flex items-center gap-4 text-xs text-dark_grey dark:text-gray-500">
+            <Link
+              href="/privacidad"
+              className="hover:text-primary transition-colors"
+            >
+              Política de Privacidad
+            </Link>
+            <span>&middot;</span>
+            <span>INADEH &mdash; República de Panamá</span>
+          </div>
         </div>
       </div>
     </footer>

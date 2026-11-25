@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import { NextRequest } from "next/server";
+import { withBasePath } from "@/lib/basePath";
 
 // This route handles Azure AD callbacks that come to the wrong path
-// Azure is sending callbacks to /ciepi/callback/azure-ad
-// but NextAuth expects /ciepi/api/auth/callback/azure-ad
+// and forwards them to NextAuth's Azure AD callback endpoint
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
 
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   console.log("  - Error:", error);
 
   // Build the correct callback URL
-  const correctPath = "/ciepi/api/auth/callback/azure-ad";
+  const correctPath = withBasePath("/api/auth/callback/azure-ad");
   const params = new URLSearchParams();
 
   if (code) params.set("code", code);

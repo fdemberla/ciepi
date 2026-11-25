@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import type { Descendant } from "slate";
 import type { FormProps, FormFieldConfig, FormSection } from "./Form.types";
 import SlateEditorField from "./SlateEditorField";
 
@@ -77,6 +78,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
   initialValues = {},
   onFieldChange,
   isSubmitting = false,
+  children,
 }) => {
   const resolvedSiteKey = siteKey || getDefaultSiteKey();
   const [formData, setFormData] =
@@ -326,7 +328,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
           <SlateEditorField
             id={f.name}
             name={f.name}
-            value={(formData[f.name] as any) || undefined}
+            value={(formData[f.name] as unknown as Descendant[]) || undefined}
             onChange={(val) => handleChange(f.name, val)}
             required={f.required}
           />
@@ -422,8 +424,8 @@ const Form: React.FC<FormWithCaptchaProps> = ({
             disabled={f.disabled || loadingOptions[f.name]}
           >
             <option value="">Seleccione...</option>
-            {normalizedOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
+            {normalizedOptions.map((opt, idx) => (
+              <option key={`${opt.value}-${idx}`} value={opt.value}>
                 {opt.label}
               </option>
             ))}
@@ -509,6 +511,7 @@ const Form: React.FC<FormWithCaptchaProps> = ({
             onSubmit={handleSubmit}
           >
             <div className="flex-1 mb-4">{renderFields(fields)}</div>
+            {children}
             {captchaError && (
               <div className="text-red-500 dark:text-red-400 text-center text-base mb-6">
                 {captchaError}

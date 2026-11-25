@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { safeErrorDetail } from "@/lib/apiError";
+import { verifyTurnstileToken } from "@/lib/turnstile";
+import { getClientIp } from "@/lib/verificationUtils";
 
 interface Params {
   params: Promise<{
@@ -7,162 +10,234 @@ interface Params {
   }>;
 }
 
+interface LookupResult {
+  exists: boolean;
+  record: {
+    id?: number;
+    cedula: string;
+    nombres: string;
+    apellidos: string;
+    nombre_cedula: string;
+    estado_civil: string | null;
+    fecha_nacimiento: string | null;
+    correo?: string | null;
+    telefono?: string | null;
+    sexo: string | null;
+  };
+}
+
+function normalizeBirthDate(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+  const dmy = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (dmy) {
+    return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+  }
+  return null;
+}
+
+async function lookupCedulaRecord(cedula: string): Promise<LookupResult | null> {
+  const dbRes = await query(
+    `SELECT
+       id, cedula, nombres, apellidos, nombre_cedula,
+       estado_civil, TO_CHAR(fecha_nacimiento, 'YYYY-MM-DD') as fecha_nacimiento,
+       correo, telefono, sexo
+     FROM ciepi.estudiantes
+     WHERE cedula = $1`,
+    [cedula],
+  );
+
+  if (dbRes.rows.length > 0) {
+    return { exists: true, record: dbRes.rows[0] };
+  }
+
+  const apiUrl = process.env.CEDULA_API_URL;
+  const apiTool = process.env.CEDULA_API_TOOL;
+  const apiKey = process.env.CEDULA_API_KEY;
+  if (!apiUrl || !apiTool || !apiKey) {
+    throw new Error("Configuración de API de cédulas incompleta");
+  }
+
+  const apiRes = await fetch(apiUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-tool-name": apiTool,
+      "x-api-key": apiKey,
+    },
+    body: JSON.stringify({ cedulas: [cedula] }),
+  });
+
+  if (!apiRes.ok) {
+    throw new Error(`API externa respondió con status ${apiRes.status}`);
+  }
+
+  const externalData = await apiRes.json();
+  const first = externalData?.results?.[0];
+  const personaData = first?.success ? first.data?.DatasetPersona?.PersonaPublica : null;
+
+  if (!personaData) {
+    return null;
+  }
+
+  return {
+    exists: false,
+    record: {
+      cedula: personaData.cedula || cedula,
+      nombres:
+        [personaData.primer_nombre, personaData.segundo_nombre]
+          .filter(Boolean)
+          .join(" ") || "",
+      apellidos:
+        [personaData.apellido_paterno, personaData.apellido_materno]
+          .filter(Boolean)
+          .join(" ") || "",
+      nombre_cedula: personaData.nombreCedula || "",
+      fecha_nacimiento: personaData.fecha_nacimiento
+        ? new Date(personaData.fecha_nacimiento).toISOString().split("T")[0]
+        : null,
+      sexo: personaData.sexo || null,
+      estado_civil: personaData.estado_civil || null,
+    },
+  };
+}
+
+/**
+ * Paso 1: Verifica si la cédula existe (con protección Turnstile).
+ * NUNCA expone datos personales del Tribunal Electoral ni de ciepi.estudiantes.
+ */
 export async function GET(request: NextRequest, { params }: Params) {
   try {
     const { cedula } = await params;
-
-    if (!cedula) {
+    const cleanCedula = cedula?.trim();
+    if (!cleanCedula) {
       return NextResponse.json(
         { error: "Cédula es requerida" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Verificar si el estudiante ya existe en la base de datos
-    const result = await query(
-      `SELECT 
-        id, 
-        cedula, 
-        nombres, 
-        apellidos, 
-        nombre_cedula,
-        estado_civil,
-        TO_CHAR(fecha_nacimiento, 'YYYY-MM-DD') as fecha_nacimiento,
-        correo,
-        telefono,
-        sexo
-      FROM ciepi.estudiantes 
-      WHERE cedula = $1`,
-      [cedula]
-    );
+    const turnstileToken =
+      request.headers.get("x-turnstile-token") ||
+      request.nextUrl.searchParams.get("turnstileToken");
 
-    if (result.rows.length > 0) {
-      // El estudiante ya existe
-      return NextResponse.json({
-        exists: true,
-        estudiante: result.rows[0],
-      });
+    const turnstileCheck = await verifyTurnstileToken(
+      turnstileToken,
+      getClientIp(request),
+    );
+    if (!turnstileCheck.success) {
+      return NextResponse.json(
+        { error: turnstileCheck.error || "Verificación de seguridad fallida" },
+        { status: 403 },
+      );
     }
 
-    // El estudiante NO existe, llamar al API externo para verificar
-    try {
-      const body = {
-        cedulas: [cedula],
-      };
-
-      const apiRes = await fetch(process.env.CEDULA_API_URL!, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tool-name": process.env.CEDULA_API_TOOL!,
-          "x-api-key": process.env.CEDULA_API_KEY!,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!apiRes.ok) {
-        throw new Error(
-          `API externa respondió con status ${apiRes.status}: ${apiRes.statusText}`
-        );
-      }
-
-      const externalData = await apiRes.json();
-
-      // Verificar si la API retornó datos válidos
-      if (
-        !externalData ||
-        !externalData.results ||
-        externalData.results.length === 0
-      ) {
-        return NextResponse.json(
-          {
-            error: "Cédula no encontrada en el sistema nacional",
-            message: "No se encontró información para esta cédula",
-          },
-          { status: 404 }
-        );
-      }
-
-      // Extraer los datos del primer resultado
-      const result = externalData.results[0];
-
-      // Verificar que la consulta fue exitosa
-      if (!result.success || !result.data) {
-        return NextResponse.json(
-          {
-            error: "Error al obtener datos de la cédula",
-            message: "La cédula no pudo ser validada",
-          },
-          { status: 404 }
-        );
-      }
-
-      // Extraer los datos de la persona
-      const personaData = result.data.DatasetPersona?.PersonaPublica;
-
-      if (!personaData) {
-        return NextResponse.json(
-          {
-            error: "Datos incompletos",
-            message: "No se encontraron datos completos para esta cédula",
-          },
-          { status: 404 }
-        );
-      }
-
-      // Formatear los datos para nuestro sistema
-      const formattedData = {
-        cedula: personaData.cedula || cedula,
-        nombres:
-          [personaData.primer_nombre, personaData.segundo_nombre]
-            .filter(Boolean)
-            .join(" ") || "",
-        apellidos:
-          [personaData.apellido_paterno, personaData.apellido_materno]
-            .filter(Boolean)
-            .join(" ") || "",
-        nombre_cedula: personaData.nombreCedula || "",
-        fecha_nacimiento: personaData.fecha_nacimiento
-          ? new Date(personaData.fecha_nacimiento).toISOString().split("T")[0]
-          : null,
-        sexo: personaData.sexo || null,
-        estado_civil: personaData.estado_civil || null,
-      };
-
-      return NextResponse.json({
-        exists: false,
-        external_data: formattedData,
-        message:
-          "Cédula verificada exitosamente. Por favor complete el formulario de inscripción.",
-      });
-    } catch (externalError) {
-      console.error("Error calling external API:", externalError);
+    const lookup = await lookupCedulaRecord(cleanCedula);
+    if (!lookup) {
       return NextResponse.json(
         {
-          error: "Error al verificar la cédula en el sistema externo",
-          details:
-            externalError instanceof Error
-              ? externalError.message
-              : "Unknown error",
+          error: "Cédula no encontrada en el sistema nacional",
+          message: "No se encontró información para esta cédula",
         },
-        { status: 500 }
+        { status: 404 },
       );
     }
+
+    return NextResponse.json({
+      found: true,
+      exists: lookup.exists,
+      cedula: lookup.record.cedula,
+    });
   } catch (error) {
-    console.error("Error in verificar cedula API:", error);
+    console.error("Error in GET /api/verificar/[cedula]:", error);
     return NextResponse.json(
       {
         error: "Error al verificar la cédula",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 /**
- * Verifica si un correo electrónico ya está registrado en el sistema
- * Endpoint usado para validación en tiempo real en el formulario
+ * Paso 2: Confirma la fecha de nacimiento contra el registro en servidor.
+ * Solo si coincide, devuelve el nombre y los datos para continuar la inscripción.
+ */
+export async function PUT(request: NextRequest, { params }: Params) {
+  try {
+    const { cedula } = await params;
+    const cleanCedula = cedula?.trim();
+    if (!cleanCedula) {
+      return NextResponse.json(
+        { error: "Cédula es requerida" },
+        { status: 400 },
+      );
+    }
+
+    const body = await request.json();
+    const rawBirthDate =
+      typeof body.fechaNacimiento === "string" ? body.fechaNacimiento : "";
+    const normalizedInput = normalizeBirthDate(rawBirthDate);
+
+    if (!normalizedInput) {
+      return NextResponse.json(
+        { error: "Formato de fecha inválido. Use DD/MM/YYYY." },
+        { status: 400 },
+      );
+    }
+
+    const lookup = await lookupCedulaRecord(cleanCedula);
+    if (!lookup) {
+      return NextResponse.json(
+        { error: "Cédula no encontrada en el sistema nacional" },
+        { status: 404 },
+      );
+    }
+
+    if (
+      !lookup.record.fecha_nacimiento ||
+      lookup.record.fecha_nacimiento !== normalizedInput
+    ) {
+      return NextResponse.json(
+        {
+          verified: false,
+          error:
+            "La fecha de nacimiento ingresada no coincide con nuestros registros.",
+        },
+        { status: 403 },
+      );
+    }
+
+    if (lookup.exists) {
+      return NextResponse.json({
+        verified: true,
+        exists: true,
+        estudiante: lookup.record,
+      });
+    }
+
+    return NextResponse.json({
+      verified: true,
+      exists: false,
+      external_data: lookup.record,
+    });
+  } catch (error) {
+    console.error("Error in PUT /api/verificar/[cedula]:", error);
+    return NextResponse.json(
+      {
+        error: "Error al confirmar la fecha de nacimiento",
+        details: safeErrorDetail(error),
+      },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * Verifica si un correo electrónico ya está registrado en el sistema.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -172,13 +247,12 @@ export async function POST(request: NextRequest) {
     if (!correo) {
       return NextResponse.json(
         { error: "Correo es requerido" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Verificar si el correo ya existe (excluyendo la cédula actual si se proporciona)
-    let queryText = `SELECT id, cedula, nombres, apellidos 
-                     FROM ciepi.estudiantes 
+    let queryText = `SELECT id, cedula, nombres, apellidos
+                     FROM ciepi.estudiantes
                      WHERE correo = $1`;
     const queryParams: (string | null)[] = [correo];
 
@@ -190,7 +264,6 @@ export async function POST(request: NextRequest) {
     const result = await query(queryText, queryParams);
 
     if (result.rows.length > 0) {
-      //   const existingUser = result.rows[0];
       return NextResponse.json({
         available: false,
         message: "Este correo electrónico ya está registrado",
@@ -210,9 +283,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Error al verificar disponibilidad del correo",
-        details: error instanceof Error ? error.message : "Unknown error",
+        details: safeErrorDetail(error),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

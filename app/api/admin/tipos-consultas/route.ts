@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { nombre, descripcion, activo } = body;
+    const { nombre, activo } = body;
 
     // Validar campos obligatorios
     if (!nombre) {

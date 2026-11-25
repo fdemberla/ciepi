@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
+import { parseCapacitacionExtraFields } from "@/lib/capacitacionDetails";
 
 export async function GET(
   request: NextRequest,
@@ -26,22 +27,66 @@ export async function GET(
 
     const queryText = `
       SELECT 
-        id,
-        banner,
-        nombre,
-        descripcion,
-        cantidad_horas,
-        cantidad_participantes,
-        archivo_adjunto,
-        fecha_inicio_inscripcion,
-        fecha_final_inscripcion,
-        fecha_inicio_capacitacion,
-        fecha_final_capacitacion,
-        activo,
-        fecha_creacion,
-        fecha_actualizacion
-      FROM ciepi.capacitaciones
-      WHERE id = $1
+        c.id,
+        c.banner,
+        c.nombre,
+        c.descripcion,
+        c.cantidad_horas,
+        c.cantidad_participantes,
+        c.archivo_adjunto,
+        c.fecha_inicio_inscripcion,
+        c.fecha_final_inscripcion,
+        c.fecha_inicio_capacitacion,
+        c.fecha_final_capacitacion,
+        c.horario,
+        c.modalidad,
+        COALESCE(s.nombre, c.sede) AS sede,
+        COALESCE(e.nombre, c.edificio) AS edificio,
+        COALESCE(a.nombre, c.salon) AS salon,
+        c.sede_id,
+        c.edificio_id,
+        c.aula_id,
+        c.activo,
+        c.fecha_creacion,
+        c.fecha_actualizacion,
+        COALESCE(
+          (
+            SELECT json_agg(
+              json_build_object(
+                'dia_semana', ch.dia_semana,
+                'hora_inicio', to_char(ch.hora_inicio, 'HH24:MI'),
+                'hora_fin', to_char(ch.hora_fin, 'HH24:MI')
+              )
+              ORDER BY ch.dia_semana, ch.hora_inicio
+            )
+            FROM ciepi.capacitacion_horarios ch
+            WHERE ch.capacitacion_id = c.id
+          ),
+          '[]'::json
+        ) AS horarios,
+        COALESCE(
+          (
+            SELECT json_agg(
+              json_build_object(
+                'id', p.id,
+                'nombre', p.nombre,
+                'apellido', p.apellido,
+                'especialidad', p.especialidad,
+                'biografia', p.biografia
+              )
+              ORDER BY p.apellido, p.nombre
+            )
+            FROM ciepi.capacitacion_profesores cp
+            JOIN ciepi.profesores p ON p.id = cp.profesor_id
+            WHERE cp.capacitacion_id = c.id
+          ),
+          '[]'::json
+        ) AS profesores
+      FROM ciepi.capacitaciones c
+      LEFT JOIN ciepi.sedes s ON s.id = c.sede_id
+      LEFT JOIN ciepi.edificios e ON e.id = c.edificio_id
+      LEFT JOIN ciepi.aulas a ON a.id = c.aula_id
+      WHERE c.id = $1
     `;
 
     const result = await query(queryText, [id]);
@@ -181,6 +226,26 @@ export async function PUT(
     const activoStr = formData.get("activo") as string;
     const activo = activoStr ? activoStr === "true" || activoStr === "1" : true;
 
+    const extraParsed = parseCapacitacionExtraFields(formData);
+    if (!extraParsed.ok) {
+      return NextResponse.json(
+        { success: false, error: extraParsed.error },
+        { status: 400 }
+      );
+    }
+    const {
+      horario,
+      modalidad,
+      sede,
+      edificio,
+      salon,
+      sedeId,
+      edificioId,
+      aulaId,
+      profesorIds,
+      horarios,
+    } = extraParsed.data;
+
     // Update in database
     const updateQuery = `
       UPDATE ciepi.capacitaciones
@@ -195,9 +260,17 @@ export async function PUT(
         fecha_final_inscripcion = $8,
         fecha_inicio_capacitacion = $9,
         fecha_final_capacitacion = $10,
-        activo = $11,
+        horario = $11,
+        modalidad = $12,
+        sede = $13,
+        edificio = $14,
+        salon = $15,
+        sede_id = $16,
+        edificio_id = $17,
+        aula_id = $18,
+        activo = $19,
         fecha_actualizacion = NOW()
-      WHERE id = $12
+      WHERE id = $20
       RETURNING *
     `;
 
@@ -212,6 +285,14 @@ export async function PUT(
       fechaFinalInscripcion,
       fechaInicioCapacitacion,
       fechaFinalCapacitacion,
+      horario,
+      modalidad,
+      sede,
+      edificio,
+      salon,
+      sedeId,
+      edificioId,
+      aulaId,
       activo,
       id,
     ];
@@ -219,6 +300,31 @@ export async function PUT(
     console.log("📊 Executing UPDATE query");
 
     const result = await query(updateQuery, values);
+
+    await query(
+      `DELETE FROM ciepi.capacitacion_profesores WHERE capacitacion_id = $1`,
+      [id]
+    );
+    if (profesorIds.length > 0) {
+      await query(
+        `INSERT INTO ciepi.capacitacion_profesores (capacitacion_id, profesor_id)
+         SELECT $1, unnest($2::int[])
+         ON CONFLICT DO NOTHING`,
+        [id, profesorIds]
+      );
+    }
+
+    await query(
+      `DELETE FROM ciepi.capacitacion_horarios WHERE capacitacion_id = $1`,
+      [id]
+    );
+    for (const h of horarios) {
+      await query(
+        `INSERT INTO ciepi.capacitacion_horarios (capacitacion_id, dia_semana, hora_inicio, hora_fin)
+         VALUES ($1, $2, $3, $4)`,
+        [id, h.dia_semana, h.hora_inicio, h.hora_fin]
+      );
+    }
 
     console.log(`✅ Capacitación ${id} updated successfully`);
 

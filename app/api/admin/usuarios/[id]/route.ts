@@ -144,22 +144,23 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     const usuarioRolActual = usuarioActualResult.rows[0].rol_id;
 
-    // No permitir cambiar rol si es admin (roles 1 o 2)
-    if (
-      (usuarioRolActual === 1 || usuarioRolActual === 2) &&
-      rol_id &&
-      rol_id !== usuarioRolActual
-    ) {
+    // El formulario siempre envía rol_id; solo cuenta como cambio de rol si
+    // es distinto del actual (antes esto bloqueaba cualquier edición del rol 2).
+    const cambiaRol =
+      rol_id !== undefined && Number(rol_id) !== usuarioRolActual;
+
+    // No permitir cambiar el rol de un administrador (roles 1 o 2)
+    if (cambiaRol && (usuarioRolActual === 1 || usuarioRolActual === 2)) {
       return NextResponse.json(
         { error: "No se puede cambiar el rol de un administrador" },
         { status: 403 }
       );
     }
 
-    // Solo SUPER_ADMIN (rol 1) puede cambiar el rol de otros usuarios
-    if (rol_id !== undefined && userRole !== 1) {
+    // Solo el Administrador Principal (rol 1) puede cambiar roles de usuarios
+    if (cambiaRol && userRole !== 1) {
       return NextResponse.json(
-        { error: "Solo el Super Administrador puede cambiar roles de usuarios" },
+        { error: "Solo el Administrador Principal puede cambiar roles de usuarios" },
         { status: 403 }
       );
     }
@@ -177,9 +178,9 @@ export async function PUT(request: NextRequest, { params }: Params) {
       updates.push(`apellido = $${paramCount++}`);
       values.push(apellido);
     }
-    if (rol_id !== undefined) {
+    if (cambiaRol) {
       updates.push(`rol_id = $${paramCount++}`);
-      values.push(rol_id);
+      values.push(Number(rol_id));
     }
     if (activo !== undefined) {
       const activoValue = activo === "true" || activo === true;

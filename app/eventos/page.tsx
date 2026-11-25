@@ -1,7 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Icon } from "@iconify/react";
 import EventoCard from "@/components/EventoCard";
+import CalendarGrid from "@/components/CalendarGrid";
+import type { CalendarEvent } from "@/lib/calendarUtils";
 
 interface Evento {
   id: number;
@@ -23,6 +25,10 @@ const EventosPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [filtro, setFiltro] = useState<EventoFiltro>("todos");
+  const [vista, setVista] = useState<"tarjetas" | "calendario">("tarjetas");
+  const now = new Date();
+  const [calYear, setCalYear] = useState(now.getFullYear());
+  const [calMonth, setCalMonth] = useState(now.getMonth());
 
   useEffect(() => {
     fetchEventos();
@@ -158,6 +164,33 @@ const EventosPage = () => {
                 <Icon icon="solar:calendar-2-bold" className="w-4 h-4" />
                 Pasados <span className="font-bold">({stats.pasados})</span>
               </button>
+
+              <div className="ml-auto flex items-center gap-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-full p-1">
+                <button
+                  type="button"
+                  onClick={() => setVista("tarjetas")}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                    vista === "tarjetas"
+                      ? "bg-primary text-white"
+                      : "text-midnight_text dark:text-gray-200"
+                  }`}
+                >
+                  <Icon icon="solar:widget-2-linear" className="text-sm" />
+                  Tarjetas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVista("calendario")}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                    vista === "calendario"
+                      ? "bg-primary text-white"
+                      : "text-midnight_text dark:text-gray-200"
+                  }`}
+                >
+                  <Icon icon="solar:calendar-mark-linear" className="text-sm" />
+                  Calendario
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -172,6 +205,34 @@ const EventosPage = () => {
               Cargando eventos...
             </p>
           </div>
+        ) : vista === "calendario" ? (
+          <CalendarGrid
+            year={calYear}
+            monthIndex0={calMonth}
+            onMonthChange={(y, m) => {
+              setCalYear(y);
+              setCalMonth(m);
+            }}
+            events={eventosFiltrados.map((ev): CalendarEvent => {
+              const d = new Date(ev.fecha_inicio);
+              const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+              const startTime = d.toLocaleTimeString("es-PA", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+              });
+              return {
+                id: `evento-${ev.id}`,
+                title: ev.nombre,
+                date: dateStr,
+                startTime,
+                color: "emerald",
+                badge: "Evento",
+                location: ev.ubicacion,
+              };
+            })}
+            emptyDayText="No hay eventos programados para este día."
+          />
         ) : eventosFiltrados.length === 0 ? (
           <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-2xl">
             <Icon

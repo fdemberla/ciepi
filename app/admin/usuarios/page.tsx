@@ -35,7 +35,7 @@ export default function UsuariosAdminPage() {
   // Proteger la ruta - solo roles 1 y 2
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.push("/login");
+      router.push("/admin/login");
     } else if (status === "authenticated") {
       const userRole = session?.user?.rolId;
       if (userRole !== 1 && userRole !== 2) {
@@ -218,12 +218,15 @@ export default function UsuariosAdminPage() {
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4 pb-6 border-b border-gray-200 dark:border-gray-700">
             <button
+              type="button"
               onClick={() => router.push("/admin/roles")}
+              aria-label="Volver a la gestión de roles"
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
               <Icon
                 icon="solar:arrow-left-linear"
                 className="w-6 h-6 text-midnight_text dark:text-white"
+                aria-hidden="true"
               />
             </button>
             <div className="flex-1">

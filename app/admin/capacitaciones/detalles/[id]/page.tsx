@@ -24,6 +24,14 @@ interface Inscripcion {
   estado: EstadoInscripcion;
   fecha_inscripcion: string;
   fecha_ultima_actualizacion: string;
+  biometria?: {
+    verificada: boolean;
+    id_auditoria?: string | null;
+    score?: number | null;
+    liveness?: number | null;
+    estado?: string | null;
+    fecha?: string | null;
+  };
 }
 
 interface Estudiante {
@@ -71,6 +79,8 @@ interface ApiResponse {
       total_inscritos: number;
       con_correo_verificado: number;
       sin_correo_verificado: number;
+      con_biometria_verificada?: number;
+      sin_biometria_verificada?: number;
     };
   };
 }
@@ -173,6 +183,26 @@ export default function DetallesCapacitacionPage() {
             </div>
           </div>
         ),
+      },
+      {
+        id: "validacion_identidad",
+        header: "Validación Identidad",
+        accessorFn: (row) =>
+          row.inscripcion.biometria?.verificada ? "Biométrica" : "Manual",
+        cell: ({ row }) => {
+          const bio = row.original.inscripcion.biometria;
+          return bio?.verificada ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+              <Icon icon="solar:verified-check-bold" className="w-3.5 h-3.5" />
+              Biométrica
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+              <Icon icon="solar:user-hand-up-bold" className="w-3.5 h-3.5" />
+              Manual / Presencial
+            </span>
+          );
+        },
       },
       {
         id: "estado",
@@ -304,6 +334,11 @@ export default function DetallesCapacitacionPage() {
       return coincideBusqueda && coincideEstado;
     }) || [];
 
+  const cantidadPendientes =
+    data?.estudiantes.filter((e) =>
+      e.inscripcion.estado.nombre.toLowerCase().startsWith("pendiente")
+    ).length || 0;
+
   if (loading) {
     return (
       <AdminProtection>
@@ -370,7 +405,7 @@ export default function DetallesCapacitacionPage() {
           </div>
 
           {/* Estadísticas */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
@@ -385,6 +420,25 @@ export default function DetallesCapacitacionPage() {
                   </p>
                   <p className="text-sm text-dark_grey dark:text-gray-400">
                     Total Inscritos
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-amber-200 dark:border-amber-800/60">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-xl flex items-center justify-center">
+                  <Icon
+                    icon="solar:clock-circle-bold"
+                    className="w-6 h-6 text-amber-600 dark:text-amber-400"
+                  />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-midnight_text dark:text-white">
+                    {cantidadPendientes}
+                  </p>
+                  <p className="text-sm text-dark_grey dark:text-gray-400">
+                    Pendientes Validación
                   </p>
                 </div>
               </div>
@@ -452,7 +506,7 @@ export default function DetallesCapacitacionPage() {
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-8">
             <div className="flex flex-col sm:flex-row gap-4">
               {/* Filtro por estado */}
-              <div className="sm:w-48">
+              <div className="sm:w-64">
                 <select
                   value={filtroEstado}
                   onChange={(e) => setFiltroEstado(e.target.value)}

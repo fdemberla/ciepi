@@ -6,6 +6,15 @@ import type { FormFieldOrSection } from "@/components/Form.types";
 import Form from "@/components/Form";
 import toast from "react-hot-toast";
 import AdminProtection from "@/components/AdminProtection";
+import ProfesoresSelector from "@/components/ProfesoresSelector";
+import UbicacionHorariosSelector, {
+  type UbicacionSelection,
+} from "@/components/UbicacionHorariosSelector";
+import { withBasePath } from "@/lib/basePath";
+import {
+  CAPACITACION_LOGISTICA_SECTION,
+  type HorarioInput,
+} from "@/lib/capacitacionDetails";
 
 const fields: FormFieldOrSection[] = [
   {
@@ -30,7 +39,6 @@ const fields: FormFieldOrSection[] = [
         type: "text",
         required: true,
         errorMessage: "El nombre es obligatorio",
-        regex: "^[A-Za-z ]+$",
       },
       {
         name: "descripcion",
@@ -107,6 +115,7 @@ const fields: FormFieldOrSection[] = [
       },
     ],
   },
+  CAPACITACION_LOGISTICA_SECTION,
   {
     name: "estado",
     label: "Estado de la Capacitación",
@@ -134,6 +143,13 @@ const EditarCapacitacionPage = () => {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedProfesorIds, setSelectedProfesorIds] = useState<number[]>([]);
+  const [ubicacion, setUbicacion] = useState<UbicacionSelection>({
+    sedeId: null,
+    edificioId: null,
+    aulaId: null,
+  });
+  const [horarios, setHorarios] = useState<HorarioInput[]>([]);
   const [initialData, setInitialData] = useState<Record<
     string,
     unknown
@@ -143,7 +159,7 @@ const EditarCapacitacionPage = () => {
     const fetchCapacitacion = async () => {
       try {
         console.log(`Fetching capacitacion ${id}...`);
-        const response = await fetch(`/ciepi/api/capacitaciones/${id}`);
+        const response = await fetch(withBasePath(`/api/capacitaciones/${id}`));
         const result = await response.json();
 
         if (!response.ok || !result.success) {
@@ -177,10 +193,25 @@ const EditarCapacitacionPage = () => {
           fechaFinalCapacitacion: formatDateForInput(
             data.fecha_final_capacitacion,
           ),
+          modalidad: data.modalidad || "",
           activo: String(data.activo),
           // Note: Files (Banner, archivoAdjunto) are not pre-loaded
           // Users need to upload new files if they want to change them
         };
+
+        if (Array.isArray(data.profesores)) {
+          setSelectedProfesorIds(
+            data.profesores.map((p: { id: number }) => p.id),
+          );
+        }
+        setUbicacion({
+          sedeId: data.sede_id ?? null,
+          edificioId: data.edificio_id ?? null,
+          aulaId: data.aula_id ?? null,
+        });
+        if (Array.isArray(data.horarios)) {
+          setHorarios(data.horarios);
+        }
 
         setInitialData(formData);
         setLoading(false);
@@ -224,12 +255,20 @@ const EditarCapacitacionPage = () => {
           }
         }
       });
+      formData.append("profesorIds", JSON.stringify(selectedProfesorIds));
+      if (ubicacion.sedeId) formData.append("sedeId", String(ubicacion.sedeId));
+      if (ubicacion.edificioId) formData.append("edificioId", String(ubicacion.edificioId));
+      if (ubicacion.aulaId) formData.append("aulaId", String(ubicacion.aulaId));
+      formData.append("horarios", JSON.stringify(horarios));
 
       // Send PUT request to the API
-      const response = await fetch(`/ciepi/api/admin/capacitaciones/${id}`, {
-        method: "PUT",
-        body: formData,
-      });
+      const response = await fetch(
+        withBasePath(`/api/admin/capacitaciones/${id}`),
+        {
+          method: "PUT",
+          body: formData,
+        },
+      );
 
       const result = await response.json();
 
@@ -302,7 +341,7 @@ const EditarCapacitacionPage = () => {
           <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-4">
             <div className="flex items-center gap-1.5 text-xs text-dark_grey dark:text-gray-400 mb-3">
               <a
-                href="/ciepi/admin/capacitaciones"
+                href={withBasePath("/admin/capacitaciones")}
                 className="hover:text-primary transition-colors"
               >
                 Capacitaciones
@@ -314,7 +353,7 @@ const EditarCapacitacionPage = () => {
             </div>
             <div className="flex items-center gap-4">
               <a
-                href="/ciepi/admin/capacitaciones"
+                href={withBasePath("/admin/capacitaciones")}
                 className="group flex-shrink-0 w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all duration-200"
                 aria-label="Volver a Capacitaciones"
               >
@@ -335,16 +374,25 @@ const EditarCapacitacionPage = () => {
           </div>
         </div>
 
-        {/* Form Content */}
-        <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-8">
-          <div className="max-w-4xl mx-auto">
-            <Form
+        {/* Form Content — 80% width on desktop */}
+        <div className="w-full lg:w-[80%] mx-auto px-4 py-8">
+          <Form
               fields={fields}
               onSubmit={handleSubmit}
               submitLabel="Guardar Cambios"
               initialValues={initialData}
-            />
-          </div>
+            >
+              <UbicacionHorariosSelector
+                ubicacion={ubicacion}
+                onUbicacionChange={setUbicacion}
+                horarios={horarios}
+                onHorariosChange={setHorarios}
+              />
+              <ProfesoresSelector
+                selectedIds={selectedProfesorIds}
+                onChange={setSelectedProfesorIds}
+              />
+            </Form>
         </div>
       </div>
     </AdminProtection>

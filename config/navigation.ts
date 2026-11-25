@@ -110,6 +110,36 @@ export const navigationConfig: NavSection[] = [
         },
       },
       {
+        name: "Profesores",
+        href: "/admin/profesores",
+        icon: "solar:user-id-linear",
+        visible: {
+          admin: true,
+          mobile: true,
+          desktop: true,
+        },
+      },
+      {
+        name: "Sedes y Aulas",
+        href: "/admin/sedes",
+        icon: "solar:buildings-2-linear",
+        visible: {
+          admin: true,
+          mobile: true,
+          desktop: true,
+        },
+      },
+      {
+        name: "Calendario",
+        href: "/admin/calendario",
+        icon: "solar:calendar-mark-linear",
+        visible: {
+          admin: true,
+          mobile: true,
+          desktop: true,
+        },
+      },
+      {
         name: "Eventos",
         href: "/admin/eventos",
         icon: "solar:calendar-minimalistic-linear",
@@ -133,6 +163,16 @@ export const navigationConfig: NavSection[] = [
         name: "Gestión de Blog",
         href: "/admin/blog",
         icon: "solar:document-text-linear",
+        visible: {
+          admin: true,
+          mobile: true,
+          desktop: true,
+        },
+      },
+      {
+        name: "Newsletter",
+        href: "/admin/newsletter",
+        icon: "solar:mailbox-linear",
         visible: {
           admin: true,
           mobile: true,

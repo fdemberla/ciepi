@@ -24,6 +24,9 @@ const getEstadoColor = (estado: string) => {
   switch (estado.toLowerCase()) {
     case "nueva inscripción":
       return "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-700";
+    case "pendiente de validación":
+    case "pendiente":
+      return "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700";
     case "matriculado":
       return "bg-success/10 text-success border-success/30";
     case "terminó curso":
@@ -159,10 +162,16 @@ export default function EstadoSelector({
                   Cambiar Estado de Inscripción
                 </h3>
                 <button
+                  type="button"
                   onClick={handleCloseModal}
+                  aria-label="Cerrar modal"
                   className="text-dark_grey dark:text-gray-400 hover:text-midnight_text dark:hover:text-white transition-colors"
                 >
-                  <Icon icon="solar:close-circle-linear" className="w-6 h-6" />
+                  <Icon
+                    icon="solar:close-circle-linear"
+                    className="w-6 h-6"
+                    aria-hidden="true"
+                  />
                 </button>
               </div>
               <p className="text-sm text-dark_grey dark:text-gray-400 mt-2">

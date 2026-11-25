@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
 
 // GET: Listar todos los roles
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Verificar autenticación
     const session = await getServerSession(authOptions);

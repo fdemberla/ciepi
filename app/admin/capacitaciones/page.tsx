@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import AdminProtection from "@/components/AdminProtection";
+import { getBasePath, withBasePath } from "@/lib/basePath";
 
 interface Capacitacion {
   id: number;
@@ -28,8 +29,8 @@ const CapacitacionesAdmin = () => {
   useEffect(() => {
     const fetchCapacitaciones = async () => {
       try {
-        // Fetch ALL capacitaciones (no activo filter)
-        const response = await fetch("/ciepi/api/capacitaciones");
+        // Endpoint admin: incluye inactivas y con inscripción cerrada
+        const response = await fetch(withBasePath("/api/admin/capacitaciones"));
         const result = await response.json();
 
         if (result.success) {
@@ -58,30 +59,26 @@ const CapacitacionesAdmin = () => {
 
   if (loading) {
     return (
-      <AdminProtection>
-        <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-primary/20 border-t-primary"></div>
-            <p className="mt-6 text-midnight_text dark:text-white text-lg font-medium">
-              Cargando...
-            </p>
-          </div>
+      <div className="min-h-screen bg-slateGray dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-primary/20 border-t-primary"></div>
+          <p className="mt-6 text-midnight_text dark:text-white text-lg font-medium">
+            Cargando...
+          </p>
         </div>
-      </AdminProtection>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <AdminProtection>
-        <div className="min-h-screen bg-slateGray dark:bg-gray-900 p-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center text-red-600 dark:text-red-500">
-              {error}
-            </div>
+      <div className="min-h-screen bg-slateGray dark:bg-gray-900 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center text-red-600 dark:text-red-500">
+            {error}
           </div>
         </div>
-      </AdminProtection>
+      </div>
     );
   }
 
@@ -208,12 +205,12 @@ const CapacitacionesAdmin = () => {
                   className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                 >
                   {/* Banner */}
-                  <div className="relative h-48 bg-gradient-to-br from-primary/80 to-primary">
+                  <div className="relative h-48 w-full overflow-hidden bg-gradient-to-br from-primary/80 to-primary">
                     {capacitacion.banner ? (
                       <img
-                        src={`${process.env.NEXT_PUBLIC_BASE_PATH}${capacitacion.banner}`}
+                        src={`${getBasePath()}${capacitacion.banner}`}
                         alt={capacitacion.nombre}
-                        className="object-cover"
+                        className="w-full h-full object-cover"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">

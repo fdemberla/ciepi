@@ -1,10 +1,19 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import type { FormFieldOrSection } from "@/components/Form.types";
 import Form from "@/components/Form";
 import toast from "react-hot-toast";
 import AdminProtection from "@/components/AdminProtection";
+import ProfesoresSelector from "@/components/ProfesoresSelector";
+import UbicacionHorariosSelector, {
+  type UbicacionSelection,
+} from "@/components/UbicacionHorariosSelector";
 import { Icon } from "@iconify/react";
+import { withBasePath } from "@/lib/basePath";
+import {
+  CAPACITACION_LOGISTICA_SECTION,
+  type HorarioInput,
+} from "@/lib/capacitacionDetails";
 
 const fields: FormFieldOrSection[] = [
   {
@@ -29,7 +38,6 @@ const fields: FormFieldOrSection[] = [
         type: "text",
         required: true,
         errorMessage: "El nombre es obligatorio",
-        regex: "^[A-Za-z ]+$",
       },
       {
         name: "descripcion",
@@ -106,9 +114,18 @@ const fields: FormFieldOrSection[] = [
       },
     ],
   },
+  CAPACITACION_LOGISTICA_SECTION,
 ];
 
 const Page = () => {
+  const [selectedProfesorIds, setSelectedProfesorIds] = useState<number[]>([]);
+  const [ubicacion, setUbicacion] = useState<UbicacionSelection>({
+    sedeId: null,
+    edificioId: null,
+    aulaId: null,
+  });
+  const [horarios, setHorarios] = useState<HorarioInput[]>([]);
+
   const handleSubmit = async (data: Record<string, unknown>) => {
     try {
       // Create FormData to send files and data
@@ -135,12 +152,20 @@ const Page = () => {
           }
         }
       });
+      formData.append("profesorIds", JSON.stringify(selectedProfesorIds));
+      if (ubicacion.sedeId) formData.append("sedeId", String(ubicacion.sedeId));
+      if (ubicacion.edificioId) formData.append("edificioId", String(ubicacion.edificioId));
+      if (ubicacion.aulaId) formData.append("aulaId", String(ubicacion.aulaId));
+      formData.append("horarios", JSON.stringify(horarios));
 
       // Send POST request to the API
-      const response = await fetch("/ciepi/api/admin/capacitaciones/crear", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch(
+        withBasePath("/api/admin/capacitaciones/crear"),
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
 
       const result = await response.json();
 
@@ -153,7 +178,7 @@ const Page = () => {
 
       // Redirect to capacitaciones list
       setTimeout(() => {
-        window.location.href = "/ciepi/admin/capacitaciones";
+        window.location.href = withBasePath("/admin/capacitaciones");
       }, 1000);
     } catch (error) {
       console.error("Error submitting form:", error);
@@ -174,7 +199,7 @@ const Page = () => {
             {/* Breadcrumb */}
             <div className="flex items-center gap-1.5 text-xs text-dark_grey dark:text-gray-400 mb-3">
               <a
-                href="/ciepi/admin/capacitaciones"
+                href={withBasePath("/admin/capacitaciones")}
                 className="hover:text-primary transition-colors"
               >
                 Capacitaciones
@@ -188,7 +213,7 @@ const Page = () => {
             {/* Header row */}
             <div className="flex items-center gap-4">
               <a
-                href="/ciepi/admin/capacitaciones"
+                href={withBasePath("/admin/capacitaciones")}
                 className="group flex-shrink-0 w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all duration-200"
                 aria-label="Volver a Capacitaciones"
               >
@@ -209,16 +234,25 @@ const Page = () => {
           </div>
         </div>
 
-        {/* Form Content — constrained width */}
-        <div className="container mx-auto lg:max-w-screen-xl md:max-w-screen-md px-4 py-8">
-          <div className="max-w-4xl mx-auto">
-            <Form
+        {/* Form Content — 80% width on desktop */}
+        <div className="w-full lg:w-[80%] mx-auto px-4 py-8">
+          <Form
               title={"Crear Nueva Capacitación"}
               fields={fields}
               onSubmit={handleSubmit}
               submitLabel="Guardar"
-            />
-          </div>
+            >
+              <UbicacionHorariosSelector
+                ubicacion={ubicacion}
+                onUbicacionChange={setUbicacion}
+                horarios={horarios}
+                onHorariosChange={setHorarios}
+              />
+              <ProfesoresSelector
+                selectedIds={selectedProfesorIds}
+                onChange={setSelectedProfesorIds}
+              />
+            </Form>
         </div>
       </div>
     </AdminProtection>

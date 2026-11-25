@@ -277,10 +277,16 @@ export default function TiposConsultaAdminPage() {
                     : "Nuevo Tipo de Consulta"}
                 </h2>
                 <button
+                  type="button"
                   onClick={() => setShowModal(false)}
+                  aria-label="Cerrar modal"
                   className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 >
-                  <Icon icon="solar:close-circle-linear" className="w-6 h-6" />
+                  <Icon
+                    icon="solar:close-circle-linear"
+                    className="w-6 h-6"
+                    aria-hidden="true"
+                  />
                 </button>
               </div>
 

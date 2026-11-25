@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
+import { withBasePath } from "@/lib/basePath";
 import {
   navigationConfig,
   type NavLink,
@@ -77,11 +78,22 @@ export default function Navbar() {
       }
     };
 
+    // Cerrar menús al presionar la tecla Escape
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowUserMenu(false);
+        setShowAdminMenu(false);
+        setShowMobileMenu(false);
+      }
+    };
+
     document.addEventListener("click", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
       document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 
@@ -113,18 +125,33 @@ export default function Navbar() {
                 return (
                   <div key={sectionIdx} className="relative" data-menu>
                     <button
+                      type="button"
                       onClick={() => setShowAdminMenu(!showAdminMenu)}
+                      aria-expanded={showAdminMenu}
+                      aria-haspopup="menu"
+                      aria-controls="admin-dropdown-menu"
                       className="px-6 py-3 text-midnight_text dark:text-gray-300 hover:bg-slateGray dark:hover:bg-gray-800 rounded-full transition-all duration-300 font-medium flex items-center gap-2"
                     >
-                      <Icon icon="solar:settings-linear" className="w-5 h-5" />
+                      <Icon
+                        icon="solar:settings-linear"
+                        className="w-5 h-5"
+                        aria-hidden="true"
+                      />
                       <span>Admin</span>
                       <Icon
                         icon="solar:alt-arrow-down-linear"
-                        className="w-4 h-4"
+                        className={`w-4 h-4 transition-transform duration-200 ${
+                          showAdminMenu ? "rotate-180" : ""
+                        }`}
+                        aria-hidden="true"
                       />
                     </button>
                     {showAdminMenu && (
-                      <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-xl py-3 z-50 border border-gray-100 dark:border-gray-700">
+                      <div
+                        id="admin-dropdown-menu"
+                        role="menu"
+                        className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-2xl shadow-xl py-3 z-50 border border-gray-100 dark:border-gray-700"
+                      >
                         {section.links.map((link, linkIdx) => (
                           <Link
                             key={linkIdx}
@@ -166,7 +193,15 @@ export default function Navbar() {
           <div className="flex items-center gap-3">
             {/* Mobile Menu Button */}
             <button
+              type="button"
               onClick={() => setShowMobileMenu(!showMobileMenu)}
+              aria-label={
+                showMobileMenu
+                  ? "Cerrar menú de navegación"
+                  : "Abrir menú de navegación"
+              }
+              aria-expanded={showMobileMenu}
+              aria-controls="mobile-navigation"
               className="lg:hidden p-2 text-midnight_text dark:text-white hover:bg-slateGray dark:hover:bg-gray-800 rounded-lg transition-colors"
               data-menu
             >
@@ -177,6 +212,7 @@ export default function Navbar() {
                     : "solar:hamburger-menu-linear"
                 }
                 className="w-6 h-6"
+                aria-hidden="true"
               />
             </button>
 
@@ -185,7 +221,12 @@ export default function Navbar() {
             ) : session ? (
               <div className="relative" data-menu>
                 <button
+                  type="button"
                   onClick={() => setShowUserMenu(!showUserMenu)}
+                  aria-label="Menú de usuario"
+                  aria-expanded={showUserMenu}
+                  aria-haspopup="menu"
+                  aria-controls="user-dropdown-menu"
                   className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                 >
                   <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary to-blue-700 flex items-center justify-center text-white font-semibold shadow-lg relative group-hover:scale-105 transition-transform">
@@ -195,13 +236,18 @@ export default function Navbar() {
                         <Icon
                           icon="solar:verified-check-bold"
                           className="text-white text-[10px]"
+                          aria-hidden="true"
                         />
                       </span>
                     )}
                   </div>
                 </button>
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-2xl shadow-xl py-3 z-50 border border-gray-100 dark:border-gray-700">
+                  <div
+                    id="user-dropdown-menu"
+                    role="menu"
+                    className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-2xl shadow-xl py-3 z-50 border border-gray-100 dark:border-gray-700"
+                  >
                     <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
                       <div className="flex items-center gap-3">
                         <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-blue-700 flex items-center justify-center text-white font-semibold text-xl shadow-lg">
@@ -229,7 +275,7 @@ export default function Navbar() {
                     <button
                       onClick={() => {
                         setShowUserMenu(false);
-                        signOut({ callbackUrl: "/ciepi/admin/login" });
+                        signOut({ callbackUrl: withBasePath("/admin/login") });
                       }}
                       className="flex items-center w-full text-left px-5 py-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700 transition-colors mt-1 group"
                     >
@@ -251,6 +297,7 @@ export default function Navbar() {
         {/* Mobile Menu */}
         {showMobileMenu && (
           <div
+            id="mobile-navigation"
             className="lg:hidden mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 animate-fade-in"
             data-menu
           >
@@ -319,7 +366,7 @@ export default function Navbar() {
                   <button
                     onClick={() => {
                       setShowMobileMenu(false);
-                      signOut({ callbackUrl: "/ciepi/admin/login" });
+                      signOut({ callbackUrl: withBasePath("/admin/login") });
                     }}
                     className="flex items-center px-4 py-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700 rounded-lg transition-colors font-medium mt-2"
                   >

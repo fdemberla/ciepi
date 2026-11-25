@@ -26,6 +26,12 @@ export default function RootLayout({
         style={{ fontFamily: "'Roboto Condensed', sans-serif" }}
       >
         <AuthProvider>
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:z-50 focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-primary focus:text-white focus:rounded-lg focus:shadow-xl focus:outline-none focus:ring-2 focus:ring-white"
+          >
+            Saltar al contenido principal
+          </a>
           <Toaster
             position="top-right"
             toastOptions={{
@@ -51,7 +57,9 @@ export default function RootLayout({
             }}
           />
           <Navbar />
-          <main className="flex-1">{children}</main>
+          <main id="main-content" className="flex-1">
+            {children}
+          </main>
           <Footer />
         </AuthProvider>
       </body>

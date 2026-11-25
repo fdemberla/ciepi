@@ -5,16 +5,11 @@ import { query } from "./db";
  * Genera un token seguro y único para verificación de correo
  * @returns Token aleatorio de 64 caracteres hexadecimales
  */
-export function generateSecureToken(): string {
+function generateSecureToken(): string {
   return randomBytes(32).toString("hex");
 }
 
-/**
- * Hash de un token para comparación segura
- * @param token Token a hashear
- * @returns Hash SHA256 del token
- */
-export function hashToken(token: string): string {
+function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
@@ -155,12 +150,13 @@ export async function markTokenAsUsed(
   token: string,
   ip?: string
 ): Promise<boolean> {
+  const tokenHash = hashToken(token);
   const result = await query(
     `UPDATE ciepi.verificacion_correo
      SET usado = true, fecha_uso = CURRENT_TIMESTAMP, ip_uso = $2
      WHERE token = $1 AND usado = false
      RETURNING id`,
-    [token, ip || null]
+    [tokenHash, ip || null]
   );
 
   return result.rows.length > 0;
@@ -176,11 +172,12 @@ export async function checkTokenStatus(token: string): Promise<{
   usado: boolean;
   expirado: boolean;
 }> {
+  const tokenHash = hashToken(token);
   const result = await query(
     `SELECT usado, fecha_expiracion
      FROM ciepi.verificacion_correo
      WHERE token = $1`,
-    [token]
+    [tokenHash]
   );
 
   if (result.rows.length === 0) {
@@ -216,26 +213,7 @@ export async function invalidatePreviousTokens(
   );
 }
 
-/**
- * Limpia tokens expirados de la base de datos (tarea de mantenimiento)
- * @param dias_antiguedad Días de antigüedad para eliminar (default: 7)
- * @returns Número de tokens eliminados
- */
-export async function cleanupExpiredTokens(
-  dias_antiguedad: number = 7
-): Promise<number> {
-  const fecha_limite = new Date();
-  fecha_limite.setDate(fecha_limite.getDate() - dias_antiguedad);
 
-  const result = await query(
-    `DELETE FROM ciepi.verificacion_correo
-     WHERE fecha_expiracion < $1
-     RETURNING id`,
-    [fecha_limite]
-  );
-
-  return result.rows.length;
-}
 
 /**
  * Obtiene información de un token por su valor
@@ -243,6 +221,7 @@ export async function cleanupExpiredTokens(
  * @returns Información del token o null si no existe
  */
 export async function getTokenInfo(token: string) {
+  const tokenHash = hashToken(token);
   const result = await query(
     `SELECT v.id, v.id_estudiante, v.correo, v.tipo, v.metadata,
             v.usado, v.fecha_creacion, v.fecha_expiracion, v.fecha_uso,
@@ -250,7 +229,7 @@ export async function getTokenInfo(token: string) {
      FROM ciepi.verificacion_correo v
      INNER JOIN ciepi.estudiantes e ON v.id_estudiante = e.id
      WHERE v.token = $1`,
-    [token]
+    [tokenHash]
   );
 
   if (result.rows.length === 0) {

@@ -30,19 +30,21 @@ export function isSafeUrl(url: string | null | undefined): boolean {
  * Verifica si una URL contiene patrones peligrosos
  */
 function containsDangerousPatterns(url: string): boolean {
-  const dangerousPatterns = [
-    "javascript:",
-    "data:",
-    "vbscript:",
-    "file:",
-    "<script",
-    "on",
-    "%3cscript",
-    "%3C",
+  const dangerousPatterns: RegExp[] = [
+    /javascript:/,
+    /data:/,
+    /vbscript:/,
+    /file:/,
+    /<script/,
+    /%3cscript/,
+    // Manejadores de eventos (onclick=, onerror=...). Antes era el texto "on"
+    // a secas, que bloqueaba rutas legítimas como "/attachments/informacion.pdf".
+    /\bon[a-z]+\s*=/,
+    /["'<>]/,
   ];
 
   const lowerUrl = url.toLowerCase();
-  return dangerousPatterns.some((pattern) => lowerUrl.includes(pattern));
+  return dangerousPatterns.some((pattern) => pattern.test(lowerUrl));
 }
 
 /**

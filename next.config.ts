@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 
+const rawBasePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "")
+  .trim()
+  .replace(/^\/+|\/+$/g, "");
+const basePath = rawBasePath ? `/${rawBasePath}` : "";
+
 const nextConfig: NextConfig = {
-  basePath: "/ciepi",
+  ...(basePath ? { basePath } : {}),
   trailingSlash: true,
   async headers() {
     return [
@@ -21,11 +26,12 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https:",
               "font-src 'self' data:",
-              "connect-src 'self'",
+              "connect-src 'self' http://localhost:8000 https://api.iconify.design https://api.simplesvg.com https://api.unisvg.com https://challenges.cloudflare.com",
+              "frame-src 'self' https://challenges.cloudflare.com",
               "frame-ancestors 'none'",
               "object-src 'none'",
               "base-uri 'self'",

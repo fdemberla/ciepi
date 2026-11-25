@@ -190,11 +190,13 @@ export default function AprobarBlogsPage() {
         acciones.push(
           <button
             key="rechazar-ciepi"
+            type="button"
             onClick={() => abrirModal("Rechazar", 3)}
             className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
             title="Rechazar blog"
+            aria-label="Rechazar blog"
           >
-            <Icon icon="solar:close-circle-linear" className="w-5 h-5" />
+            <Icon icon="solar:close-circle-linear" className="w-5 h-5" aria-hidden="true" />
           </button>,
         );
       }
@@ -204,31 +206,37 @@ export default function AprobarBlogsPage() {
         acciones.push(
           <button
             key="aprobar-detallado"
+            type="button"
             onClick={() => router.push(`/admin/blog/aprobar/${blog.id}`)}
             className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
             title="Revisar y aprobar detalladamente"
+            aria-label="Revisar y aprobar detalladamente"
           >
-            <Icon icon="solar:document-check-linear" className="w-5 h-5" />
+            <Icon icon="solar:document-check-linear" className="w-5 h-5" aria-hidden="true" />
           </button>,
         );
         acciones.push(
           <button
             key="publicar"
+            type="button"
             onClick={() => abrirModal("Publicar", 6)}
             className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
             title="Publicar directamente"
+            aria-label="Publicar directamente"
           >
-            <Icon icon="solar:verified-check-linear" className="w-5 h-5" />
+            <Icon icon="solar:verified-check-linear" className="w-5 h-5" aria-hidden="true" />
           </button>,
         );
         acciones.push(
           <button
             key="rechazar-rrpp"
+            type="button"
             onClick={() => abrirModal("Rechazar", 5)}
             className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
             title="Rechazar blog"
+            aria-label="Rechazar blog"
           >
-            <Icon icon="solar:close-circle-linear" className="w-5 h-5" />
+            <Icon icon="solar:close-circle-linear" className="w-5 h-5" aria-hidden="true" />
           </button>,
         );
       }
@@ -238,13 +246,15 @@ export default function AprobarBlogsPage() {
         acciones.push(
           <button
             key="reenviar"
+            type="button"
             onClick={() =>
               abrirModal("Reenviar a revisión", blog.estado === 3 ? 2 : 4)
             }
             className="p-2 text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded-lg transition-colors"
             title="Reenviar a revisión"
+            aria-label="Reenviar a revisión"
           >
-            <Icon icon="solar:refresh-linear" className="w-5 h-5" />
+            <Icon icon="solar:refresh-linear" className="w-5 h-5" aria-hidden="true" />
           </button>,
         );
       }
@@ -256,11 +266,13 @@ export default function AprobarBlogsPage() {
       <>
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={() => router.push(`/admin/blog/editar/${blog.id}`)}
             className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
             title="Ver/Editar blog"
+            aria-label="Ver/Editar blog"
           >
-            <Icon icon="solar:eye-linear" className="w-5 h-5" />
+            <Icon icon="solar:eye-linear" className="w-5 h-5" aria-hidden="true" />
           </button>
           {getAccionesDisponibles()}
         </div>

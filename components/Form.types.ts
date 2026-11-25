@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 // types for the form field configuration
 
 type FormFieldType =
@@ -56,4 +58,5 @@ export interface FormProps {
   requireCaptcha?: boolean;
   onFieldChange?: (fieldName: string, value: unknown) => void; // Callback when field value changes
   isSubmitting?: boolean; // Indicates if form is being submitted
+  children?: ReactNode; // Secciones adicionales dentro del formulario
 }

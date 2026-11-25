@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { query } from "@/lib/db";
-import { canCreateBlog } from "@/lib/permissions";
+import { BlogState, canCreateBlog } from "@/lib/permissions";
 import { safeErrorDetail } from "@/lib/apiError";
 
 // GET: Listar todos los blogs con filtros
@@ -26,16 +26,20 @@ export async function GET(request: NextRequest) {
     const estadoParam = searchParams.get("estado") || "";
     const creadoPor = searchParams.get("creado_por") || "";
 
-    // Validate estado is a valid blog state (1-6)
+    // Acepta uno o varios estados separados por coma (ej. "2,4"); solo 1-6.
+    // Antes se leía solo el primero, y la bandeja "Pendientes" ocultaba los
+    // blogs en revisión de Relaciones Públicas (estado 4).
     const VALID_ESTADOS = [1, 2, 3, 4, 5, 6];
-    const estadoParsed = estadoParam ? parseInt(estadoParam) : NaN;
-    const estado = !isNaN(estadoParsed) && VALID_ESTADOS.includes(estadoParsed) ? estadoParam : "";
+    const estados = estadoParam
+      .split(",")
+      .map((e) => parseInt(e.trim(), 10))
+      .filter((e) => VALID_ESTADOS.includes(e));
 
     const offset = (page - 1) * limit;
 
     // Construir query con filtros
     const whereConditions = [];
-    const queryParams: (string | number)[] = [];
+    const queryParams: (string | number | number[])[] = [];
     let paramIndex = 1;
 
     if (search) {
@@ -44,9 +48,9 @@ export async function GET(request: NextRequest) {
       paramIndex++;
     }
 
-    if (estado) {
-      whereConditions.push(`b.estado = $${paramIndex}`);
-      queryParams.push(parseInt(estado));
+    if (estados.length > 0) {
+      whereConditions.push(`b.estado = ANY($${paramIndex}::int[])`);
+      queryParams.push(estados);
       paramIndex++;
     }
 
@@ -174,6 +178,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { titulo, contenido, imagen_banner, palabras_clave } = body;
 
+    // Estado inicial: Borrador (1) o "Enviar a revisión CIEPI" (2), según
+    // eligió el autor en el editor. Cualquier otro valor se ignora.
+    const estadoInicial =
+      Number(body.estado) === BlogState.EN_REVISION_CIEPI
+        ? BlogState.EN_REVISION_CIEPI
+        : BlogState.BORRADOR;
+
     // Validar campos obligatorios
     if (!titulo || !contenido) {
       return NextResponse.json(
@@ -199,7 +210,7 @@ export async function POST(request: NextRequest) {
         palabras_clave,
         creado_por,
         estado
-      ) VALUES ($1, $2, $3, $4, $5, 1)
+      ) VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id, titulo, creado_en, estado
     `;
 
@@ -209,6 +220,7 @@ export async function POST(request: NextRequest) {
       imagen_banner || null,
       JSON.stringify(palabras_clave || []),
       session.user.adminId,
+      estadoInicial,
     ]);
 
     return NextResponse.json(

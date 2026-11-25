@@ -82,9 +82,9 @@ export async function POST(request: NextRequest) {
 
     await writeFile(filepath, buffer);
 
-    // Devolver URL pública del archivo
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
-    const publicUrl = `${basePath}/uploads/${directory}/${filename}`;
+    // Ruta pública SIN basePath: es lo que se guarda en la BD. Al mostrarla se
+    // usa assetUrl(), que agrega el basePath vigente.
+    const publicUrl = `/uploads/${directory}/${filename}`;
 
     return NextResponse.json({
       success: true,

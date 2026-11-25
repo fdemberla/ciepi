@@ -31,15 +31,6 @@ export function getVerificationUrl(token: string): string {
   return `${baseUrl}/verificacion/${token}`;
 }
 
-/**
- * Genera la URL de la página de espera de verificación
- * @param token Token de verificación
- * @returns URL completa de la página de espera
- */
-export function getWaitingUrl(token: string): string {
-  const baseUrl = getBaseUrl();
-  return `${baseUrl}/verificacion/esperando/${token}`;
-}
 
 /**
  * Obtiene la IP del cliente desde la request
